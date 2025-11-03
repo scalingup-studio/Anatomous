@@ -558,6 +558,23 @@ function DonutChart({ data, size = 120, strokeWidth = 16 }) {
 
 export default function DashboardInsights() {
   const [activeTab, setActiveTab] = useState("ai-insights");
+  const [searchParams, setSearchParams] = useState(() => new URLSearchParams(window.location.search));
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const t = String(sp.get('tab') || '').toLowerCase();
+    const allowed = ["ai-insights", "trends", "alerts", "uploads"]; 
+    if (allowed.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, []);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    sp.set('tab', activeTab);
+    const newUrl = `${window.location.pathname}${window.location.hash.split('?')[0]}?${sp.toString()}`;
+    window.history.replaceState(null, '', newUrl);
+  }, [activeTab]);
   const { user } = useAuth();
   const { showNotification } = useNotifications();
 
