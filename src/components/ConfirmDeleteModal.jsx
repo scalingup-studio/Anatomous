@@ -10,10 +10,7 @@ export function ConfirmDeleteModal({
   cancelText = "Cancel",
   isLoading = false 
 }) {
-  console.log('🔍 ConfirmDeleteModal render:', { isOpen, title, message });
-  
-  // Always render for debugging
-  console.log('🔍 Always rendering modal for debugging...');
+  if (!isOpen) return null;
   
   return (
     <div 
