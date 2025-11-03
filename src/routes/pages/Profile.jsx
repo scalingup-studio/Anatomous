@@ -1168,13 +1168,7 @@ const calculateAgeFromDOB = (dob) => {
         >
           Health Data
         </button>
-        <button 
-          onClick={() => setActiveTab('medical_records')} 
-          className={`btn ${activeTab === 'medical_records' ? 'primary' : 'outline'}`}
-          style={{ width:'auto', padding:'8px 16px', height:38 }}
-        >
-          Medical Records
-        </button>
+        {/* Medical Records tab hidden per request */}
         <span style={{ marginLeft:'auto' }} />
         <button className="btn outline" style={{ width:'auto', padding:'8px 16px', height:38 }} onClick={() => navigate('/onboarding?force=true')}>Go to Onboarding</button>
       </div>
@@ -2396,7 +2390,7 @@ const calculateAgeFromDOB = (dob) => {
         </div>
       )}
 
-      {activeTab === 'medical_records' && (
+      {false && activeTab === 'medical_records' && (
         <div style={{ maxWidth: 920 }}>
           <div className="card" style={{ padding: 0 }}>
             <div style={{ padding:16, borderBottom:'1px solid var(--border)' }}>
