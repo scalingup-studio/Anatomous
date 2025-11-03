@@ -8,6 +8,17 @@ import { TrendsApi } from "../../api/trendsApi";
 import { useNotifications } from "../../api/NotificationContext";
 import { Modal } from "../../components/Modal";
 
+// Normalize metric title: remove underscores and capitalize first letter
+function formatMetricTitle(input) {
+  if (input == null) return "";
+  try {
+    const text = String(input).replace(/_/g, ' ').trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+  } catch {
+    return String(input);
+  }
+}
+
 // BarGraph Component with tooltips
 function BarGraph({ data, height = 120, color = "var(--primary)", gradientBg = "rgba(0,186,206,0.1)" }) {
   const [tooltip, setTooltip] = useState(null);
@@ -1044,8 +1055,8 @@ function AlertsTab() {
                   }}
                 />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                    {alert.metric_name || alert.alert_type || `Alert #${idx + 1}`}
+                  <div style={{ fontWeight: 600, marginBottom: 4, textDecoration:'none', textTransform:'capitalize' }}>
+                    {formatMetricTitle(alert.metric_name || alert.alert_type || `Alert #${idx + 1}`)}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--muted)" }}>
                     {alert.description || alert.message || "Health alert"}

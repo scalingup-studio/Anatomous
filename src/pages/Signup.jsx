@@ -1,12 +1,3 @@
-// src__pages__Signup.jsx
-/**
- * Fixed Signup Page
- * Key changes:
- * 1. Better error handling
- * 2. Automatic profile creation
- * 3. Proper redirect flow
- */
-
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../api/AuthContext.jsx";
@@ -25,16 +16,14 @@ export function SignupPage({ onClose }) {
   const [terms, setTerms] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
-
-  const navigate = useNavigate?.() || (() => { });
-  const { signup, login } = useAuth?.() || {}; 
+  const navigate = useNavigate?.() || (()=>{});
+  const { signup } = useAuth?.() || {};
   const { showSuccess, showError } = useNotifications();
 
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
 
-    // Validation
     if (!terms) {
       setError("Please agree to the Terms");
       return;
@@ -49,77 +38,51 @@ export function SignupPage({ onClose }) {
       setError("Password must be at least 6 characters");
       return;
     }
-
     try {
       setLoading(true);
-      console.log('👤 Starting signup process...');
-
-      // Step 1: Signup
-      const signupData = await AuthApi.signup({
+      
+      // Use AuthContext signup function to properly set isNewUser flag
+      if (signup) {
+        const res = await signup(email, password, {
+          firstName,
+          lastName
+        });
+        if (!res?.success) throw new Error(res?.error || "Signup failed");
+        console.log('📝 Signup via AuthContext successful');
+      } else {
+        // Fallback to direct API call if AuthContext not available
+        const data = await AuthApi.signup({
           firstName,
           lastName,
           email,
           password,
         });
-
-      console.log('✅ Signup successful:', signupData);
-
-      // Step 2: Auto-login
-      if (login) {
-        console.log('🔐 Auto-logging in...');
-        const loginResult = await login(email, password);
-
-        if (!loginResult?.success) {
-          throw new Error(loginResult?.error || "Auto login failed");
-        }
-
-        console.log('✅ Auto-login successful');
+        console.log('📝 Signup response data (fallback):', data);
+        // Auth state is handled in AuthContext path; if context is missing,
+        // the user will need to login manually afterward.
       }
 
-      // Step 3: Try to create profile
-      try {
-        console.log('👤 Creating user profile...');
+      showSuccess("Account created successfully!");
 
-        const userId = signupData.new_User?.id || signupData.user?.id;
-
-        if (!userId) {
-          console.warn('⚠️ No user ID in signup response, skipping profile creation');
-        } else {
-          const profileData = {
-            user_id: userId,
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-          };
-
-          console.log('📝 Profile data:', profileData);
-
-          const profile = await ProfilesApi.create(profileData);
-          console.log('✅ Profile created:', profile);
-          showSuccess("Profile created successfully!");
-        }
-      } catch (profileError) {
-        console.warn('⚠️ Could not create profile automatically:', profileError.message);
-        // Don't fail signup if profile creation fails - they can complete it in onboarding
-      }
-
-      showSuccess("Account created successfully! Redirecting to onboarding...");
-
-      // Close modal
-      if (onClose) {
-        onClose();
-      }
-      // navigate("/login", { replace: true })
-      // Navigate to onboarding
+      // Backend already creates profile on signup (new_profile),
+      // so we skip duplicate profile creation here.
+      
+      // Redirect new users to onboarding to complete their profile setup
+      console.log('🎯 Attempting to navigate to /onboarding...');
+      navigate("/onboarding", { replace: true });
+      
+      // Fallback: if navigate doesn't work, try window.location
       setTimeout(() => {
-        navigate("/onboarding", { replace: true });
-      }, 1000);
-
+        if (window.location.hash !== '#/onboarding') {
+          console.log('🔄 Navigate failed, using window.location fallback');
+          window.location.href = '#/onboarding';
+        }
+      }, 100);
+      
+      onClose?.();
     } catch (err) {
-      console.error('❌ Signup error:', err);
       const apiMessage = err?.data?.message || err?.message;
       setError(apiMessage || "Unexpected error during signup");
-      showError(apiMessage || "Signup failed");
     } finally {
       setLoading(false);
     }
@@ -127,101 +90,38 @@ export function SignupPage({ onClose }) {
 
   return (
     <Modal open title="Sign Up" onClose={onClose}>
+
       <form className="form" onSubmit={onSubmit} noValidate>
         <div className="form-row" style={{ gap: 12 }}>
           <div className="form-field" style={{ flex: 1 }}>
             <label htmlFor="firstName">First name</label>
-            <input
-              id="firstName"
-              value={firstName}
-              onChange={e => setFirstName(e.target.value)}
-              placeholder="John"
-              required
-              disabled={loading}
-            />
+            <input id="firstName" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="John" required />
           </div>
           <div className="form-field" style={{ flex: 1 }}>
             <label htmlFor="lastName">Last name</label>
-            <input
-              id="lastName"
-              value={lastName}
-              onChange={e => setLastName(e.target.value)}
-              placeholder="Doe"
-              required
-              disabled={loading}
-            />
+            <input id="lastName" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Doe" required />
           </div>
         </div>
 
         <div className="form-field">
           <label htmlFor="signupEmail">Email address</label>
-          <input
-            id="signupEmail"
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-            disabled={loading}
-          />
+          <input id="signupEmail" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
         </div>
 
         <div className="form-field password">
           <label htmlFor="signupPassword">Password</label>
-          <input
-            id="signupPassword"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Create a password (min 6 characters)"
-            required
-            disabled={loading}
-          />
-          <button
-            type="button"
-            className="toggle-visibility"
-            aria-label="Toggle password visibility"
-            onClick={() => setShowPassword(s => !s)}
-            disabled={loading}
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
+          <input id="signupPassword" type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="Create a password" required />
+          <button type="button" className="toggle-visibility" aria-label="Toggle password visibility" onClick={() => setShowPassword(s => !s)}>{showPassword ? "Hide" : "Show"}</button>
         </div>
 
         <label className="checkbox" style={{ marginBottom: 12 }}>
-          <input
-            type="checkbox"
-            checked={terms}
-            onChange={e => setTerms(e.target.checked)}
-            disabled={loading}
-          />
-          <span>I agree to the Terms of Service and Privacy Policy</span>
+          <input type="checkbox" checked={terms} onChange={e => setTerms(e.target.checked)} />
+          <span>I agree to the Terms</span>
         </label>
 
-        {error && <div className="alert">{error}</div>}
+        {error ? <div className="alert">{error}</div> : null}
 
-        <button
-          className="btn primary"
-          type="submit"
-          disabled={loading || !terms}
-        >
-          {loading ? "Creating account..." : "Create account"}
-        </button>
-
-        <p className="alt-action" style={{ marginTop: 12, textAlign: 'center' }}>
-          Already have an account? {" "}
-          <a
-            className="link"
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              if (onClose) onClose();
-              navigate("/login");
-            }}
-          >
-            Log in
-          </a>
-        </p>
+        <button className="btn primary" type="submit" disabled={loading || !terms}>{loading ? "Creating…" : "Create account"}</button>
       </form>
     </Modal>
   );

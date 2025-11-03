@@ -42,6 +42,13 @@ export const CUSTOM_ENDPOINTS = {
     googleSuccess: `${API_BASE_AUTH}/auth/success`,
     checkAuth: `${API_BASE_AUTH}/auth/check-auth`,
   },
+  reports: {
+    generate: `${API_BASE}/report/generate`,
+    list: `${API_BASE}/reports`,
+    download: `${API_BASE}/reports/download`,
+    share: `${API_BASE}/reports/share`,
+    sharedByToken: `${API_BASE}/reports/shared/token`
+  },
   onboarding: {
     step: (step) => `${API_BASE}/onboarding/${step}`,
     personal: `${API_BASE}/onboarding/personal`,
@@ -52,7 +59,8 @@ export const CUSTOM_ENDPOINTS = {
     complete: `${API_BASE}/onboarding/complete`,
   },
   healthHistory: {
-    getHealthHistorySummary: `${API_BASE}/health_history_summary`
+    getHealthHistorySummary: `${API_BASE}/health_history_summary`,
+    userHealthSummary: `${API_BASE}/user-health-summary`
   }, 
   insights: {
     generateInsights: `${API_BASE}/generate-insight`

@@ -276,7 +276,7 @@ function getGoalsHistoryByPeriod(goals, startDate, endDate) {
       "title": "Run 5km without stopping",
       "status": "Completed",
       "completed_at": "2024-01-10T00:00:00Z",
-      "type": "fitness"б
+      "type": "fitness",
       description: test test,
       visibility_scope: private,
       updated_at: 0,

@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/Anatomous/'  // <- імʼя репозиторію GitHub Pages
+  base: '/Anatomous/'  // Required for GitHub Pages subpath
 });
 
