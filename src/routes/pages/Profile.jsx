@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
-import { useAuthRequest } from "../../api/authRequest.js";
+import { authRequest } from "../../api/apiClient.js";
 import { useAuth } from "../../api/AuthContext.jsx";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 import { ProfilesApi } from "../../api/profilesApi.js";
@@ -14,7 +14,7 @@ import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal.jsx";
 
 export default function DashboardProfile() {
   const navigate = useNavigate();
-  const authRequest = useAuthRequest();
+  
   const { user } = useAuth();
   const { showSuccess, showError, showInfo } = useNotifications();
   const [profile, setProfile] = useState(null);
@@ -2257,32 +2257,7 @@ const calculateAgeFromDOB = (dob) => {
                     >
                       {saving ? (editingRecord ? 'Updating...' : 'Saving...') : (editingRecord ? 'Update Health Data' : 'Save Health Data')}
                     </button>
-                    <button 
-                      type="button" 
-                      className="btn outline" 
-                      onClick={() => {
-                        // Fill form with test data
-                        setHealthData({
-                          date: '2024-01-15',
-                          heart_rate: '72',
-                          blood_pressure_systolic: '120',
-                          blood_pressure_diastolic: '80',
-                          weekly_activity_minutes: '150',
-                          activity_level: '3',
-                          visibility_scope: 'private',
-                          hydration_liters: '2.5',
-                          pulse_oximetry: '98',
-                          respiratory_rate: '16',
-                          body_weight_trend: 'stable',
-                          body_mass_index: '22.5',
-                          fasting_glucose: '85',
-                          body_temperature: '36.6'
-                        });
-                        showInfo('Test data loaded. Click "Save Health Data" to test API.');
-                      }}
-                    >
-                      Load Test Data
-                    </button>
+                    {/* Removed Load Test Data button per request */}
                         </div>
                 </form>
                     </div>
