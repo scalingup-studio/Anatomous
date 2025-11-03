@@ -3,51 +3,482 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %></title>
+  <title><%= title || "Health Summary Report" %></title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-    .section { margin-bottom: 25px; padding: 15px; background: #f9f9f9; border-radius: 5px; }
-    .user-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .vital-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background: #f0f0f0; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      background: white; 
+      color: #212529; 
+      line-height: 1.4;
+    }
+    .page { 
+      min-height: 29.7cm; 
+      padding: 0.5in; 
+      position: relative; 
+      page-break-after: always;
+    }
+    .cover-page { 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      text-align: center; 
+      background: white; 
+    }
+    .logo { 
+      font-size: 2.5rem; 
+      font-weight: bold; 
+      margin-bottom: 1.5rem; 
+      color: #00BACE; 
+    }
+    .report-title { 
+      font-size: 2rem; 
+      margin-bottom: 1rem; 
+      color: #004CD7;
+    }
+    .user-name { 
+      font-size: 1.3rem; 
+      margin-bottom: 0.5rem; 
+      color: #212529;
+    }
+    .date-range { 
+      font-size: 1rem; 
+      color: #6c757d; 
+      margin-bottom: 2rem; 
+    }
+    .section { 
+      margin-bottom: 20px; 
+    }
+    .section-title { 
+      color: #004CD7; 
+      font-size: 1.2rem; 
+      margin-bottom: 12px; 
+      padding-bottom: 6px; 
+      border-bottom: 2px solid #00BACE; 
+    }
+    .overview-text { 
+      background: #f8f9fa; 
+      padding: 15px; 
+      border-radius: 6px; 
+      border-left: 4px solid #00BACE; 
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .metrics-grid { 
+      display: grid; 
+      grid-template-columns: repeat(3, 1fr); 
+      gap: 12px; 
+      margin-bottom: 15px; 
+    }
+    .metric-card { 
+      background: white; 
+      border: 1px solid #e9ecef; 
+      border-radius: 6px; 
+      padding: 12px; 
+      text-align: center; 
+    }
+    .metric-value { 
+      font-size: 1.3rem; 
+      font-weight: bold; 
+      color: #004CD7; 
+      margin-bottom: 4px; 
+    }
+    .metric-label { 
+      font-size: 0.75rem; 
+      color: #6c757d; 
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metric-change { 
+      font-size: 0.7rem; 
+      padding: 2px 6px; 
+      border-radius: 12px; 
+      display: inline-block; 
+      font-weight: 600;
+    }
+    .change-positive { 
+      background: #e7f7ef; 
+      color: #0a8754; 
+    }
+    .change-negative { 
+      background: #ffe7e7; 
+      color: #d00; 
+    }
+    .chart-container { 
+      background: #f8f9fa; 
+      border: 1px solid #e9ecef; 
+      border-radius: 6px; 
+      padding: 15px; 
+      margin: 15px 0; 
+    }
+    .trend-data { 
+      width: 100%; 
+    }
+    .trend-stats { 
+      display: flex; 
+      justify-content: space-around; 
+      margin-bottom: 15px; 
+    }
+    .trend-stat { 
+      text-align: center; 
+    }
+    .trend-value { 
+      font-size: 1.1rem; 
+      font-weight: bold; 
+      color: #004CD7; 
+    }
+    .trend-label { 
+      font-size: 0.7rem; 
+      color: #6c757d; 
+      margin-top: 4px;
+    }
+    .chart-wrapper { 
+      background: white; 
+      border: 1px solid #e9ecef; 
+      border-radius: 4px; 
+      padding: 12px; 
+      height: 150px; 
+      position: relative; 
+    }
+    .chart-svg { 
+      width: 100%; 
+      height: 100%; 
+    }
+    .chart-grid line { 
+      stroke: #e9ecef; 
+      stroke-width: 1; 
+    }
+    .chart-line { 
+      stroke: #004CD7; 
+      stroke-width: 2; 
+      fill: none; 
+    }
+    .chart-area { 
+      fill: rgba(0, 76, 215, 0.1); 
+    }
+    .chart-point { 
+      fill: #00BACE; 
+      stroke: white; 
+      stroke-width: 2; 
+    }
+    .chart-axis { 
+      font-size: 9px; 
+      color: #6c757d; 
+    }
+    .no-data { 
+      text-align: center; 
+      color: #6c757d; 
+      padding: 30px 15px; 
+      font-style: italic;
+      font-size: 0.9rem;
+    }
+    .notes-section { 
+      background: #f8f9fa; 
+      padding: 12px; 
+      border-radius: 6px; 
+      border-left: 4px solid #004CD7; 
+    }
+    .note-item { 
+      margin-bottom: 8px; 
+      padding-bottom: 8px; 
+      border-bottom: 1px solid #e9ecef; 
+    }
+    .note-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+    .note-title {
+      font-weight: 600;
+      color: #004CD7;
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+    .note-content {
+      font-size: 0.8rem;
+      color: #495057;
+      line-height: 1.4;
+    }
+    .footer { 
+      text-align: center; 
+      font-size: 0.7rem; 
+      color: #6c757d; 
+      margin-top: 15px; 
+    }
+    .tagline {
+      font-style: italic;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1><%= title %></h1>
-    <p><strong>Report Date:</strong> <%= date %></p>
-  </div>
 
-  <div class="section">
-    <h2>User Information</h2>
-    <div class="user-info">
-      <p><strong>Name:</strong> <%= user.first_name %> <%= user.last_name %></p>
-      <p><strong>Date of Birth:</strong> <%= user.dob %></p>
-      <p><strong>Gender:</strong> <%= user.gender %></p>
-      <p><strong>Height:</strong> <%= user.height_cm %> cm</p>
-      <p><strong>Weight:</strong> <%= user.weight_kg %> kg</p>
+  <!-- Cover Page -->
+  <div class="page cover-page">
+    <div class="logo">ANATOMOUS</div>
+    <h1 class="report-title">Health Summary Report</h1>
+    <div class="user-name"><%= user?.first_name || "" %> <%= user?.last_name || "" %></div>
+    <div class="date-range">
+      <% if (date_range === 'all') { %>
+        All time
+      <% } else { %>
+        Last <%= date_range %> days
+      <% } %>
     </div>
   </div>
 
-  <% if (vitals && vitals.length) { %>
-  <div class="section">
-    <h2>Vital Signs</h2>
-    <% vitals.forEach(vital => { %>
-      <div class="vital-card">
-        <h3>Date: <%= vital.date %></h3>
-        <table>
-          <tr><th>Parameter</th><th>Value</th></tr>
-          <tr><td>Heart Rate</td><td><%= vital.heart_rate || 'N/A' %> bpm</td></tr>
-          <tr><td>Blood Pressure</td><td><%= vital.blood_pressure_systolic || 'N/A' %>/<%= vital.blood_pressure_diastolic || 'N/A' %> mmHg</td></tr>
-          <tr><td>Weekly Activity</td><td><%= vital.weekly_activity_minutes || 'N/A' %> minutes</td></tr>
-          <tr><td>BMI</td><td><%= vital.body_mass_index || 'N/A' %></td></tr>
-        </table>
+  <!-- Overview Page -->
+  <div class="page">
+    <!-- Overview Section -->
+    <div class="section">
+      <h2 class="section-title">Overview</h2>
+      <div class="overview-text">
+        <% 
+          const validInsights = insights && insights.filter(insight => insight.description && insight.description.length > 0);
+          if (validInsights && validInsights.length > 0) { 
+            // Беремо перший інсайт і обрізаємо до розумної довжини
+            const insightText = validInsights[0].description;
+            const maxLength = 400;
+            const displayText = insightText.length > maxLength ? 
+              insightText.substring(0, maxLength) + '...' : insightText;
+        %>
+          <%= displayText %>
+        <% } else { %>
+          This report provides a concise summary of your key health metrics and trends over the selected period. Monitor your progress and discuss any significant changes with your healthcare provider.
+        <% } %>
       </div>
-    <% }) %>
+    </div>
+
+    <!-- Key Metrics Snapshot -->
+    <div class="section">
+      <h2 class="section-title">Key Metrics Snapshot</h2>
+      <% 
+        // Фільтруємо валідні дані (не нульові)
+        const validVitals = vitals && vitals.filter(v => 
+          (v.heart_rate > 0 || v.blood_pressure_systolic > 0 || v.pulse_oximetry > 0 || 
+           v.weekly_activity_minutes > 0 || v.hydration_liters > 0)
+        );
+        const latestValid = validVitals && validVitals.length > 0 ? 
+          validVitals[validVitals.length - 1] : 
+          (vitals && vitals.length > 0 ? vitals[vitals.length - 1] : null);
+      %>
+      
+      <% if (latestValid) { %>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-value">
+            <%= latestValid.heart_rate > 0 ? latestValid.heart_rate : '--' %>
+            <% if (latestValid.heart_rate > 0) { %>bpm<% } %>
+          </div>
+          <div class="metric-label">Heart Rate</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">
+            <%= latestValid.blood_pressure_systolic > 0 ? latestValid.blood_pressure_systolic : '--' %>/
+            <%= latestValid.blood_pressure_diastolic > 0 ? latestValid.blood_pressure_diastolic : '--' %>
+          </div>
+          <div class="metric-label">Blood Pressure</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">
+            <%= latestValid.pulse_oximetry > 0 ? latestValid.pulse_oximetry : '--' %>
+            <% if (latestValid.pulse_oximetry > 0) { %>%<% } %>
+          </div>
+          <div class="metric-label">SpO₂</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value"><%= user?.weight_kg || '--' %></div>
+          <div class="metric-label">Weight (kg)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">
+            <%= latestValid.weekly_activity_minutes > 0 ? latestValid.weekly_activity_minutes : '--' %>
+            <% if (latestValid.weekly_activity_minutes > 0) { %>min<% } %>
+          </div>
+          <div class="metric-label">Weekly Activity</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">
+            <%= latestValid.hydration_liters > 0 ? latestValid.hydration_liters : '--' %>
+            <% if (latestValid.hydration_liters > 0) { %>L<% } %>
+          </div>
+          <div class="metric-label">Hydration</div>
+        </div>
+      </div>
+      <% } else { %>
+        <div class="no-data">No recent metric data available</div>
+      <% } %>
+    </div>
+
+    <!-- Heart Rate Trend Section -->
+    <div class="section">
+      <h2 class="section-title">Heart Rate Trend</h2>
+      <div class="chart-container">
+        <% 
+          // Коректна робота з структурою vitals_trend
+          const heartRateData = vitals_trend && vitals_trend.data && vitals_trend.data.heart_rate;
+          const trendData = heartRateData ? heartRateData.trend : null;
+          const summary = heartRateData ? heartRateData.summary : null;
+          
+          // Фільтруємо нульові значення для графіка
+          const validTrendData = trendData ? trendData.filter(item => item.value > 0) : null;
+        %>
+        
+        <% if (summary && validTrendData && validTrendData.length > 0) { %>
+          <div class="trend-data">
+            <div class="trend-stats">
+              <div class="trend-stat">
+                <div class="trend-value"><%= summary.last_value || '--' %> bpm</div>
+                <div class="trend-label">Current</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value"><%= summary.avg ? summary.avg.toFixed(1) : '--' %> bpm</div>
+                <div class="trend-label">Average</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value">
+                  <% if (summary.change !== undefined) { %>
+                    <span class="metric-change <%= summary.change >= 0 ? 'change-negative' : 'change-positive' %>">
+                      <%= summary.change >= 0 ? '+' : '' %><%= summary.change %>%
+                    </span>
+                  <% } else { %>
+                    --
+                  <% } %>
+                </div>
+                <div class="trend-label">Change</div>
+              </div>
+            </div>
+            
+            <div class="chart-wrapper">
+              <svg class="chart-svg" viewBox="0 0 500 150" preserveAspectRatio="none">
+                <% 
+                  const values = validTrendData.map(d => d.value);
+                  const dates = validTrendData.map(d => d.date);
+                  
+                  if (values.length > 0) {
+                    const maxValue = Math.max(...values);
+                    const minValue = Math.min(...values);
+                    const range = maxValue - minValue || 1;
+                    const padding = range * 0.1;
+                    
+                    const chartWidth = 480;
+                    const chartHeight = 120;
+                    const xStep = chartWidth / (values.length - 1);
+                %>
+                
+                <!-- Grid lines -->
+                <g class="chart-grid">
+                  <% for (let i = 0; i <= 4; i++) { %>
+                    <line 
+                      x1="10" 
+                      y1="<%= 10 + (i * chartHeight / 4) %>" 
+                      x2="<%= chartWidth + 10 %>" 
+                      y2="<%= 10 + (i * chartHeight / 4) %>" 
+                    />
+                  <% } %>
+                </g>
+                
+                <!-- Area fill -->
+                <path class="chart-area" d="
+                  M 10,<%= 10 + chartHeight - ((values[0] - minValue + padding) / (range + padding * 2)) * chartHeight %>
+                  <% values.forEach((value, index) => { %>
+                    L <%= 10 + index * xStep %>,<%= 10 + chartHeight - ((value - minValue + padding) / (range + padding * 2)) * chartHeight %>
+                  <% }); %>
+                  L <%= 10 + chartWidth %>,<%= 10 + chartHeight %>
+                  L 10,<%= 10 + chartHeight %>
+                  Z
+                "/>
+                
+                <!-- Line -->
+                <path class="chart-line" d="
+                  M 10,<%= 10 + chartHeight - ((values[0] - minValue + padding) / (range + padding * 2)) * chartHeight %>
+                  <% values.forEach((value, index) => { %>
+                    L <%= 10 + index * xStep %>,<%= 10 + chartHeight - ((value - minValue + padding) / (range + padding * 2)) * chartHeight %>
+                  <% }); %>
+                " />
+                
+                <!-- Data points -->
+                <% values.forEach((value, index) => { %>
+                  <circle 
+                    class="chart-point" 
+                    cx="<%= 10 + index * xStep %>" 
+                    cy="<%= 10 + chartHeight - ((value - minValue + padding) / (range + padding * 2)) * chartHeight %>" 
+                    r="2" 
+                  />
+                <% }); %>
+                
+                <!-- Y-axis labels -->
+                <text x="5" y="12" class="chart-axis" text-anchor="end"><%= Math.round(maxValue + padding) %></text>
+                <text x="5" y="<%= 10 + chartHeight / 2 %>" class="chart-axis" text-anchor="end"><%= Math.round((maxValue + minValue) / 2) %></text>
+                <text x="5" y="<%= 10 + chartHeight - 3 %>" class="chart-axis" text-anchor="end"><%= Math.round(minValue - padding) %></text>
+                
+                <!-- X-axis labels (first, middle, last) -->
+                <% if (dates.length > 0) { %>
+                  <text x="10" y="<%= 10 + chartHeight + 12 %>" class="chart-axis" text-anchor="start">
+                    <%= new Date(dates[0]).toLocaleDateString('en', {month: 'short', day: 'numeric'}) %>
+                  </text>
+                  <% if (dates.length > 1) { %>
+                    <text x="<%= 10 + chartWidth / 2 %>" y="<%= 10 + chartHeight + 12 %>" class="chart-axis" text-anchor="middle">
+                      <%= new Date(dates[Math.floor(dates.length / 2)]).toLocaleDateString('en', {month: 'short', day: 'numeric'}) %>
+                    </text>
+                  <% } %>
+                  <text x="<%= 10 + chartWidth %>" y="<%= 10 + chartHeight + 12 %>" class="chart-axis" text-anchor="end">
+                    <%= new Date(dates[dates.length - 1]).toLocaleDateString('en', {month: 'short', day: 'numeric'}) %>
+                  </text>
+                <% } %>
+                
+                <% } else { %>
+                  <text x="250" y="75" class="chart-axis" text-anchor="middle">No chart data available</text>
+                <% } %>
+              </svg>
+            </div>
+          </div>
+        <% } else { %>
+          <div class="no-data">
+            No trend data available for Heart Rate
+            <div style="font-size: 0.7rem; margin-top: 8px;">
+              Simple trend visualization for heart rate over time
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Goals Section -->
+    <% 
+      // Фільтруємо активні goals (не archived)
+      const activeGoals = goals && goals.filter(goal => 
+        goal.status !== 'archived' && 
+        goal.title && 
+        goal.title.trim().length > 0
+      );
+    %>
+    
+    <% if (activeGoals && activeGoals.length > 0) { %>
+    <div class="section">
+      <h2 class="section-title">Recent Goals</h2>
+      <div class="notes-section">
+        <% activeGoals.slice(0, 2).forEach(goal => { %>
+          <div class="note-item">
+            <div class="note-title"><%= goal.title %></div>
+            <div class="note-content">
+              <%= goal.description || 'No description' %>
+              <% if (goal.target_date) { %>
+                <br><small>Target: <%= new Date(goal.target_date).toLocaleDateString() %></small>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
+    <div class="footer">
+      Report generated on <%= new Date().toLocaleDateString() %>
+      <div class="tagline">Autonomy over Anatomy</div>
+    </div>
   </div>
-  <% } %>
+
 </body>
 </html>
