@@ -225,7 +225,19 @@ function AddGoalForm({ onCreate, loading }) {
           </select>
         </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%" }}>
+        <button
+          className="btn secondary"
+          onClick={() => {
+            setTitle("");
+            setDescription("");
+            setTargetDate("");
+            setType("");
+            setVisibility("private");
+          }}
+        >
+          Cancel
+        </button>
         <button className="btn primary" disabled={!canSave || loading} onClick={async () => {
           const ok = await onCreate({
             title,
