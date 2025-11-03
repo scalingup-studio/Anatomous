@@ -106,7 +106,7 @@ function AutoRedirectRoute() {
 
 function AppRouter() {
   return (
-    <HashRouter>
+    <HashRouter future={{ v7_relativeSplatPath: true }}>
       <Routes>
         {/* Public pages */}
         <Route path="/login" element={<LoginPage />} />
