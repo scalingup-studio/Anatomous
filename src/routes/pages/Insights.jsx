@@ -7,6 +7,7 @@ import { UploadFileApi } from "../../api/uploadFileApi";
 import { TrendsApi } from "../../api/trendsApi";
 import { useNotifications } from "../../api/NotificationContext";
 import { Modal } from "../../components/Modal";
+import { useSearchParams } from "react-router-dom";
 
 // Normalize metric title: remove underscores and capitalize first letter
 function formatMetricTitle(input) {
@@ -557,24 +558,29 @@ function DonutChart({ data, size = 120, strokeWidth = 16 }) {
 }
 
 export default function DashboardInsights() {
-  const [activeTab, setActiveTab] = useState("ai-insights");
-  const [searchParams, setSearchParams] = useState(() => new URLSearchParams(window.location.search));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (() => {
+    const t = String(searchParams.get('tab') || '').toLowerCase();
+    return ["ai-insights", "trends", "alerts", "uploads"].includes(t) ? t : "ai-insights";
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const t = String(sp.get('tab') || '').toLowerCase();
-    const allowed = ["ai-insights", "trends", "alerts", "uploads"]; 
-    if (allowed.includes(t) && t !== activeTab) {
+    const t = String(searchParams.get('tab') || '').toLowerCase();
+    if (["ai-insights", "trends", "alerts", "uploads"].includes(t) && t !== activeTab) {
       setActiveTab(t);
     }
-  }, []);
+  }, [searchParams]);
 
-  useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    sp.set('tab', activeTab);
-    const newUrl = `${window.location.pathname}${window.location.hash.split('?')[0]}?${sp.toString()}`;
-    window.history.replaceState(null, '', newUrl);
-  }, [activeTab]);
+  const changeTab = (next) => {
+    if (next === activeTab) return;
+    setActiveTab(next);
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev);
+      sp.set('tab', next);
+      return sp;
+    }, { replace: true });
+  };
   const { user } = useAuth();
   const { showNotification } = useNotifications();
 
@@ -592,7 +598,7 @@ export default function DashboardInsights() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => changeTab(tab.id)}
             style={{
               padding: "8px 16px",
               border: "none",
