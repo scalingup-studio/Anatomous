@@ -76,8 +76,25 @@ export const CUSTOM_ENDPOINTS = {
   },
   uploudFile: {
     uploudFile: `${API_BASE}/upload/attachment_file`,
+    avatarUpload: `${API_BASE}/upload/avatar`,
     getUserUploudFiles: `${API_BASE}/upload/get_files`,
     downloadFile: `${API_BASE}/upload/download_file`,
     deleteFile: `${API_BASE}/upload/delete_file`
+  },
+  goals: {
+    getGoals: `${API_BASE}/goals/get/goals`,
+    getHistory: `${API_BASE}/goals/get/history`,
+    readd: `${API_BASE}/goals/readd`,
+  },
+  goalProgress: {
+    create: `${API_BASE}/goal/progress`,
+    getProgress: `${API_BASE}/goal/get/progress`,
+    remove: (id) => `${API_BASE}/goal/progress/${id}`,
+  },
+  notes: {
+    list: `${API_BASE}/notes`,
+    create: `${API_BASE}/notes`,
+    update: (id) => `${API_BASE}/notes/note/${id}`,
+    getNote: `${API_BASE}/notes/get/note`,
   },
 };
