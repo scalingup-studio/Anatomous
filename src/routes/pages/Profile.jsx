@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { authRequest } from "../../api/apiClient.js";
 import { useAuth } from "../../api/AuthContext.jsx";
@@ -37,7 +37,31 @@ export default function DashboardProfile() {
     zip_code: "",
     user_id: "",
   });
-  const [activeTab, setActiveTab] = useState('personal');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (() => {
+    const t = String(searchParams.get('tab') || '').toLowerCase();
+    const allowed = ['personal', 'health_history', 'health_data'];
+    return allowed.includes(t) ? t : 'personal';
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const t = String(searchParams.get('tab') || '').toLowerCase();
+    const allowed = ['personal', 'health_history', 'health_data'];
+    if (allowed.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const changeTab = (next) => {
+    if (next === activeTab) return;
+    setActiveTab(next);
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev);
+      sp.set('tab', next);
+      return sp;
+    }, { replace: true });
+  };
   const [healthHistory, setHealthHistory] = useState({
     medical_conditions: [],
     medications: [],
@@ -1148,21 +1172,21 @@ const calculateAgeFromDOB = (dob) => {
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, paddingBottom:8, borderBottom: "1px solid var(--border)" }}>
         <button 
-          onClick={() => setActiveTab('personal')} 
+          onClick={() => changeTab('personal')} 
           className={`btn ${activeTab === 'personal' ? 'primary' : 'outline'}`}
           style={{ width:'auto', padding:'8px 16px', height:38 }}
         >
           Personal Info
         </button>
         <button 
-          onClick={() => setActiveTab('health_history')} 
+          onClick={() => changeTab('health_history')} 
           className={`btn ${activeTab === 'health_history' ? 'primary' : 'outline'}`}
           style={{ width:'auto', padding:'8px 16px', height:38 }}
         >
           Health History
         </button>
         <button 
-          onClick={() => setActiveTab('health_data')} 
+          onClick={() => changeTab('health_data')} 
           className={`btn ${activeTab === 'health_data' ? 'primary' : 'outline'}`}
           style={{ width:'auto', padding:'8px 16px', height:38 }}
         >

@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import { GoalsApi } from "../../api/goalsApi";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal.jsx";
@@ -586,7 +587,29 @@ function NotesTab() {
 }
 
 export default function GoalsPage() {
-  const [tab, setTab] = React.useState("active");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (() => {
+    const t = String(searchParams.get('tab') || '').toLowerCase();
+    return ["active", "history", "notes"].includes(t) ? t : "active";
+  })();
+  const [tab, setTab] = React.useState(initialTab);
+
+  React.useEffect(() => {
+    const t = String(searchParams.get('tab') || '').toLowerCase();
+    if (["active", "history", "notes"].includes(t) && t !== tab) {
+      setTab(t);
+    }
+  }, [searchParams]);
+
+  const handleChangeTab = (next) => {
+    if (next === tab) return;
+    setTab(next);
+    setSearchParams(prev => {
+      const sp = new URLSearchParams(prev);
+      sp.set('tab', next);
+      return sp;
+    }, { replace: true });
+  };
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -594,7 +617,7 @@ export default function GoalsPage() {
         <h1 style={{ margin: 0 }}>Goals</h1>
       </div>
 
-      <Tabs value={tab} onChange={setTab} />
+      <Tabs value={tab} onChange={handleChangeTab} />
 
       {tab === "active" && <ActiveGoalsTab />}
       {tab === "history" && <HistoryTab />}
