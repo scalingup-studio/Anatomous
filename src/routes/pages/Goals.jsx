@@ -50,6 +50,16 @@ function Empty({ title, action, onAction }) {
 }
 
 function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
+  const formatDate = (v) => {
+    if (!v) return "";
+    try {
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return String(v);
+      return d.toLocaleDateString();
+    } catch {
+      return String(v);
+    }
+  };
   const statusColor = {
     "on track": "success",
     completed: "secondary",
@@ -64,6 +74,19 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
         {goal.description && (
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>{goal.description}</div>
         )}
+        <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 6, display:'flex', gap:12, flexWrap:'wrap' }}>
+          {(() => {
+            const created = goal.created_at || goal.createdAt || goal.created || goal.created_date;
+            const target = goal.target_date || goal.targetDate;
+            const updated = goal.updated_at || goal.updatedAt;
+            const parts = [];
+            if (created) parts.push(`Created: ${formatDate(created)}`);
+            if (target) parts.push(`Target: ${formatDate(target)}`);
+            if (goal.completed_at) parts.push(`Completed: ${formatDate(goal.completed_at)}`);
+            else if (updated) parts.push(`Updated: ${formatDate(updated)}`);
+            return parts.length ? <span>{parts.join(' · ')}</span> : null;
+          })()}
+        </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {(() => {
