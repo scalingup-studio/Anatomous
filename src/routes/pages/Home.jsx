@@ -92,7 +92,7 @@ export default function DashboardHome(){
           <div style={{ fontWeight:600 }}>Vitals Summary</div>
           <div style={{ color:'var(--muted)' }}>HR: {vitals.hr} | BP: {vitals.bp} | Sleep: {vitals.sleep}h</div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
-            <Link className="btn outline small" to="/dashboard/profile">See Health Data</Link>
+            <Link className="btn outline small" to="/dashboard/profile?tab=health_data">See Health Data</Link>
           </div>
         </div>
         <div className="card" style={{ display:'grid', gap:8 }}>
@@ -105,7 +105,7 @@ export default function DashboardHome(){
       </div>
 
       {/* 3) Data Visualization */}
-      <div className="card" style={{ display:'grid', gridTemplateColumns:'1fr 1.2fr', gap:16, alignItems:'center' }}>
+      <div className="card" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:16, alignItems:'center' }}>
         {/* Ring chart approximation */}
         <div style={{ display:'grid', gap:10 }}>
           <div style={{ fontWeight:600 }}>Focus Areas</div>
@@ -135,7 +135,7 @@ export default function DashboardHome(){
       </div>
 
       {/* 4) Today action plan & 5) Recent activity */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:12 }}>
         <div className="card" style={{ display:'grid', gap:8 }}>
           <div style={{ fontWeight:600 }}>Today’s Action Plan</div>
           <div style={{ display:'grid', gap:6 }}>

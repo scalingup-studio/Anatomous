@@ -16,6 +16,7 @@ import DashboardGoals from "./routes/pages/Goals.jsx";
 import DashboardProfile from "./routes/pages/Profile.jsx";
 import DashboardSettings from "./routes/pages/Settings.jsx";
 import DashboardReports from "./routes/pages/Reports.jsx";
+import SharedReportPage from "./routes/pages/SharedReport.jsx";
 import HelpCenterPage from "./routes/pages/HelpCenter.jsx";
 import SubscriptionsPage from "./routes/pages/Subscriptions.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage-TEST.jsx";
@@ -105,6 +106,16 @@ function AutoRedirectRoute() {
 }
 
 function AppRouter() {
+  // Bridge non-hash direct URLs to HashRouter before react renders routes
+  try {
+    const path = window.location.pathname || "";
+    const match = path.match(/\/shared-reports\/([^\/?#]+)/);
+    if (match && !window.location.hash.includes('/shared-reports/')) {
+      const token = match[1];
+      window.location.hash = `#/shared-reports/${token}`;
+      return null;
+    }
+  } catch {}
   return (
     <HashRouter future={{ v7_relativeSplatPath: true }}>
       <Routes>
@@ -117,6 +128,9 @@ function AppRouter() {
         {/* ✅ Google OAuth callback route */}
         <Route path="/auth/callback/google" element={<OAuthCallbackGoogle />} />
         <Route path="/auth/success" element={<OAuthCallbackGoogle />} />
+
+        {/* Public shared report viewer */}
+        <Route path="/shared-reports/:token" element={<SharedReportPage />} />
 
         {/* 🔐 Onboarding page - only for non-completed users */}
         <Route 

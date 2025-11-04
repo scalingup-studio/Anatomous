@@ -51,11 +51,33 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     async function initAuth() {
       try {
+        // 1) Try localStorage token first and use it if still valid
+        const storedToken = (() => { try { return localStorage.getItem('authToken') || null; } catch { return null; } })();
+        const storedUser = (() => { try { const raw = localStorage.getItem('user'); return raw ? JSON.parse(raw) : null; } catch { return null; } })();
+
+        if (storedToken) {
+          try {
+            const parts = storedToken.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              const expMs = (payload?.exp || 0) * 1000;
+              const now = Date.now();
+              if (expMs > now + 15_000) { // consider valid if >15s left
+                setAuthToken(storedToken);
+                setUser(storedUser ?? null);
+                setIsNewUser(false);
+                setLoading(false);
+                console.log('✅ Restored valid session from storage without re-login');
+                return;
+              }
+            }
+          } catch {}
+        }
+
         console.log('🔄 Attempting auto-authentication with refresh token...');
-  
         const refreshRes = await AuthApi.refreshToken();
         console.log('✅ Auto-authentication successful:', refreshRes);
-  
+
         if (refreshRes?.authToken) {
           setAuthToken(refreshRes.authToken);
           setUser(refreshRes.user ?? null);
@@ -63,34 +85,30 @@ export function AuthProvider({ children }) {
             localStorage.setItem('authToken', refreshRes.authToken);
             if (refreshRes.user) localStorage.setItem('user', JSON.stringify(refreshRes.user));
           } catch {}
-          setIsNewUser(false); // Auto-refresh means existing user, not new signup
-          
+          setIsNewUser(false);
           console.log('🔄 Auto-authentication successful - existing user will go to dashboard');
         } else {
           console.log('ℹ️ No valid session found');
           setAuthToken(null);
           setUser(null);
           setIsNewUser(false);
+          try { localStorage.removeItem('authToken'); localStorage.removeItem('user'); } catch {}
         }
       } catch (error) {
         if (error.message?.includes('expired') || error.message?.includes('Invalid')) {
           console.log('🔄 Refresh token expired or invalid, clearing session');
-          // Automatically clear expired tokens
-          await AuthApi.logout().catch(() => {}); // Ignore logout errors
+          await AuthApi.logout().catch(() => {});
         } else {
           console.log('ℹ️ Auto-authentication failed:', error.message);
         }
         setAuthToken(null);
         setUser(null);
-        try {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-        } catch {}
+        try { localStorage.removeItem('authToken'); localStorage.removeItem('user'); } catch {}
       } finally {
         setLoading(false);
       }
     }
-  
+
     initAuth();
   }, []);
 
@@ -173,6 +191,14 @@ export function AuthProvider({ children }) {
       try {
         localStorage.setItem('authToken', res.authToken);
         if (res.user) localStorage.setItem('user', JSON.stringify(res.user));
+        // Store decoded expiry for awareness (optional)
+        try {
+          const parts = res.authToken?.split?.('.') || [];
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            if (payload?.exp) localStorage.setItem('authTokenExpiresAt', String(payload.exp * 1000));
+          }
+        } catch {}
       } catch {}
       setIsNewUser(false); // This is a login, not a signup
       

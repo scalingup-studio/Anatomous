@@ -803,14 +803,28 @@ function TrendsTab() {
   const handleGetTrends = async () => {
     try {
       setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const now = new Date();
+      let startDate, endDate;
+      if (selectedPeriod === 'Monthly') {
+        const first = new Date(now.getFullYear(), now.getMonth(), 1);
+        const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        startDate = first.toISOString().split('T')[0];
+        endDate = last.toISOString().split('T')[0];
+      } else if (selectedPeriod === 'Daily') {
+        const last7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        startDate = last7.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+      } else {
+        const last30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        startDate = last30.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+      }
       
       const response = await TrendsApi.getTrends({
         typeMetric: selectedMetric,
         period: selectedPeriod.toLowerCase(),
-        startDate: weekAgo,
-        endDate: today,
+        startDate,
+        endDate,
       });
       
       // Set trends if we got valid data (support both 'succes' and 'success' spelling)
@@ -857,7 +871,7 @@ function TrendsTab() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Top section */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         {/* Recent Insights */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Recent Insights</h3>
@@ -956,7 +970,7 @@ function TrendsTab() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
           {/* Health Trend */}
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center"}}>
@@ -984,9 +998,9 @@ function TrendsTab() {
                 </span>
               )}
             </div>
-            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
               <DonutChart data={forecastDonutData} size={120} />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", gap: 8 }}>
                 {forecastDonutData.map((item, i) => {
                   const percentage = item.value;
                   return (

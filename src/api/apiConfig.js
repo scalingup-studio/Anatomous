@@ -43,11 +43,20 @@ export const CUSTOM_ENDPOINTS = {
     checkAuth: `${API_BASE_AUTH}/auth/check-auth`,
   },
   reports: {
-    generate: `${API_BASE}/report/generate`,
+    generate: `${API_BASE}/report/generate`, // backward compatibility
+    generateSimple: `${API_BASE}/report/generate/simple`,
+    generateDetailed: `${API_BASE}/report/generate/detailed`,
     list: `${API_BASE}/reports`,
     download: `${API_BASE}/reports/download`,
     share: `${API_BASE}/reports/share`,
-    sharedByToken: `${API_BASE}/reports/shared/token`
+    // Build URL with token param for public access
+    sharedByToken: (token) => `${API_BASE}/reports/shared/token${token ? `?token=${encodeURIComponent(token)}` : ''}`,
+    // Email send endpoint
+    shareEmailSend: `${API_BASE}/reports/share/email-send`,
+    // Update share info (expiration, visibility, title)
+    updateShare: (shareId) => `${API_BASE}/reports/shares/${shareId}`,
+    // Revoke share (set is_active=false)
+    revokeShare: (shareId) => `${API_BASE}/reports/shares/revoke/${shareId}`
   },
   onboarding: {
     step: (step) => `${API_BASE}/onboarding/${step}`,

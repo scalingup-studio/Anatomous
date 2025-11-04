@@ -56,8 +56,8 @@ function DownloadReportsTab() {
 
   const loadReports = React.useCallback(async () => {
     try {
-      const res = await ReportsApi.list({ start_date: start, end_date: end, type });
-      setReports(res.all_reports_list || []);
+      const res = await ReportsApi.listWithDate({ start_date: start, end_date: end, type });
+      setReports(res.sort_result || res.all_reports_list || []);
     } catch (e) {
       setReports([]);
     }
@@ -82,8 +82,8 @@ function DownloadReportsTab() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {reports.map((r) => (
-          <div key={r.id} className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12 }}>
+        {reports.map((r, idx) => (
+          <div key={(r.id ?? r.report_id ?? r.file_url ?? r.title ?? 'row') + '_' + idx} className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(0,186,206,0.15)", border: "1px solid var(--border)" }} />
               <div>
@@ -96,12 +96,19 @@ function DownloadReportsTab() {
               <button
                 className="btn outline small"
                 onClick={() => {
+                  if (r.file_url) {
+                    const dateStr = r.date || new Date().toISOString().split('T')[0];
+                    const suggested = `${(r.title || 'Report').replace(/\s+/g,'_')}_${dateStr}.pdf`;
+                    ReportsApi.downloadFileUrl(r.file_url, suggested);
+                    return;
+                  }
                   const reportId = r.report_id ?? r.id;
-                  if (!reportId) return;
-                  ReportsApi.download(reportId);
+                  if (reportId) {
+                    ReportsApi.download(reportId);
+                  }
                 }}
-                disabled={!r.report_id && !r.id}
-                title={!r.report_id && !r.id ? 'No report_id available' : 'Download'}
+                disabled={!r.file_url && !r.report_id && !r.id}
+                title={!r.file_url && !r.report_id && !r.id ? 'No file available' : 'Download'}
               >
                 Download
               </button>
@@ -114,31 +121,223 @@ function DownloadReportsTab() {
 }
 
 function ShareWithProviderTab() {
+  const [reports, setReports] = React.useState([]);
+  const [selectedIdx, setSelectedIdx] = React.useState(0);
+  const [expiresAt, setExpiresAt] = React.useState("");
+  const [isVisible, setIsVisible] = React.useState(true);
+  const [title, setTitle] = React.useState("");
+  const [share, setShare] = React.useState(null);
+  const [shareUrl, setShareUrl] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [status, setStatus] = React.useState("");
+
+  const [recipientEmail, setRecipientEmail] = React.useState("");
+  const [subject, setSubject] = React.useState("");
+  const [customMessage, setCustomMessage] = React.useState("");
+  const [includeFileLink, setIncludeFileLink] = React.useState(false);
+
+  const loadReports = React.useCallback(async () => {
+    try {
+      const res = await ReportsApi.list();
+      const items = res.sort_result || res.all_reports_list || res.items || res || [];
+      setReports(Array.isArray(items) ? items : []);
+      if (Array.isArray(items) && items.length) {
+        setSelectedIdx(0);
+        setTitle(items[0].title || items[0].name || "");
+      }
+    } catch (e) {
+      setReports([]);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadReports();
+  }, [loadReports]);
+
+  // Keep title synced with current selected report
+  React.useEffect(() => {
+    const r = reports[selectedIdx];
+    if (r) setTitle(r.title || r.name || "");
+  }, [reports, selectedIdx]);
+
+  const handleCreateOrUpdateShare = async () => {
+    const selected = reports[selectedIdx];
+    const selectedReportId = selected?.report_id ?? selected?.id;
+    if (!selectedReportId) {
+      setStatus("Selected report has no id to share. Generate a new report first.");
+      return;
+    }
+    setLoading(true);
+    setStatus("");
+    try {
+      const payload = {
+        report_id: String(selectedReportId),
+        title: title || undefined,
+        expiration_date: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+        is_visible: Boolean(isVisible),
+        // Some backends require this var to exist during share creation
+        report_share_url: shareUrl || "",
+      };
+      const res = await ReportsApi.share(payload);
+      const s = res?.share || res || {};
+      const normalized = {
+        ...s,
+        id: s?.id ?? s?.share_id ?? s?.shareId,
+        share_url: s?.share_url ?? s?.url ?? s?.shareUrl,
+      };
+      setShare(normalized);
+      setShareUrl(normalized.share_url || "");
+      setStatus("Share link created/updated.");
+    } catch (e) {
+      setStatus(e?.message || "Failed to create/update share.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const url = shareUrl || share?.share_url;
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus("Link copied to clipboard.");
+    } catch {
+      setStatus("Failed to copy link.");
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!share?.id) {
+      setStatus("Create a share link first.");
+      return;
+    }
+    setLoading(true);
+    setStatus("");
+    try {
+      const res = await ReportsApi.sendShareEmail({
+        share_id: share.id,
+        recipient_email: recipientEmail,
+        subject: subject || undefined,
+        custom_message: customMessage || undefined,
+        include_file_link: includeFileLink,
+        // Some templates expect explicit share URL variable
+        report_share_url: shareUrl || share?.share_url,
+      });
+      setStatus(res?.message || "Email sent.");
+    } catch (e) {
+      setStatus(e?.message || "Failed to send email.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="card" style={{ maxWidth: 520 }}>
       <h3 style={{ marginTop: 0 }}>Share with Provider</h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div>
           <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Report to Share</label>
-          <select style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}>
-            <option>Full Health Summary</option>
-            <option>Vitals Summary</option>
+          <select
+            value={String(selectedIdx)}
+            onChange={(e)=>{
+              const idx = Number(e.target.value);
+              setSelectedIdx(idx);
+              const r = reports[idx];
+              if (r) setTitle(r.title || r.name || "");
+            }}
+            style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+          >
+            {reports.length === 0 ? (
+              <option value="" disabled>No reports found</option>
+            ) : (
+              reports.map((r, i) => {
+                const title = r.title || r.name || `Report ${i+1}`;
+                const date = r.date ? ` — ${r.date}` : '';
+                const size = typeof r.size === 'number' && r.size > 0 ? ` — ${r.size} KB` : '';
+                return (
+                  <option key={(r.report_id ?? r.id ?? r.file_url ?? r.title ?? 'row') + '_' + i} value={String(i)}>
+                    {title}{date}{size}
+                  </option>
+                );
+              })
+            )}
           </select>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 8, alignItems: "center" }}>
+        <div>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Title</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e)=>setTitle(e.target.value)}
+            placeholder="Full Health Summary"
+            style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+          />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8, alignItems: "center" }}>
           <div>
             <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Expires</label>
-            <input type="datetime-local" style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }} />
+            <input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(e)=>setExpiresAt(e.target.value)}
+              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+            />
           </div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--muted)" }}>
-            <input type="checkbox" defaultChecked />
+            <input type="checkbox" checked={isVisible} onChange={(e)=>setIsVisible(e.target.checked)} />
             Visible
           </label>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn" style={{ width: 120 }}>Copy Link</button>
-          <button className="btn outline" style={{ flex: 1 }}>Send via Email…</button>
+          <button className="btn outline" onClick={handleCreateOrUpdateShare} aria-disabled={loading}>
+            {loading ? 'Saving…' : 'Create/Update Link'}
+          </button>
+          <button className="btn" style={{ width: 120 }} onClick={handleCopyLink} disabled={!shareUrl && !share?.share_url}>Copy Link</button>
         </div>
+
+        {shareUrl || share?.share_url ? (
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>
+            Share URL: <span style={{ wordBreak: 'break-all' }}>{shareUrl || share?.share_url}</span>
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>Send via Email</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              type="email"
+              value={recipientEmail}
+              onChange={(e)=>setRecipientEmail(e.target.value)}
+              placeholder="recipient@example.com"
+              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+            />
+            <input
+              type="text"
+              value={subject}
+              onChange={(e)=>setSubject(e.target.value)}
+              placeholder="Subject (optional)"
+              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+            />
+            <textarea
+              value={customMessage}
+              onChange={(e)=>setCustomMessage(e.target.value)}
+              placeholder="Custom message (optional)"
+              rows={3}
+              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+            />
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: 'var(--muted)' }}>
+              <input type="checkbox" checked={includeFileLink} onChange={(e)=>setIncludeFileLink(e.target.checked)} />
+              Include file link
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn outline" onClick={handleSendEmail} disabled={loading || !recipientEmail || !share?.id}>Send</button>
+            </div>
+          </div>
+        </div>
+
+        {status ? (
+          <div style={{ fontSize: 12, color: status.toLowerCase().includes('fail') ? 'var(--error)' : 'var(--muted)' }}>{status}</div>
+        ) : null}
       </div>
     </div>
   );

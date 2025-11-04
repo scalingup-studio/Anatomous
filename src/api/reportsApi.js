@@ -2,16 +2,37 @@ import { authRequest, request } from "./apiClient";
 import { CUSTOM_ENDPOINTS } from "./apiConfig";
 
 export const ReportsApi = {
-  async list({ start_date, end_date, type = 'all' } = {}) {
-    // Provide sensible defaults if dates are missing
-    const today = new Date();
-    const toISO = (d) => d.toISOString().split('T')[0];
-    const defaultEnd = toISO(today);
-    const defaultStart = toISO(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30));
-
+  async list({ type = 'all' } = {}) {
+    // Only pass type per requirement; no date filters
     const params = new URLSearchParams();
-    params.set("start_date", start_date || defaultStart);
-    params.set("end_date", end_date || defaultEnd);
+    params.set("type", type || 'all');
+    // Backend requires user_id
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const userId = parsed?.id || parsed?.user?.id;
+        if (userId) params.set("user_id", String(userId));
+      }
+    } catch {}
+    const url = `${CUSTOM_ENDPOINTS.reports.list}?${params.toString()}`;
+    return await authRequest(url, { method: "GET" });
+  },
+
+  async listWithDate({ start_date, end_date, type = 'all' } = {}) {
+    // Full listing with optional date filters (for Download tab)
+    const params = new URLSearchParams();
+    if (start_date) params.set("start_date", start_date);
+    if (end_date) params.set("end_date", end_date);
+    // Some backends require user_id when date filters are used
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const userId = parsed?.id || parsed?.user?.id;
+        if (userId) params.set("user_id", String(userId));
+      }
+    } catch {}
     params.set("type", type || 'all');
     const url = `${CUSTOM_ENDPOINTS.reports.list}?${params.toString()}`;
     return await authRequest(url, { method: "GET" });
@@ -39,7 +60,13 @@ export const ReportsApi = {
 
     try { console.log('📤 ReportsApi.generate payload:', body); } catch {}
 
-    return await authRequest(CUSTOM_ENDPOINTS.reports.generate, {
+    // Choose endpoint based on layout
+    const layoutLower = String(body.layout || 'detailed').toLowerCase();
+    const endpoint = layoutLower === 'simple'
+      ? CUSTOM_ENDPOINTS.reports.generateSimple
+      : CUSTOM_ENDPOINTS.reports.generateDetailed;
+
+    return await authRequest(endpoint, {
       method: "POST",
       body,
     });
@@ -78,16 +105,58 @@ export const ReportsApi = {
     return { success: true };
   },
 
+  async downloadFileUrl(fileUrl, suggestedName = 'report') {
+    if (!fileUrl) throw new Error('No file_url provided');
+    const a = document.createElement('a');
+    a.href = fileUrl;
+    a.download = suggestedName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return { success: true };
+  },
+
   async share(payload) {
-    // Share endpoint is public per spec
-    return await request(CUSTOM_ENDPOINTS.reports.share, {
+    // Spec: create or update share link for a report (auth required)
+    const body = { ...payload };
+    return await authRequest(CUSTOM_ENDPOINTS.reports.share, {
       method: "POST",
+      body,
+    });
+  },
+
+  async updateShare(shareId, payload) {
+    return await authRequest(CUSTOM_ENDPOINTS.reports.updateShare(shareId), {
+      method: "PATCH",
       body: payload,
     });
   },
 
-  async sharedByToken() {
-    return await authRequest(CUSTOM_ENDPOINTS.reports.sharedByToken, { method: "GET" });
+  async sendShareEmail({ share_id, recipient_email, subject, custom_message, include_file_link }) {
+    return await authRequest(CUSTOM_ENDPOINTS.reports.shareEmailSend, {
+      method: "POST",
+      body: { share_id, recipient_email, subject, custom_message, include_file_link },
+    });
+  },
+
+  async revokeShare(shareId) {
+    return await authRequest(CUSTOM_ENDPOINTS.reports.revokeShare(shareId), {
+      method: "PATCH",
+      body: {},
+    });
+  },
+
+  async sharedByToken(token) {
+    // Try public first; if 401, retry with auth
+    const url = CUSTOM_ENDPOINTS.reports.sharedByToken(token);
+    try {
+      return await request(url, { method: "GET" });
+    } catch (e) {
+      if (e?.status === 401) {
+        return await authRequest(url, { method: "GET" });
+      }
+      throw e;
+    }
   },
 };
 

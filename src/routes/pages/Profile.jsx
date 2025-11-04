@@ -15,7 +15,7 @@ import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal.jsx";
 export default function DashboardProfile() {
   const navigate = useNavigate();
   
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const { showSuccess, showError, showInfo } = useNotifications();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
@@ -1153,6 +1153,19 @@ const calculateAgeFromDOB = (dob) => {
         ? "Profile updated and photo uploaded successfully!" 
         : "Profile updated successfully!";
       showSuccess(successMessage);
+
+      // Update global auth user so sidebar reflects latest data immediately
+      try {
+        setUser(prev => ({
+          ...prev,
+          first_name: updated?.first_name ?? basePayload.first_name ?? prev?.first_name,
+          last_name: updated?.last_name ?? basePayload.last_name ?? prev?.last_name,
+          phone_number: updated?.phone_number ?? basePayload.phone_number ?? prev?.phone_number,
+          // Try to set an avatar-like field that UserSummary can use directly
+          avatar: updated?.avatar || updated?.avatar_url || updated?.photo_url || (typeof updated?.profile_photo === 'string' ? updated?.profile_photo : (updated?.profile_photo?.url || updated?.profile_photo?.path)) || prev?.avatar,
+          profile_photo: updated?.profile_photo ?? prev?.profile_photo,
+        }));
+      } catch {}
     } catch (err) {
       const errorMessage = err.message || "Failed to save profile";
       console.error('❌ Profile save error:', err);

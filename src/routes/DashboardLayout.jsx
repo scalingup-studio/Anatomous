@@ -30,7 +30,7 @@ export default function DashboardLayout() {
       <header className="dash-header">
         <Logo height={28} />
       </header>
-      <button className="hamburger" aria-label="Open menu" aria-expanded={menuOpen} aria-controls="sidebar" onClick={() => setMenuOpen(v => !v)}>
+      <button className={`hamburger ${menuOpen ? 'open' : ''}`} aria-label="Open menu" aria-expanded={menuOpen} aria-controls="sidebar" onClick={() => setMenuOpen(v => !v)}>
         <span />
         <span />
         <span />
