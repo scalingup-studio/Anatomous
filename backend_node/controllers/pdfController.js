@@ -103,13 +103,13 @@ exports.generateSimplePdf = async (req, res) => {
       logo: data.logo || "https://cdn.anatomous.app/assets/logo.png",
       title: data.pdf_data.title || "Health Summary Report",
       date: data.pdf_data.date || new Date().toLocaleDateString(),
-      date_range: data.pdf_data.date_range || 30,
-      user: data.pdf_data.user || {},
-      insights: data.pdf_data.sections?.insights || [],
-      vitals: data.pdf_data.sections?.vitals || [],
-      vitals_trend: data.pdf_data.sections?.vitals_trend.data || {},
-      uploads: data.pdf_data.sections?.lab_results || [],
-      goals: data.pdf_data.sections?.goals || [],
+      date_range: data.pdf_data?.date_range || 30,
+      user: data.pdf_data?.user || {},
+      insights: data.pdf_data?.sections?.insights || [],
+      vitals: data.pdf_data?.sections?.vitals || [],
+      vitals_trend: data.pdf_data?.sections?.vitals_trend || {}, 
+      uploads: data.pdf_data?.sections?.uploads || [], 
+      goals: data.pdf_data?.sections?.goals || [],
       layout: data.pdf_data.layout || "simple",
       export_settings: data.pdf_data.export_settings || {},
     };
@@ -160,10 +160,11 @@ exports.generateDetailedPdf = async (req, res) => {
   user: data.pdf_data?.user || {},
   insights: data.pdf_data?.sections?.insights || [],
   vitals: data.pdf_data?.sections?.vitals || [],
-  vitals_trend: data.pdf_data?.sections?.vitals_trend || {}, // ✅ Без .data
-  uploads: data.pdf_data?.sections?.uploads || [], // ✅ uploads замість lab_results
+  vitals_trend: data.pdf_data?.sections?.vitals_trend || {}, 
+  uploads: data.pdf_data?.sections?.uploads || [], 
   goals: data.pdf_data?.sections?.goals || [],
-  alerts: data.pdf_data?.sections?.alerts || [], // ✅ alerts замість alert
+   progress: data.pdf_data?.sections?.progress || [],
+  alerts: data.pdf_data?.sections?.alerts || [], 
   notes: data.pdf_data?.sections?.notes || [],
   layout: data.pdf_data?.layout || "detailed",
   export_settings: data.pdf_data?.export_settings || {},
@@ -188,9 +189,6 @@ exports.generateDetailedPdf = async (req, res) => {
     res.status(500).json({ error: "Failed to generate PDF", details: err.message });
   }
 };
-
-
-
 
 
 exports.listPdfs = async (req, res) => {
