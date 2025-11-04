@@ -3,400 +3,1518 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %></title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <title><%= title || "Detailed Health Report" %></title>
   <style>
-    :root {
-      --primary: #4361ee;
-      --secondary: #3f37c9;
-      --success: #4cc9f0;
-      --light: #f8f9fa;
-      --dark: #212529;
-      --gray: #6c757d;
-      --light-gray: #e9ecef;
-      --border-radius: 12px;
-      --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      --transition: all 0.3s ease;
-    }
+    /* === Anatomous Design System - Dark Theme === */
+:root {
+  /* Primary Brand Colors */
+  --anatomous-primary: #00BACE;
+  --anatomous-secondary: #004CD7;
+  --anatomous-accent: #00A3B5;
+  
+  /* Base UI Colors */
+  --anatomous-bg: #000000;
+  --anatomous-surface: #111111;
+  --anatomous-divider: #222222;
+  
+  /* Text & Icon Colors */
+  --anatomous-text-primary: #FFFFFF;
+  --anatomous-text-secondary: #CCCCCC;
+  --anatomous-text-disabled: #777777;
+  
+  /* Semantic Colors */
+  --status-positive: #00C37A;
+  --status-warning: #F5A623;
+  --status-negative: #FF4C4C;
+  --status-info: #5BC0DE;
+  
+  /* Legacy support */
+  --anatomous-dark: #FFFFFF;
+  --anatomous-gray: #CCCCCC;
+  --anatomous-light: #111111;
+  --anatomous-white: #000000;
+  --anatomous-border: #222222;
+  
+  --font-primary: 'Inter', 'Manrope', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      line-height: 1.6;
-      color: var(--dark);
-      background-color: #f5f7fb;
-      padding: 20px;
-    }
+body {
+  font-family: var(--font-primary);
+  font-weight: 400;
+  background: var(--anatomous-bg);
+  color: var(--anatomous-text-primary);
+  line-height: 1.4;
+  counter-reset: page;
+  font-size: 12px; /* ✅ Base font smaller */
+}
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
+/* === Оптимізована структура сторінок === */
+.page {
+  min-height: auto;
+  padding: 0.4in 0.5in 0.6in 0.5in;
+  position: relative;
+  page-break-after: always;
+  page-break-inside: avoid;
+  counter-increment: page;
+  background: var(--anatomous-bg);
+}
 
-    .report-header {
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      color: white;
-      padding: 30px;
-      border-radius: var(--border-radius);
-      margin-bottom: 30px;
-      box-shadow: var(--box-shadow);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+/* === Номер сторінки === */
+.page::after {
+  content: "Page " counter(page);
+  position: absolute;
+  bottom: 0.25in;
+  right: 0.5in;
+  font-size: 0.65rem;
+  color: var(--anatomous-text-disabled);
+  z-index: 10;
+}
 
-    .report-header h1 {
-      font-size: 2.2rem;
-      margin-bottom: 10px;
-    }
+/* === Обкладинка === */
+.cover-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 29.7cm;
+  background: linear-gradient(135deg, var(--anatomous-bg) 0%, var(--anatomous-surface) 100%);
+}
 
-    .report-date {
-      font-size: 1.1rem;
-      opacity: 0.9;
-    }
+.cover-page::after {
+  content: none;
+}
 
-    .report-badge {
-      background: rgba(255, 255, 255, 0.2);
-      padding: 8px 16px;
-      border-radius: 50px;
-      font-size: 0.9rem;
-    }
+/* === Заголовки === */
+.logo {
+  font-size: 2.5rem; /* ✅ Smaller */
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: var(--anatomous-primary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
 
-    .section {
-      background: white;
-      border-radius: var(--border-radius);
-      padding: 25px;
-      margin-bottom: 25px;
-      box-shadow: var(--box-shadow);
-      transition: var(--transition);
-    }
+.report-title {
+  font-size: 2rem; /* ✅ 2.5rem → 2rem */
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--anatomous-secondary);
+}
 
-    .section:hover {
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-    }
+.user-name {
+  font-size: 1.25rem; /* ✅ 1.5rem → 1.25rem */
+  margin-bottom: 0.4rem;
+  color: var(--anatomous-text-primary);
+}
 
-    .section-title {
-      display: flex;
-      align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid var(--light-gray);
-      color: var(--primary);
-    }
+.date-range {
+  font-size: 0.95rem; /* ✅ 1.1rem → 0.95rem */
+  color: var(--anatomous-text-secondary);
+  margin-bottom: 1.5rem;
+}
 
-    .section-title i {
-      margin-right: 10px;
-      font-size: 1.5rem;
-    }
+.section-title {
+  color: var(--anatomous-secondary);
+  font-size: 1.15rem; /* ✅ 1.4rem → 1.15rem */
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid var(--anatomous-primary);
+  page-break-after: avoid;
+}
 
-    .section-title h2 {
-      font-size: 1.5rem;
-    }
+.subsection-title {
+  color: var(--anatomous-primary);
+  font-size: 0.95rem; /* ✅ 1.1rem → 0.95rem */
+  font-weight: 600;
+  margin: 0.75rem 0 0.5rem 0;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--anatomous-primary);
+  page-break-after: avoid;
+}
 
-    .user-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 15px;
-    }
+/* === Секції === */
+.section {
+  margin-bottom: 1.25rem;
+  page-break-inside: avoid;
+}
 
-    .user-info-card {
-      background: var(--light);
-      padding: 15px;
-      border-radius: var(--border-radius);
-      border-left: 4px solid var(--primary);
-    }
+.section:last-child {
+  margin-bottom: 0;
+}
 
-    .user-info-card strong {
-      display: block;
-      color: var(--gray);
-      font-size: 0.9rem;
-      margin-bottom: 5px;
-    }
+/* === Контент === */
+.overview-text {
+  background: var(--anatomous-surface);
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--anatomous-primary);
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem; /* ✅ Smaller */
+  color: var(--anatomous-text-secondary);
+}
 
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-    }
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  page-break-inside: avoid;
+}
 
-    .card {
-      background: var(--light);
-      border-radius: var(--border-radius);
-      padding: 20px;
-      transition: var(--transition);
-      border-top: 4px solid var(--success);
-    }
+.metric-card {
+  background: var(--anatomous-surface);
+  border: 1px solid var(--anatomous-divider);
+  border-radius: 6px;
+  padding: 0.85rem;
+  text-align: center;
+  transition: border-color 0.2s;
+}
 
-    .card:hover {
-      transform: translateY(-5px);
-    }
+.metric-card:hover {
+  border-color: var(--anatomous-primary);
+}
 
-    .insight-card {
-      border-top-color: #7209b7;
-    }
+.metric-value {
+  font-size: 1.15rem; /* ✅ 1.6rem → 1.15rem */
+  font-weight: 700;
+  color: var(--anatomous-primary);
+  margin-bottom: 0.4rem;
+}
 
-    .vital-card {
-      border-top-color: #f72585;
-    }
+.metric-label {
+  font-size: 0.7rem; /* ✅ 0.85rem → 0.7rem */
+  color: var(--anatomous-text-disabled);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 
-    .goal-card {
-      border-top-color: #4cc9f0;
-    }
+.chart-container {
+  background: var(--anatomous-surface);
+  border: 1px solid var(--anatomous-divider);
+  border-radius: 6px;
+  padding: 1.25rem;
+  margin: 1.25rem 0;
+  page-break-inside: avoid;
+}
 
-    .upload-card {
-      border-top-color: #4895ef;
-    }
+.trend-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
 
-    .card h3 {
-      color: var(--dark);
-      margin-bottom: 10px;
-      font-size: 1.2rem;
-    }
+.trend-stat {
+  text-align: center;
+  min-width: 100px;
+}
 
-    .card p {
-      margin-bottom: 8px;
-    }
+.trend-value {
+  font-size: 1rem; /* ✅ 1.3rem → 1rem */
+  font-weight: 700;
+  color: var(--anatomous-primary);
+  margin-bottom: 0.3rem;
+}
 
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 50px;
-      font-size: 0.8rem;
-      font-weight: bold;
-      margin-top: 10px;
-    }
+.trend-label {
+  font-size: 0.65rem; /* ✅ 0.8rem → 0.65rem */
+  color: var(--anatomous-text-disabled);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
 
-    .status-active {
-      background: #e7f7ef;
-      color: #0a8754;
-    }
+.metric-change {
+  font-size: 0.7rem; /* ✅ 0.8rem → 0.7rem */
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
 
-    .status-completed {
-      background: #e7f1ff;
-      color: var(--primary);
-    }
+.change-positive {
+  background: rgba(0, 195, 122, 0.15);
+  color: var(--status-positive);
+}
 
-    .vital-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 10px;
-      margin-top: 15px;
-    }
+.change-negative {
+  background: rgba(255, 76, 76, 0.15);
+  color: var(--status-negative);
+}
 
-    .vital-item {
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      text-align: center;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    }
+.no-data {
+  text-align: center;
+  color: var(--anatomous-text-disabled);
+  padding: 1.5rem 1rem;
+  font-style: italic;
+  font-size: 0.85rem;
+}
 
-    .vital-value {
-      font-size: 1.4rem;
-      font-weight: bold;
-      color: var(--primary);
-    }
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin: 1.25rem 0;
+  page-break-inside: avoid;
+}
 
-    .vital-label {
-      font-size: 0.8rem;
-      color: var(--gray);
-      margin-top: 5px;
-    }
+.comparison-card {
+  background: var(--anatomous-surface);
+  padding: 1.25rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--anatomous-secondary);
+}
 
-    .empty-state {
-      text-align: center;
-      padding: 30px;
-      color: var(--gray);
-    }
+.comparison-card h4 {
+  color: var(--anatomous-primary);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
 
-    .empty-state i {
-      font-size: 3rem;
-      margin-bottom: 15px;
-      opacity: 0.5;
-    }
+.comparison-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.6rem 0;
+  padding: 0.6rem;
+  background: var(--anatomous-bg);
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
 
-    @media (max-width: 768px) {
-      .report-header {
-        flex-direction: column;
-        text-align: center;
-        gap: 15px;
-      }
-      
-      .user-grid, .card-grid, .vital-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+.comparison-metric .metric-label {
+  color: var(--anatomous-text-secondary);
+  text-transform: capitalize;
+}
+
+.comparison-value {
+  font-weight: 600;
+  color: var(--anatomous-text-primary);
+  margin-right: 0.5rem;
+}
+
+.comparison-change {
+  font-size: 0.7rem;
+  padding: 3px 10px;
+  border-radius: 15px;
+  font-weight: 600;
+}
+
+.goals-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--anatomous-surface);
+  margin-bottom: 1rem;
+  page-break-inside: auto;
+  font-size: 0.8rem; /* ✅ Smaller */
+}
+
+.goals-table thead {
+  page-break-after: avoid;
+}
+
+.goals-table th,
+.goals-table td {
+  padding: 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--anatomous-divider);
+}
+
+.goals-table th {
+  background: var(--anatomous-bg);
+  color: var(--anatomous-primary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+}
+
+.goals-table td {
+  color: var(--anatomous-text-secondary);
+}
+
+.goals-table td strong {
+  color: var(--anatomous-text-primary);
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.status-on-track {
+  background: rgba(0, 195, 122, 0.15);
+  color: var(--status-positive);
+}
+
+.status-completed {
+  background: rgba(0, 76, 215, 0.15);
+  color: var(--anatomous-secondary);
+}
+
+.status-paused {
+  background: rgba(245, 166, 35, 0.15);
+  color: var(--status-warning);
+}
+
+.alerts-container {
+  margin: 1.25rem 0;
+}
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem;
+  margin: 0.6rem 0;
+  border-radius: 6px;
+  border-left: 3px solid;
+  background: var(--anatomous-surface);
+  page-break-inside: avoid;
+}
+
+.alert-item.high {
+  border-left-color: var(--status-negative);
+  background: rgba(255, 76, 76, 0.1);
+}
+
+.alert-item.medium {
+  border-left-color: var(--status-warning);
+  background: rgba(245, 166, 35, 0.1);
+}
+
+.alert-item.low {
+  border-left-color: var(--anatomous-secondary);
+  background: rgba(0, 76, 215, 0.1);
+}
+
+.alert-severity {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-right: 0.85rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.alert-item.high .alert-severity {
+  background: var(--status-negative);
+  color: var(--anatomous-bg);
+}
+
+.alert-item.medium .alert-severity {
+  background: var(--status-warning);
+  color: var(--anatomous-bg);
+}
+
+.alert-item.low .alert-severity {
+  background: var(--anatomous-secondary);
+  color: var(--anatomous-text-primary);
+}
+
+.alert-message {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--anatomous-text-secondary);
+}
+
+.journal-entry {
+  background: var(--anatomous-surface);
+  padding: 1rem;
+  margin: 0.85rem 0;
+  border-radius: 6px;
+  border-left: 3px solid var(--anatomous-primary);
+  page-break-inside: avoid;
+}
+
+.journal-date {
+  font-weight: 600;
+  color: var(--anatomous-primary);
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.journal-content {
+  line-height: 1.5;
+  margin-bottom: 0.6rem;
+  color: var(--anatomous-text-secondary);
+  font-size: 0.85rem;
+}
+
+.recommendations-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin: 1.25rem 0;
+}
+
+.recommendation-category {
+  background: var(--anatomous-surface);
+  padding: 1.25rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--anatomous-primary);
+  page-break-inside: avoid;
+}
+
+.recommendation-category h3 {
+  color: var(--anatomous-primary);
+  font-size: 0.95rem;
+  margin-bottom: 0.85rem;
+}
+
+.recommendation-list {
+  list-style: none;
+  margin: 0.85rem 0 0 0;
+}
+
+.recommendation-list li {
+  margin: 0.6rem 0;
+  padding: 0.6rem 0.85rem;
+  background: var(--anatomous-bg);
+  border-radius: 4px;
+  border-left: 2px solid var(--anatomous-secondary);
+  line-height: 1.4;
+  font-size: 0.8rem;
+  color: var(--anatomous-text-secondary);
+}
+
+.recommendation-list li small {
+  color: var(--anatomous-text-disabled);
+  font-size: 0.7rem;
+}
+
+.disclaimer-text {
+  background: var(--anatomous-surface);
+  padding: 1.25rem;
+  border-radius: 6px;
+  border: 1px solid var(--anatomous-divider);
+  line-height: 1.6;
+  font-size: 0.8rem;
+  color: var(--anatomous-text-secondary);
+}
+
+.disclaimer-text p {
+  margin-bottom: 0.85rem;
+}
+
+.disclaimer-text p:last-child {
+  margin-bottom: 0;
+}
+
+.disclaimer-text strong {
+  color: var(--anatomous-text-primary);
+}
+
+.footer {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--anatomous-text-disabled);
+  margin-top: 1.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--anatomous-divider);
+}
+
+.tagline {
+  font-style: italic;
+  color: var(--anatomous-primary);
+}
+
+.toc-list {
+  list-style: decimal;
+  margin-left: 2rem;
+  line-height: 1.8;
+}
+
+.toc-list li {
+  margin: 0.6rem 0;
+  padding-left: 0.4rem;
+}
+
+.toc-list a {
+  color: var(--anatomous-primary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+
+.toc-list a:hover {
+  color: var(--anatomous-secondary);
+  text-decoration: underline;
+}
+
+.progress-summary {
+  background: var(--anatomous-surface);
+  padding: 1.25rem;
+  border-radius: 6px;
+  margin: 1.25rem 0;
+  border-left: 3px solid var(--anatomous-secondary);
+  page-break-inside: avoid;
+}
+
+/* === Progress Bars === */
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-bar-background {
+  flex-grow: 1;
+  background: var(--anatomous-divider);
+  border-radius: 10px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, var(--anatomous-primary), var(--anatomous-secondary));
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.progress-value {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--anatomous-primary);
+  min-width: 35px;
+}
+
+.progress-details {
+  font-size: 0.65rem;
+  color: var(--anatomous-text-disabled);
+  margin-top: 3px;
+}
+
+.progress-bar-full {
+  background: var(--anatomous-divider);
+  border-radius: 10px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.progress-bar-gradient {
+  background: linear-gradient(90deg, var(--anatomous-primary), var(--anatomous-secondary));
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+  color: var(--anatomous-text-disabled);
+}
+
+.progress-percentage {
+  font-weight: 600;
+  color: var(--anatomous-primary);
+}
+
+.entry-value {
+  font-weight: 600;
+  color: var(--anatomous-primary);
+}
+
+.entry-date {
+  color: var(--anatomous-text-disabled);
+}
+
+/* === Print оптимізація === */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  
+  .page {
+    page-break-after: always;
+    page-break-inside: avoid;
+    background: white;
+  }
+  
+  .section,
+  .metric-card,
+  .chart-container,
+  .comparison-card,
+  .alert-item,
+  .journal-entry,
+  .recommendation-category {
+    page-break-inside: avoid;
+  }
+  
+  .section-title,
+  .subsection-title {
+    page-break-after: avoid;
+  }
+  
+  /* Print dark theme colors */
+  :root {
+    --anatomous-bg: #ffffff;
+    --anatomous-surface: #f5f5f5;
+    --anatomous-text-primary: #000000;
+    --anatomous-text-secondary: #333333;
+  }
+}
   </style>
 </head>
-<body>
-  <div class="container">
-    <header class="report-header">
-      <div>
-        <h1><%= title %></h1>
-        <p class="report-date"><i class="far fa-calendar-alt"></i> <%= date %></p>
-      </div>
-      <div class="report-badge">
-        <i class="fas fa-user-md"></i> Health Report
-      </div>
-    </header>
+<body>  
 
-    <section class="section">
-      <div class="section-title">
-        <i class="fas fa-user-circle"></i>
-        <h2>User Information</h2>
-      </div>
-      <div class="user-grid">
-        <div class="user-info-card">
-          <strong>First Name</strong>
-          <%= user.first_name %>
-        </div>
-        <div class="user-info-card">
-          <strong>Last Name</strong>
-          <%= user.last_name %>
-        </div>
-        <div class="user-info-card">
-          <strong>Date of Birth</strong>
-          <%= user.dob %>
-        </div>
-        <div class="user-info-card">
-          <strong>Gender</strong>
-          <%= user.gender %>
-        </div>
-        <div class="user-info-card">
-          <strong>Height</strong>
-          <%= user.height_cm %> cm
-        </div>
-        <div class="user-info-card">
-          <strong>Weight</strong>
-          <%= user.weight_kg %> kg
-        </div>
-      </div>
-    </section>
+  <!-- Cover Page -->
+  <div class="page cover-page">
+    <div class="logo">ANATOMOUS</div>
+    <h1 class="report-title"><%= title || "Detailed Health Report" %></h1>
+    <div class="user-name"><%= user?.first_name || "" %> <%= user?.last_name || "" %></div>
+    <div class="date-range">Period: <%= date_range === 'all' ? 'All time' : `Last ${date_range} days` %></div>
+  </div>
 
-    <% if (insights && insights.length) { %>
-    <section class="section">
-      <div class="section-title">
-        <i class="fas fa-chart-line"></i>
-        <h2>Health Insights</h2>
-      </div>
-      <div class="card-grid">
-        <% insights.forEach(insight => { %>
-          <div class="card insight-card">
-            <% if(insight.title) { %>
-              <h3><i class="fas fa-lightbulb"></i> <%= insight.title %></h3>
-            <% } %>
-            <p><%= insight.description %></p>
-          </div>
-        <% }) %>
-      </div>
-    </section>
-    <% } else { %>
-    <section class="section">
-      <div class="section-title">
-        <i class="fas fa-chart-line"></i>
-        <h2>Health Insights</h2>
-      </div>
-      <div class="empty-state">
-        <i class="fas fa-comment-slash"></i>
-        <p>No insights available at this time.</p>
-      </div>
-    </section>
-    <% } %>
+  <!-- Table of Contents -->
+  <div class="page">
+    <h2 class="section-title">Table of Contents</h2>
+    <div class="toc-section">
+      <ol class="toc-list">
+        <li><a href="#overview">Overview / Summary</a></li>
+        <li><a href="#vitals-trends">Vitals & Trends</a></li>
+        <li><a href="#comparative-analytics">Comparative Analytics</a></li>
+        <li><a href="#goals-progress">Goals & Progress</a></li>
+        <li><a href="#lab-documents">Laboratory Files & Documents</a></li> 
+        <li><a href="#early-alerts">Early Alerts Summary</a></li>
+        <li><a href="#journal-entries">Notes / Journal Entries</a></li>
+        <li><a href="#conclusions">Conclusions & Recommendations</a></li>
+        <li><a href="#disclaimers">References / Disclaimers</a></li>
+      </ol>
+    </div>
+  </div>
 
+  <!-- Overview / Summary -->
+  <div class="page" id="overview">
+    <h2 class="section-title">Overview / Summary</h2>
+    <div class="overview-text">
+      <% if (insights && insights.length) { %>
+        <%= insights[0].description || insights[0].insight_text %>
+      <% } else { %>
+        This comprehensive health report provides detailed analysis of your biometric data, trends, and progress toward health goals. The following sections offer in-depth insights into your vital metrics, comparative analytics, and personalized recommendations.
+      <% } %>
+    </div>
+
+    <!-- Key Metrics Snapshot -->
     <% if (vitals && vitals.length) { %>
-    <section class="section">
-      <div class="section-title">
-        <i class="fas fa-heartbeat"></i>
-        <h2>Vital Signs</h2>
-      </div>
-      <div class="card-grid">
-        <% vitals.forEach(vital => { %>
-          <div class="card vital-card">
-            <h3><i class="far fa-calendar"></i> <%= vital.date %></h3>
-            <div class="vital-grid">
-              <div class="vital-item">
-                <div class="vital-value"><%= vital.heart_rate || '–' %></div>
-                <div class="vital-label">Heart Rate (bpm)</div>
-              </div>
-              <div class="vital-item">
-                <div class="vital-value"><%= vital.blood_pressure_systolic || '–' %>/<%= vital.blood_pressure_diastolic || '–' %></div>
-                <div class="vital-label">Blood Pressure</div>
-              </div>
-              <div class="vital-item">
-                <div class="vital-value"><%= vital.weekly_activity_minutes || '–' %></div>
-                <div class="vital-label">Activity (min)</div>
-              </div>
-              <div class="vital-item">
-                <div class="vital-value"><%= vital.hydration_liters || '–' %></div>
-                <div class="vital-label">Hydration (L)</div>
-              </div>
-              <div class="vital-item">
-                <div class="vital-value"><%= vital.pulse_oximetry || '–' %></div>
-                <div class="vital-label">Oximetry (%)</div>
-              </div>
-              <div class="vital-item">
-                <div class="vital-value"><%= vital.body_mass_index || '–' %></div>
-                <div class="vital-label">BMI</div>
-              </div>
-            </div>
-            <div style="margin-top: 15px; font-size: 0.9rem; color: var(--gray);">
-              <p><strong>Activity Level:</strong> <%= vital.activity_level || '–' %></p>
-              <p><strong>Respiratory Rate:</strong> <%= vital.respiratory_rate || '–' %></p>
-              <p><strong>Body Temperature:</strong> <%= vital.body_temperature || '–' %> °C</p>
-              <p><strong>Fasting Glucose:</strong> <%= vital.fasting_glucose || '–' %></p>
-            </div>
+    <div class="section">
+      <h3 class="subsection-title">Key Metrics Snapshot</h3>
+      <div class="metrics-grid">
+        <% 
+          const latest = vitals[vitals.length - 1]; 
+          const validVitals = vitals.filter(v => v.heart_rate > 0 || v.blood_pressure_systolic > 0);
+          const latestValid = validVitals.length > 0 ? validVitals[validVitals.length - 1] : latest;
+        %>
+        <div class="metric-card">
+          <div class="metric-value"><%= latestValid.heart_rate > 0 ? latestValid.heart_rate : '--' %> bpm</div>
+          <div class="metric-label">Heart Rate</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">
+            <%= latestValid.blood_pressure_systolic > 0 ? latestValid.blood_pressure_systolic : '--' %>/
+            <%= latestValid.blood_pressure_diastolic > 0 ? latestValid.blood_pressure_diastolic : '--' %>
           </div>
-        <% }) %>
+          <div class="metric-label">Blood Pressure</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value"><%= latestValid.pulse_oximetry > 0 ? latestValid.pulse_oximetry : '--' %>%</div>
+          <div class="metric-label">SpO₂</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value"><%= user?.weight_kg || '--' %> kg</div>
+          <div class="metric-label">Weight</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value"><%= latestValid.weekly_activity_minutes > 0 ? latestValid.weekly_activity_minutes : '--' %> min</div>
+          <div class="metric-label">Weekly Activity</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value"><%= latestValid.hydration_liters > 0 ? latestValid.hydration_liters : '--' %> L</div>
+          <div class="metric-label">Hydration</div>
+        </div>
       </div>
-    </section>
-    <% } %>
-
-    <% if (goals && goals.length) { %>
-    <section class="section">
-      <div class="section-title">
-        <i class="fas fa-bullseye"></i>
-        <h2>Health Goals</h2>
-      </div>
-      <div class="card-grid">
-        <% goals.forEach(goal => { %>
-          <div class="card goal-card">
-            <h3><%= goal.title %></h3>
-            <p><%= goal.description %></p>
-            <div class="status-badge <%= goal.status === 'active' ? 'status-active' : 'status-completed' %>">
-              <%= goal.status %>
-            </div>
-            <div style="margin-top: 15px; font-size: 0.9rem;">
-              <p><strong>Type:</strong> <%= goal.type || '–' %></p>
-              <p><strong>Target Date:</strong> <%= goal.target_date %></p>
-            </div>
-          </div>
-        <% }) %>
-      </div>
-    </section>
-    <% } %>
-
-    <% if (uploads && uploads.length) { %>
-    <section class="section">
-      <div class="section-title">
-        <i class="fas fa-file-upload"></i>
-        <h2>Uploaded Files</h2>
-      </div>
-      <div class="card-grid">
-        <% uploads.forEach(upload => { %>
-          <div class="card upload-card">
-            <h3><i class="fas fa-file"></i> <%= upload.name %></h3>
-            <p><strong>File Type:</strong> <%= upload.type %></p>
-            <p><strong>Uploaded At:</strong> <%= upload.created_at %></p>
-          </div>
-        <% }) %>
-      </div>
-    </section>
+    </div>
     <% } %>
   </div>
+
+  <!-- Vitals & Trends -->
+  <div class="page" id="vitals-trends">
+    <h2 class="section-title">Vitals & Trends</h2>
+    
+    <!-- Heart Rate Trend -->
+    <div class="section">
+      <h3 class="subsection-title">Heart Rate Trend</h3>
+      <div class="chart-container">
+        <% if (vitals_trend && vitals_trend.data && vitals_trend.data.heart_rate) { %>
+          <% const hr = vitals_trend.data.heart_rate; %>
+          <div class="trend-data">
+            <div class="trend-stats">
+              <div class="trend-stat">
+                <div class="trend-value"><%= hr.summary.last_value || '--' %> bpm</div>
+                <div class="trend-label">Current</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value"><%= hr.summary.avg ? hr.summary.avg.toFixed(1) : '--' %> bpm</div>
+                <div class="trend-label">Average</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value">
+                  <% if (hr.summary.change !== undefined) { %>
+                    <span class="metric-change <%= hr.summary.change >= 0 ? 'change-negative' : 'change-positive' %>">
+                      <%= hr.summary.change >= 0 ? '+' : '' %><%= hr.summary.change %>%
+                    </span>
+                  <% } else { %>
+                    --
+                  <% } %>
+                </div>
+                <div class="trend-label">Change vs Previous Period</div>
+              </div>
+            </div>
+            <div class="trend-stats">
+              <div class="trend-stat">
+                <div class="trend-value"><%= hr.summary.min || '--' %> bpm</div>
+                <div class="trend-label">Min</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value"><%= hr.summary.max || '--' %> bpm</div>
+                <div class="trend-label">Max</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value"><%= hr.summary.median || '--' %> bpm</div>
+                <div class="trend-label">Median</div>
+              </div>
+            </div>
+          </div>
+        <% } else { %>
+          <div class="no-data">No heart rate trend data available</div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Blood Pressure Trend -->
+    <div class="section">
+      <h3 class="subsection-title">Blood Pressure Trends</h3>
+      <div class="chart-container">
+        <% if (vitals_trend && vitals_trend.data && vitals_trend.data.blood_pressure_systolic) { %>
+          <% const bp_sys = vitals_trend.data.blood_pressure_systolic; %>
+          <% const bp_dia = vitals_trend.data.blood_pressure_diastolic; %>
+          <div class="trend-data">
+            <div class="trend-stats">
+              <div class="trend-stat">
+                <div class="trend-value">
+                  <%= bp_sys.summary.last_value || '--' %>/<%= bp_dia.summary.last_value || '--' %> mmHg
+                </div>
+                <div class="trend-label">Current BP</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value">
+                  <%= bp_sys.summary.avg ? bp_sys.summary.avg.toFixed(1) : '--' %>/
+                  <%= bp_dia.summary.avg ? bp_dia.summary.avg.toFixed(1) : '--' %> mmHg
+                </div>
+                <div class="trend-label">Average BP</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value">
+                  <% if (bp_sys.summary.change !== undefined) { %>
+                    <span class="metric-change <%= bp_sys.summary.change >= 0 ? 'change-negative' : 'change-positive' %>">
+                      <%= bp_sys.summary.change >= 0 ? '+' : '' %><%= bp_sys.summary.change %>%
+                    </span>
+                  <% } else { %>
+                    --
+                  <% } %>
+                </div>
+                <div class="trend-label">Systolic Change vs Previous Period</div>
+              </div>
+            </div>
+          </div>
+        <% } else { %>
+          <div class="no-data">No blood pressure trend data available</div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Activity & Hydration Trends -->
+    <div class="section">
+      <h3 class="subsection-title">Activity & Hydration Trends</h3>
+      <div class="chart-container">
+        <% if (vitals_trend && vitals_trend.data) { %>
+          <div class="trend-data">
+            <div class="trend-stats">
+              <% if (vitals_trend.data.weekly_activity_minutes) { %>
+                <div class="trend-stat">
+                  <div class="trend-value"><%= vitals_trend.data.weekly_activity_minutes.summary.last_value || '--' %> min</div>
+                  <div class="trend-label">Weekly Activity</div>
+                </div>
+              <% } %>
+              <% if (vitals_trend.data.hydration_liters) { %>
+                <div class="trend-stat">
+                  <div class="trend-value"><%= vitals_trend.data.hydration_liters.summary.last_value || '--' %> L</div>
+                  <div class="trend-label">Hydration</div>
+                </div>
+              <% } %>
+              <% if (vitals_trend.data.activity_level) { %>
+                <div class="trend-stat">
+                  <div class="trend-value"><%= vitals_trend.data.activity_level.summary.last_value || '--' %></div>
+                  <div class="trend-label">Activity Level</div>
+                </div>
+              <% } %>
+            </div>
+            <div class="trend-stats">
+              <% if (vitals_trend.data.weekly_activity_minutes && vitals_trend.data.weekly_activity_minutes.summary.change !== undefined) { %>
+                <div class="trend-stat">
+                  <div class="trend-value">
+                    <span class="metric-change <%= vitals_trend.data.weekly_activity_minutes.summary.change >= 0 ? 'change-positive' : 'change-negative' %>">
+                      <%= vitals_trend.data.weekly_activity_minutes.summary.change >= 0 ? '+' : '' %><%= vitals_trend.data.weekly_activity_minutes.summary.change %>%
+                    </span>
+                  </div>
+                  <div class="trend-label">Activity Change</div>
+                </div>
+              <% } %>
+              <% if (vitals_trend.data.hydration_liters && vitals_trend.data.hydration_liters.summary.change !== undefined) { %>
+                <div class="trend-stat">
+                  <div class="trend-value">
+                    <span class="metric-change <%= vitals_trend.data.hydration_liters.summary.change >= 0 ? 'change-positive' : 'change-negative' %>">
+                      <%= vitals_trend.data.hydration_liters.summary.change >= 0 ? '+' : '' %><%= vitals_trend.data.hydration_liters.summary.change %>%
+                    </span>
+                  </div>
+                  <div class="trend-label">Hydration Change</div>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        <% } else { %>
+          <div class="no-data">No activity trend data available</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparative Analytics -->
+  <div class="page" id="comparative-analytics">
+    <h2 class="section-title">Comparative Analytics</h2>
+    
+    <div class="comparison-grid">
+      <div class="comparison-card">
+        <h3 class="subsection-title">Metrics Overview vs Previous <%= date_range || 30 %> Days</h3>
+        <% if (vitals_trend && vitals_trend.data) { %>
+          <% Object.keys(vitals_trend.data).forEach(metric => { %>
+            <% if (vitals_trend.data[metric].summary && vitals_trend.data[metric].summary.change !== undefined) { %>
+              <div class="comparison-metric">
+                <span class="metric-label"><%= metric.replace(/_/g, ' ') %></span>
+                <div>
+                  <span class="comparison-value"><%= vitals_trend.data[metric].summary.last_value || '--' %></span>
+                  <span class="comparison-change <%= vitals_trend.data[metric].summary.change >= 0 ? 'change-negative' : 'change-positive' %>">
+                    <%= vitals_trend.data[metric].summary.change >= 0 ? '+' : '' %><%= vitals_trend.data[metric].summary.change %>%
+                  </span>
+                </div>
+              </div>
+            <% } %>
+          <% }) %>
+        <% } else { %>
+          <div class="no-data">No comparative data available</div>
+        <% } %>
+      </div>
+      
+      <div class="comparison-card">
+        <h3 class="subsection-title">Trend Summary</h3>
+        <% 
+          const trends = [];
+          if (vitals_trend && vitals_trend.data) {
+            Object.keys(vitals_trend.data).forEach(metric => {
+              if (vitals_trend.data[metric].summary) {
+                trends.push({
+                  metric: metric.replace(/_/g, ' '),
+                  direction: vitals_trend.data[metric].summary.trend_direction || 'stable',
+                  change: vitals_trend.data[metric].summary.change || 0
+                });
+              }
+            });
+          }
+        %>
+        <% if (trends.length > 0) { %>
+          <% trends.forEach(trend => { %>
+            <div class="comparison-metric">
+              <span class="metric-label"><%= trend.metric %></span>
+              <span class="comparison-change <%= trend.direction === 'up' ? 'change-negative' : trend.direction === 'down' ? 'change-positive' : '' %>">
+                <%= trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '→' %>
+                <%= trend.change %>%
+              </span>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <div class="no-data">No trend summary available</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goals & Progress -->
+  <!-- Goals & Progress -->
+<div class="page" id="goals-progress">
+  <h2 class="section-title">Goals & Progress</h2>
+  
+  <% 
+    // Safe handling of progress data with fallback
+    let activeGoals = [];
+    try {
+      if (typeof progress !== 'undefined' && Array.isArray(progress)) {
+        activeGoals = progress.filter(goal => goal && goal.status && goal.status !== 'archived');
+      }
+    } catch (error) {
+      activeGoals = [];
+    }
+  %>
+  
+  <% if (activeGoals && activeGoals.length) { %>
+    <!-- Загальна таблиця цілей -->
+    <div class="section">
+      <h3 class="subsection-title">Active Goals Overview</h3>
+      <table class="goals-table">
+        <thead>
+          <tr>
+            <th>Goal</th>
+            <th>Description</th>
+            <th>Target Date</th>
+            <th>Progress</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% activeGoals.forEach(goal => { %>
+            <tr>
+              <td><strong><%= goal.title || 'Untitled Goal' %></strong></td>
+              <td><%= goal.description || 'No description' %></td>
+              <td><%= goal.target_date ? new Date(goal.target_date).toLocaleDateString() : 'No date' %></td>
+              <td>
+                <% if (goal.progress && goal.progress.entries && goal.progress.entries.length > 0 && goal.progress.summary) { %>
+                  <% 
+                    // ✅ FIX: Правильний розрахунок прогресу
+                    const progressValue = Math.min(100, Math.max(0, goal.progress.summary.latest_value || 0));
+                  %>
+                  <div class="progress-container">
+                    <div class="progress-bar-background">
+                      <!-- ✅ FIX: Правильний синтаксис width без лапок -->
+                      <div class="progress-bar-fill" style="width: <%= progressValue %>%;"></div>
+                    </div>
+                    <span class="progress-value"><%= progressValue %>%</span>
+                  </div>
+                  <div class="progress-details">
+                    Latest: <%= goal.progress.summary.latest_value %> <%= goal.progress.summary.unit || '' %>
+                  </div>
+                <% } else { %>
+                  <span class="no-progress-data">No progress data</span>
+                <% } %>
+              </td>
+              <td>
+                <span class="status-badge status-<%= goal.status ? goal.status.toLowerCase().replace(' ', '-') : 'on-track' %>">
+                  <%= goal.status || 'On Track' %>
+                </span>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Детальний прогрес для кожної цілі -->
+    <div class="section">
+      <h3 class="subsection-title">Detailed Progress Tracking</h3>
+      
+      <% activeGoals.forEach((goal, index) => { %>
+        <% if (goal.progress && goal.progress.entries && goal.progress.entries.length > 0 && goal.progress.summary) { %>
+          <div class="chart-container goal-progress-container">
+            <h4 class="goal-title">
+              <%= goal.title || 'Untitled Goal' %>
+              <% if (goal.description) { %>
+                <span class="goal-description"> - <%= goal.description %></span>
+              <% } %>
+            </h4>
+            
+            <!-- Статистика прогресу -->
+            <div class="trend-stats">
+              <div class="trend-stat">
+                <div class="trend-value"><%= goal.progress.summary.latest_value %> <%= goal.progress.summary.unit || '' %></div>
+                <div class="trend-label">Current Value</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value"><%= goal.progress.summary.average_value || 0 %> <%= goal.progress.summary.unit || '' %></div>
+                <div class="trend-label">Average</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value"><%= goal.progress.summary.total_entries || 0 %></div>
+                <div class="trend-label">Entries</div>
+              </div>
+              <div class="trend-stat">
+                <div class="trend-value"><%= goal.progress.summary.total_value || 0 %> <%= goal.progress.summary.unit || '' %></div>
+                <div class="trend-label">Total</div>
+              </div>
+            </div>
+
+            <!-- Історія записів прогресу -->
+            <div class="progress-history">
+              <h5>Progress History</h5>
+              <table class="progress-history-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Value</th>
+                    <th>Unit</th>
+                    <th>Recorded</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% goal.progress.entries.forEach(entry => { %>
+                    <tr>
+                      <td class="entry-date"><%= entry.date ? new Date(entry.date).toLocaleDateString() : 'N/A' %></td>
+                      <td class="entry-value"><%= entry.value %></td>
+                      <td><%= entry.unit || '' %></td>
+                      <td class="entry-date"><%= entry.created_at ? new Date(entry.created_at).toLocaleDateString() : 'N/A' %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- ✅ FIX: Правильний прогрес бар з градієнтом -->
+            <div class="goal-progress-bar">
+              <div class="progress-label">
+                <span>Overall Progress</span>
+                <span class="progress-percentage">
+                  <% 
+                    const overallProgress = Math.min(100, Math.max(0, goal.progress.summary.latest_value || 0));
+                  %>
+                  <%= overallProgress %>%
+                </span>
+              </div>
+              <div class="progress-bar-full">
+                <!-- ✅ FIX: Правильний синтаксис без лапок всередині -->
+                <div class="progress-bar-gradient" style="width: <%= overallProgress %>%;"></div>
+              </div>
+            </div>
+          </div>
+        <% } else { %>
+          <!-- Цілі без прогресу -->
+          <div class="chart-container no-goal-progress">
+            <h4 class="goal-title-muted"><%= goal.title || 'Untitled Goal' %></h4>
+            <p class="no-progress-message">
+              No progress data recorded yet. Start tracking your progress to see insights here.
+            </p>
+          </div>
+        <% } %>
+      <% }) %>
+    </div>
+
+    <!-- Загальна статистика по цілях -->
+    <div class="section">
+      <h3 class="subsection-title">Goals Summary</h3>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-value"><%= activeGoals.length %></div>
+          <div class="metric-label">Active Goals</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">
+            <%= activeGoals.filter(goal => goal.progress && goal.progress.entries && goal.progress.entries.length > 0).length %>
+          </div>
+          <div class="metric-label">Goals with Progress</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">
+            <% 
+              const goalsWithGoodProgress = activeGoals.filter(goal => 
+                goal.progress && goal.progress.entries && goal.progress.entries.length > 0 && 
+                goal.progress.summary && goal.progress.summary.latest_value >= 50
+              ).length;
+            %>
+            <%= goalsWithGoodProgress %>
+          </div>
+          <div class="metric-label">Goals > 50% Progress</div>
+        </div>
+      </div>
+    </div>
+
+  <% } else { %>
+    <div class="no-data">No active goals available</div>
+  <% } %>
+</div>
+   
+  <!-- Laboratory Files & Documents -->
+  <div class="page" id="lab-documents">
+    <h2 class="section-title">Laboratory Files & Documents</h2>
+    
+    <% if (uploads && uploads.length) { %>
+      <div class="section">
+        <h3 class="subsection-title">Uploaded Files</h3>
+        <div class="uploads-container">
+          <table class="goals-table">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Type</th>
+                <th>Upload Date</th>
+                <th>Category</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% uploads.forEach(upload => { %>
+                <% if (!upload.deleted) { %>
+                  <tr>
+                    <td>
+                      <strong><%= upload.filename || 'Unnamed File' %></strong>
+                      <% if (upload.file && upload.file.size) { %>
+                        <br><small><%= (upload.file.size / 1024 / 1024).toFixed(2) %> MB</small>
+                      <% } %>
+                    </td>
+                    <td>
+                      <span class="status-badge status-on-track">
+                        <%= upload.file_type || 'Document' %>
+                      </span>
+                    </td>
+                    <td>
+                      <%= upload.created_at ? new Date(upload.created_at).toLocaleDateString() : 'Unknown date' %>
+                    </td>
+                    <td>
+                      <%= upload.category || 'General' %>
+                    </td>
+                  </tr>
+                <% } %>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- File Summary -->
+      <div class="section">
+        <h3 class="subsection-title">Documents Summary</h3>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-value"><%= uploads.filter(u => !u.deleted).length %></div>
+            <div class="metric-label">Total Files</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value">
+              <%= uploads.filter(u => !u.deleted && u.file_type === 'pdf').length %>
+            </div>
+            <div class="metric-label">PDF Documents</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value">
+              <% 
+                const totalSize = uploads
+                  .filter(u => !u.deleted && u.file && u.file.size)
+                  .reduce((sum, u) => sum + u.file.size, 0);
+              %>
+              <%= (totalSize / 1024 / 1024).toFixed(1) %> MB
+            </div>
+            <div class="metric-label">Total Size</div>
+          </div>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="no-data">
+        No laboratory files or documents uploaded
+        <div style="font-size: 0.9rem; margin-top: 10px;">
+          Upload lab results, medical documents, or other health-related files through the Anatomous platform.
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Early Alerts Summary -->
+  <div class="page" id="early-alerts">
+    <h2 class="section-title">Early Alerts Summary</h2>
+    
+    <div class="alerts-container">
+      <% if (alerts && alerts.length) { %>
+        <% 
+          const activeAlerts = alerts.filter(alert => !alert.resolved);
+          const criticalAlerts = activeAlerts.filter(alert => alert.severity === 'critical');
+        %>
+        
+        <% if (criticalAlerts.length > 0) { %>
+          <h3 class="subsection-title">Critical Alerts</h3>
+          <% criticalAlerts.forEach(alert => { %>
+            <div class="alert-item high">
+              <div class="alert-severity">Critical</div>
+              <div class="alert-message"><%= alert.description %></div>
+              <div class="alert-status">Active</div>
+            </div>
+          <% }) %>
+        <% } %>
+        
+        <% if (activeAlerts.length > criticalAlerts.length) { %>
+          <h3 class="subsection-title">Other Alerts</h3>
+          <% activeAlerts.forEach(alert => { %>
+            <% if (alert.severity !== 'critical') { %>
+              <div class="alert-item <%= alert.severity || 'medium' %>">
+                <div class="alert-severity"><%= alert.severity || 'Medium' %></div>
+                <div class="alert-message"><%= alert.description %></div>
+                <div class="alert-status">Active</div>
+              </div>
+            <% } %>
+          <% }) %>
+        <% } %>
+      <% } else { %>
+        <div class="no-data">No active alerts</div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Notes / Journal Entries -->
+  <div class="page" id="journal-entries">
+    <h2 class="section-title">Notes / Journal Entries</h2>
+    
+    <div class="journal-entries">
+      <% if (notes && notes.length) { %>
+        <% notes.forEach(note => { %>
+          <div class="journal-entry">
+            <div class="journal-date">
+              <%= note.data ? new Date(note.data).toLocaleDateString() : 
+                  note.created_at ? new Date(note.created_at).toLocaleDateString() : 'Unknown date' %>
+            </div>
+            <div class="journal-content"><%= note.text || note.content %></div>
+            <% if (note.mood_tag) { %>
+              <div class="journal-tags">
+                <span class="journal-tag">Mood: <%= note.mood_tag %></span>
+              </div>
+            <% } %>
+          </div>
+        <% }) %>
+      <% } else { %>
+        <div class="no-data">No journal entries available</div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Conclusions & Recommendations -->
+  <div class="page" id="conclusions">
+    <h2 class="section-title">Conclusions & Recommendations</h2>
+    
+    <!-- 30-Day Progress Summary -->
+    <div class="section">
+      <h3 class="subsection-title"><%= date_range || 30 %>-Day Progress Summary</h3>
+      <div class="progress-summary">
+        <div class="comparison-grid">
+          <div class="comparison-card">
+            <h4>Metric Improvements</h4>
+            <% 
+              const improvements = [];
+              if (vitals_trend && vitals_trend.data) {
+                Object.keys(vitals_trend.data).forEach(metric => {
+                  if (vitals_trend.data[metric].summary && vitals_trend.data[metric].summary.change < 0) {
+                    improvements.push({
+                      metric: metric.replace(/_/g, ' '),
+                      change: vitals_trend.data[metric].summary.change,
+                      current: vitals_trend.data[metric].summary.last_value
+                    });
+                  }
+                });
+              }
+            %>
+            <% if (improvements.length > 0) { %>
+              <% improvements.forEach(imp => { %>
+                <div class="comparison-metric">
+                  <span class="metric-label"><%= imp.metric %></span>
+                  <span class="comparison-change change-positive">
+                    ↓ <%= Math.abs(imp.change) %>%
+                  </span>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <div class="no-data">No significant improvements in the last <%= date_range || 30 %> days</div>
+            <% } %>
+          </div>
+          
+          <div class="comparison-card">
+            <h4>Areas Needing Attention</h4>
+            <% 
+              const concerns = [];
+              if (vitals_trend && vitals_trend.data) {
+                Object.keys(vitals_trend.data).forEach(metric => {
+                  if (vitals_trend.data[metric].summary && vitals_trend.data[metric].summary.change > 5) {
+                    concerns.push({
+                      metric: metric.replace(/_/g, ' '),
+                      change: vitals_trend.data[metric].summary.change,
+                      current: vitals_trend.data[metric].summary.last_value
+                    });
+                  }
+                });
+              }
+            %>
+            <% if (concerns.length > 0) { %>
+              <% concerns.forEach(concern => { %>
+                <div class="comparison-metric">
+                  <span class="metric-label"><%= concern.metric %></span>
+                  <span class="comparison-change change-negative">
+                    ↑ <%= concern.change %>%
+                  </span>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <div class="no-data">No significant concerns in trend analysis</div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="recommendations-grid">
+      <div class="recommendation-category">
+        <h3>Health Maintenance</h3>
+        <ul class="recommendation-list">
+          <% if (vitals_trend && vitals_trend.data && vitals_trend.data.heart_rate) { %>
+            <% const hr = vitals_trend.data.heart_rate; %>
+            <li>
+              Continue monitoring heart rate regularly
+              <% if (hr.summary && hr.summary.change !== undefined) { %>
+                <br><small>Trend: <%= hr.summary.change >= 0 ? '+' : '' %><%= hr.summary.change %>% vs previous <%= date_range || 30 %> days</small>
+              <% } %>
+            </li>
+          <% } %>
+          
+          <% if (vitals_trend && vitals_trend.data && vitals_trend.data.blood_pressure_systolic) { %>
+            <% const bp_sys = vitals_trend.data.blood_pressure_systolic; %>
+            <li>
+              Maintain blood pressure monitoring schedule
+              <% if (bp_sys.summary && bp_sys.summary.change !== undefined) { %>
+                <br><small>Systolic trend: <%= bp_sys.summary.change >= 0 ? '+' : '' %><%= bp_sys.summary.change %>% vs previous <%= date_range || 30 %> days</small>
+              <% } %>
+            </li>
+          <% } %>
+          
+          <% if (vitals_trend && vitals_trend.data && vitals_trend.data.weekly_activity_minutes) { %>
+            <% const activity = vitals_trend.data.weekly_activity_minutes; %>
+            <li>
+              Focus on consistent sleep and activity patterns
+              <% if (activity.summary && activity.summary.change !== undefined) { %>
+                <br><small>Activity change: <%= activity.summary.change >= 0 ? '+' : '' %><%= activity.summary.change %>% vs previous <%= date_range || 30 %> days</small>
+              <% } %>
+            </li>
+          <% } %>
+        </ul>
+      </div>
+      
+      <div class="recommendation-category">
+        <h3>Areas for Improvement</h3>
+        <ul class="recommendation-list">
+          <% if (alerts && alerts.length > 0) { %>
+            <li>
+              Address critical alerts with healthcare provider
+              <br><small><%= alerts.filter(a => !a.resolved && a.severity === 'critical').length %> active critical alerts</small>
+            </li>
+          <% } %>
+          
+          <% if (vitals_trend && vitals_trend.data && vitals_trend.data.weekly_activity_minutes) { %>
+            <% const activity = vitals_trend.data.weekly_activity_minutes; %>
+            <% if (activity.summary && activity.summary.last_value < 150) { %>
+              <li>
+                Consider increasing weekly activity to 150 minutes
+                <br><small>Current: <%= activity.summary.last_value %> minutes (<%= activity.summary.change >= 0 ? '+' : '' %><%= activity.summary.change %>% vs previous period)</small>
+              </li>
+            <% } %>
+          <% } %>
+          
+          <% if (vitals_trend && vitals_trend.data && vitals_trend.data.hydration_liters) { %>
+            <% const hydration = vitals_trend.data.hydration_liters; %>
+            <li>
+              Review nutrition and hydration habits
+              <% if (hydration.summary && hydration.summary.change !== undefined) { %>
+                <br><small>Hydration trend: <%= hydration.summary.change >= 0 ? '+' : '' %><%= hydration.summary.change %>% vs previous <%= date_range || 30 %> days</small>
+              <% } %>
+            </li>
+          <% } %>
+        </ul>
+      </div>
+    </div>
+    
+    <!-- Period Comparison Summary -->
+    <div class="section">
+      <h3 class="subsection-title">Period-over-Period Analysis</h3>
+      <div class="chart-container">
+        <div class="trend-stats">
+          <div class="trend-stat">
+            <div class="trend-value">
+              <% 
+                const improvedMetrics = vitals_trend && vitals_trend.data ? 
+                  Object.keys(vitals_trend.data).filter(metric => 
+                    vitals_trend.data[metric].summary && vitals_trend.data[metric].summary.change < 0
+                  ).length : 0;
+              %>
+              <%= improvedMetrics %>
+            </div>
+            <div class="trend-label">Metrics Improved</div>
+          </div>
+          <div class="trend-stat">
+            <div class="trend-value">
+              <% 
+                const declinedMetrics = vitals_trend && vitals_trend.data ? 
+                  Object.keys(vitals_trend.data).filter(metric => 
+                    vitals_trend.data[metric].summary && vitals_trend.data[metric].summary.change > 5
+                  ).length : 0;
+              %>
+              <%= declinedMetrics %>
+            </div>
+            <div class="trend-label">Metrics Declined</div>
+          </div>
+          <div class="trend-stat">
+            <div class="trend-value">
+              <%= date_range || 30 %> days
+            </div>
+            <div class="trend-label">Comparison Period</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- AI Insights Summary -->
+    <% if (insights && insights.length) { %>
+    <div class="section">
+      <h3 class="subsection-title">AI-Generated Insights</h3>
+      <div class="overview-text">
+        <% insights.slice(0, 3).forEach((insight, index) => { %>
+          <p><strong>Insight <%= index + 1 %>:</strong> <%= insight.description.substring(0, 200) %>...</p>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- References / Disclaimers -->
+  <div class="page" id="disclaimers">
+    <h2 class="section-title">References & Disclaimers</h2>
+    
+    <div class="disclaimer-text">
+      <p><strong>Important Disclaimer:</strong> This report is generated for informational purposes only and should not be considered medical advice.</p>
+      
+      <p>Always consult with qualified healthcare professionals for medical diagnoses and treatment recommendations.</p>
+      
+      <p>The Anatomous platform and its health reports are not substitutes for professional medical care.</p>
+      
+      <p>Report generated on: <%= new Date().toLocaleDateString() %></p>
+      <p>User: <%= user?.first_name || '' %> <%= user?.last_name || '' %></p>
+      <p class="tagline">Autonomy over Anatomy</p>
+    </div>
+    <div class="footer">
+      <div class="tagline">Autonomy over Anatomy</div>
+    </div>
+  </div>
+
 </body>
 </html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #4361ee;
+      --secondary: #3f37c9;
+      --success: #4cc9f0;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --gray: #6c757d;
+      --light-gray: #e9ecef;
+      --border-radius: 12px;
+      --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --transition: all 0.3s ease;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: var(--dark);
+      background-color: #f5f7fb;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .report-header {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      padding: 30px;
+      border-radius: var(--border-radius);
+      margin-bottom: 30px;
+      box-shadow: var(--box-shadow);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .report-header h1 {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+    }
+
+    .report-date {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    .report-badge {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 8px 16px;
+      border-radius: 50px;
+      font-size: 0.9rem;
+    }
+
+    .section {
+      background: white;
+      border-radius: var(--border-radius);
+      padding: 25px;
+      margin-bottom: 25px;
+      box-shadow: var(--box-shadow);
+      transition: var(--transition);
+    }
+
+    .section:hover {
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--light-gray);
+      color: var(--primary);
+    }
+
+    .section-title i {
+      margin-right: 10px;
+      font-size: 1.5rem;
+    }
+
+    .section-title h2 {
+      font-size: 1.5rem;
+    }
+
+    .user-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .user-info-card {
+      background: var(--light);
+      padding: 15px;
+      border-radius: var(--border-radius);
+      border-left: 4px solid var(--primary);
+    }
+
+    .user-info-card strong {
+      display: block;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--light);
+      border-radius: var(--border-radius);
+      padding: 20px;
+      transition: var(--transition);
+      border-top: 4px solid var(--success);
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+    }
+
+    .insight-card {
+      border-top-color: #7209b7;
+    }
+
+    .vital-card {
+      border-top-color: #f72585;
+    }
+
+    .goal-card {
+      border-top-color: #4cc9f0;
+    }
+
+    .upload-card {
+      border-top-color: #4895ef;
+    }
+
+    .card h3 {
+      color: var(--dark);
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+    }
+
+    .card p {
+      margin-bottom: 8px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .status-active {
+      background: #e7f7ef;
+      color: #0a8754;
+    }
+
+    .status-completed {
+      background: #e7f1ff;
+      color: var(--primary);
+    }
+
+    .vital-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .vital-item {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .vital-value {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: var(--primary);
+    }
+
+    .vital-label {
+      font-size: 0.8rem;
+      color: var(--gray);
+      margin-top: 5px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px;
+      color: var(--gray);
+    }
+
+    .empty-state i {
+      font-size: 3rem;
+      margin-bottom: 15px;
+      opacity: 0.5;
+    }
+
+    @media (max-width: 768px) {
+      .report-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+      }
+      
+      .user-grid, .card-grid, .vital-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="report-header">
+      <div>
+        <h1><%= title %></h1>
+        <p class="report-date"><i class="far fa-calendar-alt"></i> <%= date %></p>
+      </div>
+      <div class="report-badge">
+        <i class="fas fa-user-md"></i> Health Report
+      </div>
+    </header>
+
+    <section class="section">
+      <div class="section-title">
+        <i class="fas fa-user-circle"></i>
+        <h2>User Information</h2>
+      </div>
+      <div class="user-grid">
+        <div class="user-info-card">
+          <strong>First Name</strong>
+          <%= user.first_name %>
+        </div>
+        <div class="user-info-card">
+          <strong>Last Name</strong>
+          <%= user.last_name %>
+        </div>
+        <div class="user-info-card">
+          <strong>Date of Birth</strong>
+          <%= user.dob %>
+        </div>
+        <div class="user-info-card">
+          <strong>Gender</strong>
+          <%= user.gender %>
+        </div>
+        <div class="user-info-card">
+          <strong>Height</strong>
+          <%= user.height_cm %> cm
+        </div>
+        <div class="user-info-card">
+          <strong>Weight</strong>
+          <%= user.weight_kg %> kg
+        </div>
+      </div>
+    </section>
+
+    <% if (insights && insights.length) { %>
+    <section class="section">
+      <div class="section-title">
+        <i class="fas fa-chart-line"></i>
+        <h2>Health Insights</h2>
+      </div>
+      <div class="card-grid">
+        <% insights.forEach(insight => { %>
+          <div class="card insight-card">
+            <% if(insight.title) { %>
+              <h3><i class="fas fa-lightbulb"></i> <%= insight.title %></h3>
+            <% } %>
+            <p><%= insight.description %></p>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+    <% } else { %>
+    <section class="section">
+      <div class="section-title">
+        <i class="fas fa-chart-line"></i>
+        <h2>Health Insights</h2>
+      </div>
+      <div class="empty-state">
+        <i class="fas fa-comment-slash"></i>
+        <p>No insights available at this time.</p>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (vitals && vitals.length) { %>
+    <section class="section">
+      <div class="section-title">
+        <i class="fas fa-heartbeat"></i>
+        <h2>Vital Signs</h2>
+      </div>
+      <div class="card-grid">
+        <% vitals.forEach(vital => { %>
+          <div class="card vital-card">
+            <h3><i class="far fa-calendar"></i> <%= vital.date %></h3>
+            <div class="vital-grid">
+              <div class="vital-item">
+                <div class="vital-value"><%= vital.heart_rate || '–' %></div>
+                <div class="vital-label">Heart Rate (bpm)</div>
+              </div>
+              <div class="vital-item">
+                <div class="vital-value"><%= vital.blood_pressure_systolic || '–' %>/<%= vital.blood_pressure_diastolic || '–' %></div>
+                <div class="vital-label">Blood Pressure</div>
+              </div>
+              <div class="vital-item">
+                <div class="vital-value"><%= vital.weekly_activity_minutes || '–' %></div>
+                <div class="vital-label">Activity (min)</div>
+              </div>
+              <div class="vital-item">
+                <div class="vital-value"><%= vital.hydration_liters || '–' %></div>
+                <div class="vital-label">Hydration (L)</div>
+              </div>
+              <div class="vital-item">
+                <div class="vital-value"><%= vital.pulse_oximetry || '–' %></div>
+                <div class="vital-label">Oximetry (%)</div>
+              </div>
+              <div class="vital-item">
+                <div class="vital-value"><%= vital.body_mass_index || '–' %></div>
+                <div class="vital-label">BMI</div>
+              </div>
+            </div>
+            <div style="margin-top: 15px; font-size: 0.9rem; color: var(--gray);">
+              <p><strong>Activity Level:</strong> <%= vital.activity_level || '–' %></p>
+              <p><strong>Respiratory Rate:</strong> <%= vital.respiratory_rate || '–' %></p>
+              <p><strong>Body Temperature:</strong> <%= vital.body_temperature || '–' %> °C</p>
+              <p><strong>Fasting Glucose:</strong> <%= vital.fasting_glucose || '–' %></p>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (goals && goals.length) { %>
+    <section class="section">
+      <div class="section-title">
+        <i class="fas fa-bullseye"></i>
+        <h2>Health Goals</h2>
+      </div>
+      <div class="card-grid">
+        <% goals.forEach(goal => { %>
+          <div class="card goal-card">
+            <h3><%= goal.title %></h3>
+            <p><%= goal.description %></p>
+            <div class="status-badge <%= goal.status === 'active' ? 'status-active' : 'status-completed' %>">
+              <%= goal.status %>
+            </div>
+            <div style="margin-top: 15px; font-size: 0.9rem;">
+              <p><strong>Type:</strong> <%= goal.type || '–' %></p>
+              <p><strong>Target Date:</strong> <%= goal.target_date %></p>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (uploads && uploads.length) { %>
+    <section class="section">
+      <div class="section-title">
+        <i class="fas fa-file-upload"></i>
+        <h2>Uploaded Files</h2>
+      </div>
+      <div class="card-grid">
+        <% uploads.forEach(upload => { %>
+          <div class="card upload-card">
+            <h3><i class="fas fa-file"></i> <%= upload.name %></h3>
+            <p><strong>File Type:</strong> <%= upload.type %></p>
+            <p><strong>Uploaded At:</strong> <%= upload.created_at %></p>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+    <% } %>
+  </div>
+</body>
+</html>
