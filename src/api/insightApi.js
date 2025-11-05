@@ -16,6 +16,8 @@ export const InsightApi = {
         data_range: data.data_range || data.date_range || 'all'
       };
 
+      try { console.log('📤 generate-insight body:', requestData); } catch {}
+
       const response = await authRequest(`${API_BASE}/generate-insight`, {
         method: "POST",
         body: requestData,
