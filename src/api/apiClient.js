@@ -39,6 +39,14 @@ export const authRequest = async (url, options = {}, retry = true) => {
   const authToken = localStorage.getItem('authToken');
   if (authToken) {
     config.headers["Authorization"] = `Bearer ${authToken}`;
+    // Debug: show token in console in development or when explicitly enabled
+    try {
+      const isDev = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'development') || (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development');
+      const explicit = localStorage.getItem('debugShowToken') === '1';
+      if (isDev || explicit) {
+        console.log('🔐 authToken:', authToken);
+      }
+    } catch {}
   }
 
   if (config.body && typeof config.body === "object" && !isFormData) {
