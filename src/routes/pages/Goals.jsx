@@ -1,4 +1,5 @@
 import React from "react";
+import "./Goals.css";
 import { useSearchParams } from "react-router-dom";
 import { GoalsApi } from "../../api/goalsApi";
 import { useNotifications } from "../../api/NotificationContext.jsx";
@@ -14,7 +15,7 @@ function Tabs({ value, onChange }) {
     { key: "notes", label: "Notes" },
   ];
   return (
-    <div role="tablist" aria-label="Goals navigation" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 16 }}>
+    <div role="tablist" aria-label="Goals navigation" className="goals-tabs" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 16 }}>
       {items.map((t) => (
         <button
           key={t.key}
@@ -70,7 +71,7 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
   }[String(goal.status || "on track").toLowerCase()] || "secondary";
 
   return (
-    <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+    <div className="card goal-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
       <div>
         <div style={{ fontWeight: 600 }}>{goal.title}</div>
         {goal.description && (
@@ -90,7 +91,7 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
           })()}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="goal-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {(() => {
           const current = String(goal.status || 'on track').toLowerCase();
           const all = ["on track", "completed", "paused", "archived"];
@@ -99,6 +100,7 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
             <select
               value={current}
               onChange={(e) => onUpdate(goal, { status: e.target.value })}
+              className="status-select"
               style={{ height: 32, minWidth: 160 }}
               aria-label="Change status"
             >
@@ -225,7 +227,7 @@ function AddGoalForm({ onCreate, loading }) {
   const canSave = title.trim().length > 0;
 
   return (
-    <div className="card" style={{ display: "grid", gap: 12 }}>
+    <div className="card goals-form" style={{ display: "grid", gap: 12 }}>
       <div className="form-field">
         <label>Title</label>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Run 5km" />
@@ -370,7 +372,7 @@ export default function GoalsPage() {
   };
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="goals-page" style={{ display: "grid", gap: 16 }}>
       <div className="dash-toolbar">
         <h1 style={{ margin: 0 }}>Goals</h1>
       </div>

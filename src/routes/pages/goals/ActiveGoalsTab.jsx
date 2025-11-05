@@ -1,4 +1,5 @@
 import React from "react";
+import "../Goals.css";
 import { Modal } from "../../../components/Modal.jsx";
 import { ConfirmDeleteModal } from "../../../components/ConfirmDeleteModal.jsx";
 import { useGoals } from "../../../hooks/useGoals.js";
