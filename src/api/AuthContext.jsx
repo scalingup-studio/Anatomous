@@ -50,6 +50,14 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function initAuth() {
+      // Skip any auth bootstrap on public shared report route
+      try {
+        const href = typeof window !== 'undefined' ? (window.location.hash || window.location.pathname || '') : '';
+        if (href.includes('/shared-reports/')) {
+          setLoading(false);
+          return;
+        }
+      } catch {}
       try {
         // 1) Try localStorage token first and use it if still valid
         const storedToken = (() => { try { return localStorage.getItem('authToken') || null; } catch { return null; } })();

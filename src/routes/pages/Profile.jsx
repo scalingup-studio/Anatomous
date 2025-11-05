@@ -1054,7 +1054,7 @@ const calculateAgeFromDOB = (dob) => {
           console.log('📦 User ID:', user.id);
           console.log('📦 Category:', 'profile');
           
-          const res = await UploadFileApi.uploadAvatar(pendingPhotoFile, 'profile');
+          const res = await UploadFileApi.uploadAvatar(pendingPhotoFile, user.id);
           const uploaded = res?.result || res;
           const url = uploaded?.url || uploaded?.path || '';
           
@@ -1642,7 +1642,6 @@ const calculateAgeFromDOB = (dob) => {
                           throw new Error('Invalid vaccinations_id: must be a number');
                         }
                         const updatePayload = {
-                          vaccinations_id: numericId,
                           vaccine_name: payload.vaccine_name || '',
                           vaccination_date: payload.vaccination_date || null,
                           lot_number: payload.lot_number || '',
@@ -1651,7 +1650,7 @@ const calculateAgeFromDOB = (dob) => {
                           notes: payload.notes || '',
                           last_updated: Date.now(),
                         };
-                        response = await HealthHistoryApi.updateVaccination(updatePayload);
+                        response = await HealthHistoryApi.updateVaccination(numericId, updatePayload);
                       } else {
                         response = await HealthHistoryApi.addVaccination(payload);
                       }

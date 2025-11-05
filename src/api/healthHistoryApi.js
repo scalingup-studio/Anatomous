@@ -109,13 +109,12 @@ export const HealthHistoryApi = {
   },
 
   /**
-   * Update vaccination (PATCH /vaccinations with vaccinations_id in body)
-   * @param {Object} data - Must include vaccinations_id and fields to update
+   * Update vaccination via PATCH /vaccinations/{vaccinations_id}
    */
-  async updateVaccination(data) {
+  async updateVaccination(vaccinations_id, data) {
     try {
-      // Spec uses PATCH on collection with id in body
-      return await authRequest(ENDPOINTS.vaccinations.create, {
+      const url = ENDPOINTS.vaccinations.update(vaccinations_id);
+      return await authRequest(url, {
         method: 'PATCH',
         body: data
       });

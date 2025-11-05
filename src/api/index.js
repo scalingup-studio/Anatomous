@@ -15,6 +15,8 @@ export { UploadFileApi } from "./uploadFileApi";
 export { ComprehensiveAlertsApi } from "./comprehensiveAlertsApi";
 export { TrendsApi } from "./trendsApi";
 export { GetAlertsInsightApi } from "./getAlertsInsightApi";
+export { VaccinationsApi } from "./vaccinationsApi";
+export { FamilyHistoryApi } from "./familyHistoryApi";
 
 // Utilities and helpers
 export { createCrudApi } from "./helpers";
@@ -36,4 +38,6 @@ export const Api = {
   ComprehensiveAlerts: ComprehensiveAlertsApi,
   Trends: TrendsApi,
   GetAlertsInsight: GetAlertsInsightApi,
+  Vaccinations: VaccinationsApi,
+  FamilyHistory: FamilyHistoryApi,
 };

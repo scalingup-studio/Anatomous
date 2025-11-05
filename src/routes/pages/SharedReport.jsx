@@ -1,12 +1,21 @@
 import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { ReportsApi } from "../../api/reportsApi";
+import "../OnboardingLayout.css";
 
 export default function SharedReportPage() {
   const { token } = useParams();
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [data, setData] = React.useState(null);
+  const [viewerUrl, setViewerUrl] = React.useState("");
+  const handleCopyResult = React.useCallback(async () => {
+    const value = data?.result;
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(String(value));
+    } catch {}
+  }, [data]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -30,13 +39,67 @@ export default function SharedReportPage() {
   const fileUrl = data?.file_url || data?.report?.file_url || data?.result;
   const title = data?.title || data?.report?.title || "Shared Report";
   const expiresAt = data?.expires_at || data?.share?.expires_at;
+  const resultUrl = typeof data?.result === 'string' ? data.result : '';
+
+  // When we get a fileUrl, try to fetch as Blob to bypass X-Frame-Options on remote hosts
+  React.useEffect(() => {
+    let revokedUrl = "";
+    let cancelled = false;
+    async function prepareViewerUrl() {
+      if (!fileUrl) {
+        setViewerUrl("");
+        return;
+      }
+      // Default to direct URL first
+      setViewerUrl(fileUrl);
+      try {
+        const res = await fetch(fileUrl, { method: 'GET', credentials: 'omit' });
+        // If we cannot read due to CORS, this will still be ok for .blob() in many cases, but might throw
+        if (!res.ok) throw new Error(`Failed to load file (${res.status})`);
+        const blob = await res.blob();
+        // Only switch to blob URL if it is a PDF
+        const isPdf = (blob.type || '').toLowerCase().includes('pdf');
+        const objectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        revokedUrl = objectUrl;
+        setViewerUrl(isPdf ? objectUrl : fileUrl);
+      } catch (_) {
+        // Fallbacks if remote disallows embedding or CORS blocks reading
+        // 1) Try local proxy which strips X-Frame-Options
+        const origin = window.location.origin.replace(/\/$/, '');
+        const localProxy = `${origin}/api/pdf/proxy?url=${encodeURIComponent(fileUrl)}`;
+        // Also try dev server if backend runs on :3000 while UI on :5173
+        const devProxy = `http://localhost:3000/api/pdf/proxy?url=${encodeURIComponent(fileUrl)}`;
+        const candidate = origin.includes('3000') ? localProxy : devProxy;
+        setViewerUrl(candidate);
+      }
+    }
+    prepareViewerUrl();
+    return () => {
+      cancelled = true;
+      if (revokedUrl) URL.revokeObjectURL(revokedUrl);
+    };
+  }, [fileUrl]);
 
   return (
-    <div style={{ maxWidth: 920, margin: "24px auto", padding: 16 }}>
+    <>
+    <div
+      style={{
+        maxWidth: 1100,
+        width: "100%",
+        margin: "0 auto",
+        padding: 16,
+        minHeight: "calc(100vh - 80px)",
+        paddingBottom: 96
+      }}
+    >
       <div className="card" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ margin: 0 }}>{title}</h2>
-          <Link to="/" className="btn small outline">Back</Link>
+      
         </div>
         {expiresAt ? (
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>Expires: {new Date(expiresAt).toLocaleString()}</div>
@@ -53,14 +116,20 @@ export default function SharedReportPage() {
 
       {!loading && !error && (
         <div className="card" style={{ padding: 16 }}>
+         
           {fileUrl ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <a className="btn outline" href={fileUrl} target="_blank" rel="noreferrer">Open file</a>
-                <a className="btn" href={fileUrl} download>Download</a>
-              </div>
-              <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
-                <iframe title="shared-report" src={fileUrl} style={{ width: "100%", height: 640, border: 0 }} />
+            
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  height: "calc(100vh - 180px)",
+                  maxHeight: "calc(100vh - 120px)"
+                }}
+              >
+                <iframe title="shared-report" src={viewerUrl || fileUrl} style={{ width: "100%", height: "100%", border: 0 }} />
               </div>
             </div>
           ) : (
@@ -69,6 +138,20 @@ export default function SharedReportPage() {
         </div>
       )}
     </div>
+    {/* Full-width fixed footer */}
+    <footer className="onboarding-footer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, width: '100%', marginTop: 0 }}>
+      <div className="footer-content">
+        <div className="footer-left">
+          <span>© 2025 Anatomous</span>
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+        </div>
+        <div className="footer-right">
+          <a href="https://crisp.chat" target="_blank" rel="noopener noreferrer">Need Help?</a>
+        </div>
+      </div>
+    </footer>
+    </>
   );
 }
 

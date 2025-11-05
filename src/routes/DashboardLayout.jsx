@@ -111,7 +111,7 @@ function UserSummaryAndLogout({ onLogout }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.id]);
+  }, [user]);
   return (
     <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border, #ececec)' }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>

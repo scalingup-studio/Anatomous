@@ -147,16 +147,9 @@ export const ReportsApi = {
   },
 
   async sharedByToken(token) {
-    // Try public first; if 401, retry with auth
+    // Public endpoint; do NOT trigger auth refresh on this page
     const url = CUSTOM_ENDPOINTS.reports.sharedByToken(token);
-    try {
-      return await request(url, { method: "GET" });
-    } catch (e) {
-      if (e?.status === 401) {
-        return await authRequest(url, { method: "GET" });
-      }
-      throw e;
-    }
+    return await request(url, { method: "GET" });
   },
 };
 

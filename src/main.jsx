@@ -112,7 +112,9 @@ function AppRouter() {
     const match = path.match(/\/shared-reports\/([^\/?#]+)/);
     if (match && !window.location.hash.includes('/shared-reports/')) {
       const token = match[1];
-      window.location.hash = `#/shared-reports/${token}`;
+      const base = path.split('/shared-reports/')[0] || '/';
+      const target = `${base}#/shared-reports/${token}`;
+      window.location.replace(target);
       return null;
     }
   } catch {}

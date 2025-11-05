@@ -22,5 +22,6 @@ router.post("/generate-detailed", authMiddleware, pdfController.generateDetailed
 router.get("/list", authMiddleware, pdfController.listPdfs);
 router.delete("/:filename", authMiddleware, pdfController.deletePdf);
 router.get("/download", authMiddleware, pdfController.downloadPdf);
+router.get("/proxy", pdfController.proxyPdf);
 
 module.exports = router;

@@ -599,6 +599,7 @@ const OnboardingLayout = () => {
       // Complete onboarding
       console.log('✅ Completing onboarding...');
       const result = await OnboardingApi.completeOnboarding({
+        user_id: user?.id,
         stepsCompleted: [...completedSteps, currentStep]
       });
       
@@ -615,7 +616,10 @@ const OnboardingLayout = () => {
       localStorage.removeItem('onboarding-completed');
       
       showSuccess('Welcome to Anatomous! Your profile has been set up successfully.');
-      console.log('🚫 Skipping redirect to dashboard after completion success');
+      // Redirect to dashboard after successful completion
+      try {
+        navigate('/dashboard');
+      } catch {}
     } catch (error) {
       console.error('❌ Error completing onboarding:', error);
       showError('Failed to complete setup. Please try again.');

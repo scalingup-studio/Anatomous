@@ -23,13 +23,14 @@ function formatMetricTitle(input) {
 // BarGraph Component with tooltips
 function BarGraph({ data, height = 120, color = "var(--primary)", gradientBg = "rgba(0,186,206,0.1)" }) {
   const [tooltip, setTooltip] = useState(null);
+  const containerRef = React.useRef(null);
 
   if (!data || data.length === 0) {
     return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>No data</div>;
   }
 
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={containerRef} style={{ position: "relative", overflow: "visible" }}>
       <div
         style={{
           height,
@@ -99,33 +100,164 @@ function BarGraph({ data, height = 120, color = "var(--primary)", gradientBg = "
         ))}
       </div>
       
-      {tooltip && (
-        <div
-          style={{
-            position: "absolute",
-            left: `${(tooltip.x / data.length) * 100}%`,
-            bottom: "100%",
-            transform: "translateX(-50%) translateY(-8px)",
-            background: "rgba(0,0,0,0.9)",
-            backdropFilter: "blur(8px)",
-            color: "var(--text)",
-            padding: "6px 10px",
-            borderRadius: 6,
-            fontSize: 12,
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            border: "1px solid var(--border)",
-            zIndex: 1000,
-          }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.label}</div>
-          <div style={{ color: tooltip.isEmpty ? "var(--muted)" : color, fontSize: 11 }}>
-            {tooltip.isEmpty ? "No data" : tooltip.value}
+      {tooltip && (() => {
+        const width = containerRef.current?.clientWidth || 0;
+        const rawLeft = (tooltip.x / data.length) * width;
+        const clamped = Math.max(56, Math.min(width - 56, rawLeft));
+        return (
+          <div
+            style={{
+              position: "absolute",
+              left: clamped,
+              bottom: "100%",
+              transform: "translateY(-8px)",
+              background: "rgba(0,0,0,0.9)",
+              backdropFilter: "blur(8px)",
+              color: "var(--text)",
+              padding: "6px 10px",
+              borderRadius: 6,
+              fontSize: 12,
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              border: "1px solid var(--border)",
+              zIndex: 2000,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.label}</div>
+            <div style={{ color: tooltip.isEmpty ? "var(--muted)" : color, fontSize: 11 }}>
+              {tooltip.isEmpty ? "No data" : tooltip.value}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
+}
+
+// Robust bar chart using flex divs (no SVG), tooltip pinned inside container
+function FlexBarChart({ data, height = 140, color = 'var(--primary)' }) {
+  const [tip, setTip] = useState(null); // {x,label,value}
+  const ref = React.useRef(null);
+  const barRefs = React.useRef([]);
+  if (!data || data.length === 0) {
+    return <div style={{ height, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)' }}>No data</div>;
+  }
+  const maxH = Math.max(1, ...data.map(d=>Number(d.height)||0));
+  return (
+    <div ref={ref} style={{ position:'relative', border:'1px solid var(--border)', borderRadius:8, padding:'8px', background:'linear-gradient(to top, rgba(0,186,206,0.08), transparent)', height }}>
+      <div style={{ position:'absolute', inset:'8px', display:'flex', alignItems:'flex-end', gap:4 }}>
+        {data.map((d,i)=>{
+          const hPct = Math.max(0, Math.min(100, (Number(d.height)||0)));
+          return (
+            <div key={i} ref={el => (barRefs.current[i] = el)}
+              style={{ flex:1, minWidth:2, height:'100%', display:'flex', alignItems:'flex-end' }}
+              onMouseEnter={() => {
+                const cont = ref.current?.getBoundingClientRect();
+                const b = barRefs.current[i]?.getBoundingClientRect();
+                if (!cont || !b) return;
+                const center = (b.left + b.right) / 2 - cont.left;
+                setTip({ x: center, label: d.label || `Day ${i+1}`, value: d.value });
+              }}
+              onMouseLeave={() => setTip(null)}
+            >
+              <div style={{ width:'100%', height:`${(hPct/maxH)*100}%`, background:color, opacity:d.isEmpty?0.4:1, borderRadius:'2px 2px 0 0' }} />
+            </div>
+          );
+        })}
+      </div>
+      {tip && (()=>{
+        const w = ref.current?.clientWidth || 0;
+        const left = Math.max(56, Math.min(w-56, tip.x));
+        return (
+          <div style={{ position:'absolute', left, top:8, transform:'translateX(-50%)', background:'rgba(0,0,0,0.9)', color:'var(--text)', padding:'6px 10px', border:'1px solid var(--border)', borderRadius:6, fontSize:12, pointerEvents:'none', zIndex:3000, maxWidth:'90%', whiteSpace:'nowrap' }}>
+            <div style={{ fontWeight:600, marginBottom:2 }}>{tip.label}</div>
+            <div style={{ fontSize:11 }}>{tip.value}</div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// Google Charts ColumnChart wrapper
+function GoogleColumnChart({ data, height = 180, color = '#00BACE' }) {
+  const containerRef = React.useRef(null);
+
+  const loadGoogle = React.useCallback(() => {
+    return new Promise((resolve) => {
+      if (window.google && window.google.charts) {
+        resolve();
+        return;
+      }
+      const existing = document.querySelector('script[src="https://www.gstatic.com/charts/loader.js"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve());
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = 'https://www.gstatic.com/charts/loader.js';
+      s.async = true;
+      s.onload = () => resolve();
+      document.head.appendChild(s);
+    });
+  }, []);
+
+  const draw = React.useCallback(() => {
+    if (!containerRef.current || !window.google) return;
+    const google = window.google;
+    if (!google.visualization) return;
+
+    const table = new google.visualization.DataTable();
+    table.addColumn('string', 'Day');
+    table.addColumn('number', 'Value');
+    table.addColumn({ type: 'string', role: 'style' });
+
+    const rows = (data || []).map((d, i) => {
+      const label = d.label || String(i + 1);
+      // Prefer value if present; fallback to height percentage
+      const val = Number(d.value ?? d.height ?? 0);
+      return [label, isNaN(val) ? 0 : val, `color: ${color}`];
+    });
+    table.addRows(rows);
+
+    const opts = {
+      backgroundColor: 'transparent',
+      legend: { position: 'none' },
+      bar: { groupWidth: '85%' },
+      height,
+      chartArea: { left: 32, top: 12, width: '88%', height: '72%' },
+      hAxis: { textStyle: { color: '#9AA0A6', fontSize: 9 } },
+      vAxis: { textStyle: { color: '#9AA0A6', fontSize: 9 }, gridlines: { color: 'rgba(255,255,255,0.1)' } },
+      tooltip: { isHtml: false },
+    };
+
+    const chart = new google.visualization.ColumnChart(containerRef.current);
+    chart.draw(table, opts);
+    return chart;
+  }, [data, height, color]);
+
+  React.useEffect(() => {
+    let chartInstance = null;
+    let resize;
+    let mounted = true;
+    (async () => {
+      await loadGoogle();
+      if (!mounted) return;
+      window.google.charts.load('current', { packages: ['corechart'] });
+      window.google.charts.setOnLoadCallback(() => {
+        chartInstance = draw();
+        resize = () => draw();
+        window.addEventListener('resize', resize);
+      });
+    })();
+    return () => {
+      mounted = false;
+      if (resize) window.removeEventListener('resize', resize);
+      // google charts cleans on next draw; nothing to dispose safely here
+    };
+  }, [loadGoogle, draw]);
+
+  return <div ref={containerRef} style={{ width: '100%', height }} />;
 }
 
 // LineGraph Component with tooltips
@@ -237,7 +369,7 @@ function LineGraph({ data, height = 120, color = "var(--primary)", gradientBg = 
   };
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div style={{ position: "relative", width: "100%", overflow: "visible" }}>
       <svg
         width="100%"
         height={height}
@@ -418,9 +550,9 @@ function LineGraph({ data, height = 120, color = "var(--primary)", gradientBg = 
         <div
           style={{
             position: "absolute",
-            left: `${(tooltip.x / data.length) * 100}%`,
+            left: `${Math.min(92, Math.max(8, (tooltip.x / data.length) * 100))}%`,
             bottom: "100%",
-            transform: "translateX(-50%) translateY(-8px)",
+            transform: "translateY(-8px)",
             background: "rgba(0,0,0,0.9)",
             backdropFilter: "blur(8px)",
             color: "var(--text)",
@@ -430,7 +562,7 @@ function LineGraph({ data, height = 120, color = "var(--primary)", gradientBg = 
             whiteSpace: "nowrap",
             pointerEvents: "none",
             border: "1px solid var(--border)",
-            zIndex: 1000,
+            zIndex: 2000,
           }}
         >
           <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.label}</div>
@@ -627,8 +759,85 @@ export default function DashboardInsights() {
 
 function AIInsightsTab() {
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+     
       <ChatComponent />
+    </div>
+  );
+}
+
+function RecentInsightsCard() {
+  const [metric, setMetric] = useState('heart_rate');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [data, setData] = useState(null);
+
+  const metrics = [
+    'heart_rate',
+    'blood_pressure',
+    'sleep_duration',
+    'blood_oxygen',
+    'body_temp'
+  ];
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const res = await InsightApi.getRecentInsights(metric);
+      setData(res?.result || res);
+    } catch (e) {
+      setError(e?.message || 'Failed to load recent insights');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [metric]);
+
+  const items = (() => {
+    const r = data ?? [];
+    const list = Array.isArray(r)
+      ? r
+      : (r.items || r.results || r.list || r.insights || r.data || (r.insight ? [r] : []));
+    if (!Array.isArray(list)) return [];
+    return list.map((it) => {
+      const title = it.title || it.name || '';
+      const body = it.insight || it.text || it.message || it.content || '';
+      const created = it.created_at || it.date || '';
+      return { title, body, created };
+    });
+  })();
+
+  return (
+    <div className="card" style={{ padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        <h3 style={{ margin: 0 }}>Recent Insights</h3>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select value={metric} onChange={(e)=>setMetric(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(17,17,17,.85)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+            {metrics.map(m => (<option key={m} value={m}>{m}</option>))}
+          </select>
+          <button className="btn outline small" onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+        </div>
+      </div>
+      {error ? (
+        <div style={{ color: 'var(--error)', fontSize: 12 }}>{error}</div>
+      ) : items.length ? (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {items.map((it, idx) => (
+            <div key={idx} style={{ padding:12, border:'1px solid var(--border)', borderRadius:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <div style={{ fontWeight:600 }}>Insight #{idx+1}{it.title ? ` — ${it.title}` : ''}</div>
+                {it.created ? (<div style={{ fontSize:12, color:'var(--muted)' }}>{new Date(it.created).toLocaleString()}</div>) : null}
+              </div>
+              <div style={{ fontSize:14, color:'var(--text)' }}>{it.body || '—'}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 14, color: 'var(--muted)' }}>No recent insight available for this metric.</div>
+      )}
     </div>
   );
 }
@@ -642,6 +851,38 @@ function TrendsTab() {
   const [selectedPeriod, setSelectedPeriod] = useState("Overview");
   const { showNotification } = useNotifications();
   const { user } = useAuth();
+
+  // Recent insights for the selected metric (GET /insights_recent)
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [recentError, setRecentError] = useState("");
+  const [recentItems, setRecentItems] = useState([]);
+
+  const loadRecentInsights = async () => {
+    try {
+      setRecentLoading(true);
+      setRecentError("");
+      const res = await InsightApi.getRecentInsights(selectedMetric);
+      const raw = res?.result || res;
+      const list = Array.isArray(raw)
+        ? raw
+        : (raw?.items || raw?.results || raw?.list || raw?.insights || (raw?.insight || raw?.description ? [raw] : []));
+      const normalized = Array.isArray(list)
+        ? list.map((it) => ({
+            title: it.title || it.name || "",
+            body: it.description || it.insight || it.text || it.message || it.content || "",
+            created: it.created_at || it.date || "",
+          }))
+        : [];
+      setRecentItems(normalized);
+    } catch (e) {
+      setRecentError(e?.message || "Failed to load recent insights");
+      setRecentItems([]);
+    } finally {
+      setRecentLoading(false);
+    }
+  };
+
+  useEffect(() => { loadRecentInsights(); }, [selectedMetric]);
 
   const metrics = ["heart_rate", "blood_pressure", "sleep_duration", "blood_oxygen", "body_temp"];
 
@@ -872,39 +1113,54 @@ function TrendsTab() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Top section */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-        {/* Recent Insights */}
+        {/* Recent Insights (wired to API) */}
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Recent Insights</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-            {[1, 2, 3, 4].map((num) => (
-              <div
-                key={num}
-                style={{
-                  padding: 12,
-                  background: "rgba(0,186,206,0.1)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  minHeight: 100,
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>Insight #{num}</div>
-                <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-                </div>
-              </div>
-            ))}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <h3 style={{ marginTop: 0 }}>Recent Insights</h3>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <select value={selectedMetric} onChange={(e)=>setSelectedMetric(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(17,17,17,.85)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+                {metrics.map(m => (<option key={m} value={m}>{m}</option>))}
+              </select>
+              <button className="btn outline small" onClick={loadRecentInsights} disabled={recentLoading}>{recentLoading ? 'Loading…' : 'Refresh'}</button>
+            </div>
           </div>
+          {recentError ? (
+            <div style={{ color:'var(--error)', fontSize:12, marginTop:8 }}>{recentError}</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+              {(recentItems.length ? recentItems.slice(0,4) : []).map((it, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: 12,
+                    background: "rgba(0,186,206,0.1)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    minHeight: 100,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Insight #{idx+1}{it.title ? ` — ${it.title}` : ''}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {it.body || '—'}
+                  </div>
+                </div>
+              ))}
+              {(!recentItems.length) && [1,2,3,4].map((num) => (
+                <div key={`placeholder-${num}`} style={{ padding:12, background:"rgba(0,186,206,0.1)", border:"1px solid var(--border)", borderRadius:8, minHeight:100 }}>
+                  <div style={{ fontWeight:600, marginBottom:8 }}>Insight #{num}</div>
+                  <div style={{ fontSize:12, color:"var(--muted)" }}>No data yet.</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Vitals */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Vitals</h3>
           <div style={{ marginTop: 12 }}>
-            {/* Placeholder graph */}
-            <BarGraph 
-              data={vitalsData}
-              height={120}
-            />
+            {/* Google Column Chart */}
+            <GoogleColumnChart data={vitalsData} height={160} />
 
             {/* Vital stats */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -977,10 +1233,7 @@ function TrendsTab() {
             <h4 style={{ marginTop: 0, marginBottom: 12 }}>Health Trend</h4>
           
             </div>
-            <BarGraph 
-              data={healthTrendData}
-              height={120}
-            />
+            <GoogleColumnChart data={healthTrendData} height={180} />
           </div>
 
           {/* Forecast */}

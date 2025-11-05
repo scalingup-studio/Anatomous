@@ -47,6 +47,29 @@ export const UploadFileApi = {
   },
 
   /**
+   * Upload user avatar
+   */
+  async uploadAvatar(file, userId) {
+    try {
+      const formData = new FormData();
+      // Some backends expect field name `image` instead of `file`
+      formData.append("file", file);
+      formData.append("image", file);
+      if (userId) formData.append("user_id", userId);
+      // Keep payload minimal for avatar endpoint; many backends reject file_type here
+      formData.append("file_name", file.name || "avatar.jpg");
+
+      return await authRequest(CUSTOM_ENDPOINTS.uploudFile.avatarUpload, {
+        method: "POST",
+        body: formData,
+      });
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get all uploaded files for a specific user
    */
   async getUserFiles(userId) {
