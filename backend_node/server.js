@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const pdfRoutes = require("./routes/pdf");
+const path = require("path"); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,10 +24,17 @@ app.use((req, res, next) => {
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// ✅ ПРАВИЛЬНЫЕ пути - теперь css и images на одном уровне с server.js
+app.use('/css', express.static(path.join(__dirname, 'css')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
 // Routes
 app.use("/api/pdf", pdfRoutes);
 
 // Start server
 app.listen(PORT, () => {
   console.log(`PDF service running on http://localhost:${PORT}`);
+  console.log(`CSS available at: http://localhost:${PORT}/css/report-advanced.css`);
+  console.log(`CSS available at: http://localhost:${PORT}/css/report-basic.css`);
+  console.log(`Images available at: http://localhost:${PORT}/images/logo-anatomous.png`);
 });
