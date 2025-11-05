@@ -11,7 +11,9 @@ export const InsightApi = {
     try {
       const requestData = {
         query: data.query || '',
-        metrics: data.metrics || [] // Always send metrics array
+        metrics: data.metrics || [], // Always send metrics array
+        // Xano endpoint expects body.data_range (note: not date_range)
+        data_range: data.data_range || data.date_range || 'all'
       };
 
       const response = await authRequest(`${API_BASE}/generate-insight`, {
