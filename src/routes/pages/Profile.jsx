@@ -2415,9 +2415,7 @@ const calculateAgeFromDOB = (dob) => {
                     <p style={{ color: 'var(--muted)', margin: '0 0 8px 0' }}>
                       No health data records yet. Add your first entry above.
                     </p>
-                    <p style={{ color: 'var(--warning)', fontSize: '14px', margin: 0 }}>
-                      Note: If you've added data but don't see it here, the API endpoint may not be available yet.
-                    </p>
+                   
                   </div>
                 )}
               </div>

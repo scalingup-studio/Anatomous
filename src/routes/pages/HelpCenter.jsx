@@ -97,7 +97,7 @@ export default function HelpCenterPage() {
 
       <div style={{ display:'grid', gridTemplateColumns:'1.2fr 1fr', gap:16 }}>
         {/* FAQ column */}
-        <div className="card" style={{ display:'grid', gap:8 }}>
+        <div className="card" style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
           <h3 style={{ marginTop:0 }}>Smart FAQ</h3>
           {filtered.map(cat => (
             <div key={cat.id} id={`hc-cat-${cat.id}`} className="card" style={{ padding:12 }}>

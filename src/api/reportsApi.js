@@ -51,6 +51,9 @@ export const ReportsApi = {
       auto_generate: Boolean(payload.auto_generate),
       layout: payload.layout || 'detailed',
       date_range: payload.date_range || 'all',
+      // Optional explicit dates for custom ranges
+      start_date: payload.start_date || undefined,
+      end_date: payload.end_date || undefined,
       insights: !!(payload.insights ?? payload.sections?.insights),
       vitals: !!(payload.vitals ?? payload.sections?.vitals),
       labs: !!(payload.labs ?? payload.sections?.labs),
@@ -66,10 +69,35 @@ export const ReportsApi = {
       ? CUSTOM_ENDPOINTS.reports.generateSimple
       : CUSTOM_ENDPOINTS.reports.generateDetailed;
 
-    return await authRequest(endpoint, {
-      method: "POST",
-      body,
-    });
+    // Strategy: 1) JSON (per docs). If 400 filename -> 2) JSON + ?filename. If still fails -> 3) multipart + ?filename
+    try {
+      return await authRequest(endpoint, { method: 'POST', body });
+    } catch (err1) {
+      const needsFilename = (err1?.status === 400) && (
+        err1?.data?.code === 'ERROR_CODE_INPUT_ERROR' || String(err1?.message || '').toLowerCase().includes('filename')
+      );
+      if (!needsFilename) throw err1;
+
+      // Retry JSON with filename in query
+      const params1 = new URLSearchParams();
+      params1.set('filename', body.filename);
+      const url1 = `${endpoint}?${params1.toString()}`;
+      try {
+        return await authRequest(url1, { method: 'POST', body });
+      } catch (err2) {
+        const stillNeeds = (err2?.status === 400) && (
+          err2?.data?.code === 'ERROR_CODE_INPUT_ERROR' || String(err2?.message || '').toLowerCase().includes('filename')
+        );
+        if (!stillNeeds) throw err2;
+
+        // Final fallback: multipart + query
+        const form = new FormData();
+        Object.entries(body).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) form.append(k, String(v));
+        });
+        return await authRequest(url1, { method: 'POST', body: form });
+      }
+    }
   },
 
   async download(report_id, opts = {}) {
