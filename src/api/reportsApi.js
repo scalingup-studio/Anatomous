@@ -122,26 +122,18 @@ export const ReportsApi = {
     const inferredName = decodeURIComponent(match?.[1] || match?.[2] || 'report');
 
     const blob = await res.blob();
-    const a = document.createElement('a');
     const objectUrl = URL.createObjectURL(blob);
-    a.href = objectUrl;
-    a.download = inferredName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-    return { success: true };
+    // Open in new tab instead of forcing download
+    window.open(objectUrl, '_blank', 'noopener');
+    // Revoke after short delay to allow tab to load the blob
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+    return { success: true, filename: inferredName };
   },
 
   async downloadFileUrl(fileUrl, suggestedName = 'report') {
     if (!fileUrl) throw new Error('No file_url provided');
-    const a = document.createElement('a');
-    a.href = fileUrl;
-    a.download = suggestedName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    return { success: true };
+    window.open(fileUrl, '_blank', 'noopener');
+    return { success: true, filename: suggestedName };
   },
 
   async share(payload) {
