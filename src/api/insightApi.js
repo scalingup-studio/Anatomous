@@ -11,9 +11,10 @@ export const InsightApi = {
     try {
       const requestData = {
         query: data.query || '',
-        metrics: data.metrics || [], // Always send metrics array
-        // Xano endpoint expects body.data_range (note: not date_range)
-        data_range: data.data_range || data.date_range || 'all'
+        // metrics should be an object per spec; gracefully handle arrays/undefined
+        metrics: (data && typeof data.metrics === 'object' && !Array.isArray(data.metrics)) ? data.metrics : {},
+        // Optional: some backends expect body.data_range; include only if provided
+        ...(data?.data_range || data?.date_range ? { data_range: data.data_range || data.date_range } : {})
       };
 
       try { console.log('📤 generate-insight body:', requestData); } catch {}
