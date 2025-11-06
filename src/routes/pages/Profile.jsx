@@ -1211,7 +1211,7 @@ const calculateAgeFromDOB = (dob) => {
       </div>
 
       {activeTab === 'personal' && (
-      <div className="card" style={{ display: "flex", gap: 16, marginBottom: 24,  alignItems:'flex-start', width: 'fit-content', maxWidth: '100%' }}>
+      <div className="card" style={{ display: "flex", gap: 16, marginBottom: 24,  alignItems:'flex-start', maxWidth: 900}}>
         <div 
           style={{ width: 120, height: 120, backgroundColor: "#0b0b0b", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border:'1px solid var(--border)', overflow:'hidden', cursor:'pointer', position:'relative' }}
           onClick={() => fileInputRef.current?.click()}

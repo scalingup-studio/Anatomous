@@ -72,23 +72,46 @@ const useOpenAI = () => {
       }
 
       // First: validate the query via /check_query
+      let shouldGenerate = false;
       try {
         const check = await CheckQueryApi.checkQuery(message);
-        try { console.log('✅ check_query result:', check); } catch {}
-        // If backend indicates the query is invalid or requires fallback, return its message
-        if (check && (check.success === false || check.allowed === false || check.ok === false)) {
-          const rejectionMessage = check?.message || check?.reason || "I'm unable to answer that request. Please ask a general health question.";
-          setConversation(prev => [...prev, { role: 'assistant', content: rejectionMessage }]);
+        try { console.log('✅ check_query raw:', check); } catch {}
+        // Normalize nested structures: some backends wrap data in { response: { ... } }
+        const payload = (check && typeof check === 'object' && ('response' in check)) ? check.response : check;
+        try { console.log('✅ check_query payload:', payload); } catch {}
+        const isAllowed = !!(payload && (
+          payload.success === true ||
+          payload.allowed === true ||
+          payload.ok === true ||
+          payload.validation_passed === true
+        ));
+        if (isAllowed) {
+          // Allowed → proceed to generate insight
+          shouldGenerate = true;
+          try { console.log('➡️ check_query OK — proceeding to generate-insight'); } catch {}
+        } else {
+          // Not allowed → DO NOT generate; respond with backend message (or generic)
+          const decline = (payload?.response && payload.response.message) || payload?.message || payload?.reason || "I'm unable to answer that request.";
+          setConversation(prev => [...prev, { role: 'assistant', content: decline }]);
           setLoading(false);
-          return rejectionMessage;
+          return decline;
         }
       } catch (checkErr) {
-        // If check_query fails (network/5xx), we will proceed to generate insight as a fallback
-        try { console.warn('⚠️ check_query failed, falling back to generate-insight:', checkErr?.message || checkErr); } catch {}
+        // If check_query fails (network/5xx), DO NOT generate per new rule; return error guidance
+        try { console.warn('⚠️ check_query failed, not generating:', checkErr?.message || checkErr); } catch {}
+        const msg = "I couldn't validate your request at the moment. Please try again in a minute.";
+        setConversation(prev => [...prev, { role: 'assistant', content: msg }]);
+        setLoading(false);
+        return msg;
       }
 
       // Generate insight using InsightApi
       let response;
+      if (!shouldGenerate) {
+        // If we already returned above for OK case, code won't reach here. Safety guard.
+        setLoading(false);
+        return "";
+      }
       try {
         response = await InsightApi.generateInsight({
           query: message,

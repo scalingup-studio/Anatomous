@@ -946,7 +946,7 @@ const OnboardingLayout = () => {
             <div className="form-field">
               <label>Goal Visibility</label>
               <div className="radio-group">
-                <label className="radio">
+                <label className="radio" style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="radio"
                     name="goalVisibility"
@@ -956,7 +956,7 @@ const OnboardingLayout = () => {
                   />
                   <span>Private - Only I can see my goals</span>
                 </label>
-                <label className="radio">
+                <label className="radio" style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="radio"
                     name="goalVisibility"
