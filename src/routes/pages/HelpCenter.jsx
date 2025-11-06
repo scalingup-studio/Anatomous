@@ -1,5 +1,5 @@
 import React from "react";
-import useOpenAI from "../../hooks/useOpenAI.js";
+// NOTE: For Help Center we use a local Q&A helper and DO NOT call /generate-insight
 
 export default function HelpCenterPage() {
   const categories = [
@@ -43,8 +43,42 @@ export default function HelpCenterPage() {
   const [open, setOpen] = React.useState({});
   const toggle = (key) => setOpen(v => ({ ...v, [key]: !v[key] }));
 
-  const { conversation, sendMessage, loading, clearConversation } = useOpenAI();
+  const [conversation, setConversation] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
   const [prompt, setPrompt] = React.useState("");
+  const clearConversation = () => setConversation([]);
+
+  const localSendMessage = async (message) => {
+    setLoading(true);
+    try {
+      // push user message
+      setConversation((prev) => [...prev, { role: "user", content: message }]);
+      const q = message.trim().toLowerCase();
+      // search in categories FAQs
+      const matches = [];
+      for (const cat of categories) {
+        for (const f of cat.faqs) {
+          if (
+            f.q.toLowerCase().includes(q) ||
+            f.a.toLowerCase().includes(q)
+          ) {
+            matches.push({ q: f.q, a: f.a, cat: cat.title });
+          }
+        }
+      }
+      let reply = "I couldn't find an exact answer. Try different keywords or browse the Smart FAQ above.";
+      if (matches.length > 0) {
+        const top = matches.slice(0, 3)
+          .map((m, i) => `${i + 1}. ${m.q}\n${m.a}`)
+          .join("\n\n");
+        reply = top;
+      }
+      setConversation((prev) => [...prev, { role: "assistant", content: reply }]);
+      return reply;
+    } finally {
+      setLoading(false);
+    }
+  };
   const [search, setSearch] = React.useState("");
 
   const filtered = React.useMemo(() => {
@@ -136,10 +170,10 @@ export default function HelpCenterPage() {
           <div className="form-row">
             <div className="form-field" style={{ flex:1 }}>
               <label>Ask your question</label>
-              <input value={prompt} onChange={(e)=>setPrompt(e.target.value)} placeholder="Type your question..." onKeyDown={(e)=>{ if(e.key==='Enter' && prompt.trim()) { sendMessage(prompt.trim()); setPrompt(''); } }} />
+              <input value={prompt} onChange={(e)=>setPrompt(e.target.value)} placeholder="Type your question..." onKeyDown={(e)=>{ if(e.key==='Enter' && prompt.trim()) { localSendMessage(prompt.trim()); setPrompt(''); } }} />
             </div>
             <div style={{ alignSelf:'end' }}>
-              <button className="btn primary" disabled={!prompt.trim() || loading} onClick={()=>{ if(!prompt.trim()) return; sendMessage(prompt.trim()); setPrompt(''); }}>{loading ? 'Sending…' : 'Send'}</button>
+              <button className="btn primary" disabled={!prompt.trim() || loading} onClick={()=>{ if(!prompt.trim()) return; localSendMessage(prompt.trim()); setPrompt(''); }}>{loading ? 'Sending…' : 'Send'}</button>
             </div>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
