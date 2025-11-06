@@ -635,6 +635,7 @@ textarea::placeholder {
   border-radius:16px; 
   box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,0.05); 
   overflow:hidden; 
+  max-height: 90vh;
   color:var(--text);
   animation: slideUp 0.3s ease-out;
 }
@@ -650,7 +651,37 @@ textarea::placeholder {
 .modal-header h2 { margin:0; font-size:20px; color:var(--text); }
 .icon-btn { background:transparent; border:none; color:var(--muted); font-size:22px; line-height:1; cursor:pointer; }
 .icon-btn:hover { color:var(--text); }
-.modal-body { padding:18px; display:flex; align-items:center; justify-content:center; flex-direction: column; gap:16px; }
+.modal-body { padding:18px; display:flex; align-items:center; justify-content:center; flex-direction: column; gap:16px; overflow-y: auto; max-height: calc(90vh - 72px); }
+
+/* Styled scrollbars inside modals */
+.modal-body,
+.modal-content {
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: var(--primary) rgba(255,255,255,0.08);
+}
+
+.modal-body::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.modal-body::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+}
+
+.modal-body::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--primary), var(--primary-600));
+  border-radius: 8px;
+  border: 2px solid rgba(0,0,0,0.3);
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover,
+.modal-content::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.1);
+}
 
 /* Notification System */
 .notification-container {
