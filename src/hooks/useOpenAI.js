@@ -1,6 +1,7 @@
 // hooks/useOpenAI.js
 import { useState, useCallback } from 'react';
 import { InsightApi } from '../api/insightApi';
+import { CheckQueryApi } from '../api/checkQueryApi';
 import { useAuth } from '../api/AuthContext';
 
 const useOpenAI = () => {
@@ -68,6 +69,22 @@ const useOpenAI = () => {
         setError('Authentication required');
         setLoading(false);
         return fallbackResponse;
+      }
+
+      // First: validate the query via /check_query
+      try {
+        const check = await CheckQueryApi.checkQuery(message);
+        try { console.log('✅ check_query result:', check); } catch {}
+        // If backend indicates the query is invalid or requires fallback, return its message
+        if (check && (check.success === false || check.allowed === false || check.ok === false)) {
+          const rejectionMessage = check?.message || check?.reason || "I'm unable to answer that request. Please ask a general health question.";
+          setConversation(prev => [...prev, { role: 'assistant', content: rejectionMessage }]);
+          setLoading(false);
+          return rejectionMessage;
+        }
+      } catch (checkErr) {
+        // If check_query fails (network/5xx), we will proceed to generate insight as a fallback
+        try { console.warn('⚠️ check_query failed, falling back to generate-insight:', checkErr?.message || checkErr); } catch {}
       }
 
       // Generate insight using InsightApi
