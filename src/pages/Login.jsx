@@ -245,7 +245,7 @@ export function LoginPage({ onOpenSignup }) {
       </section>
 
       <aside className="artwork">
-        <img src="./images/login_image.avif" alt="Artwork" />
+        <img src={`${import.meta.env.BASE_URL}images/login_image.avif`} alt="Artwork" />
       </aside>
 
       <NotificationSystem
