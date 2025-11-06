@@ -171,13 +171,23 @@ export const AuthApi = {
     }
   },
 
-  async requestPasswordReset(email) {
+  async requestPasswordReset(email, opts = {}) {
     try {
       console.log('📧 Requesting password reset for:', email);
-      
+      // Build default reset URL (works for dev and GH Pages)
+      let defaultUrl = 'https://scalingup-studio.github.io/Anatomous#/reset-password';
+      try {
+        const base = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) ? import.meta.env.BASE_URL : '/';
+        const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
+        // Use hash router per app
+        defaultUrl = `${origin}${base}#/reset-password`;
+      } catch {}
+
+      const url = opts.url || defaultUrl;
+
       const response = await request(CUSTOM_ENDPOINTS.auth.forgotPassword, {
         method: "POST",
-        body: { email },
+        body: { email, url },
       });
 
       console.log('✅ Password reset email sent');
