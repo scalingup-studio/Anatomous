@@ -345,9 +345,7 @@ function ShareWithProviderTab() {
 
 function ExportSettingsTab() {
   const [layout, setLayout] = React.useState("detailed");
-  const [dateRange, setDateRange] = React.useState("all");
-  const [customStart, setCustomStart] = React.useState("");
-  const [customEnd, setCustomEnd] = React.useState("");
+  const [dateRange, setDateRange] = React.useState("all"); // 'all' | '30'
   const [sections, setSections] = React.useState({ insights: false, vitals: true, labs: true, goals: true });
   const [autoGenerate, setAutoGenerate] = React.useState(false);
   const [title, setTitle] = React.useState("Full Health Summary");
@@ -370,9 +368,8 @@ function ExportSettingsTab() {
         filename: computedFilename,
         auto_generate: autoGenerate,
         layout,
-        date_range: dateRange,
-        start_date: dateRange === 'custom' ? (customStart || undefined) : undefined,
-        end_date: dateRange === 'custom' ? (customEnd || undefined) : undefined,
+        // API expects 'all' or '30'
+        date_range: dateRange === '30' ? '30' : 'all',
         // Flat flags (per doc)
         insights: !!sections.insights,
         vitals: !!sections.vitals,
@@ -419,18 +416,8 @@ function ExportSettingsTab() {
               style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, maxHeight: 32 }}
             >
               <option value="all">All time</option>
-              <option value="last_7">Last 7 days</option>
-              <option value="last_30">Last 30 days</option>
-              <option value="last_90">Last 90 days</option>
-              <option value="this_year">This year</option>
-              <option value="custom">Custom…</option>
+              <option value="30">Last 30 days</option>
             </select>
-            {dateRange === 'custom' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-                <input type="date" value={customStart} onChange={(e)=>setCustomStart(e.target.value)} style={{ padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }} />
-                <input type="date" value={customEnd} onChange={(e)=>setCustomEnd(e.target.value)} style={{ padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }} />
-              </div>
-            )}
           </div>
         </div>
         <div>
