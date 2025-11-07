@@ -58,50 +58,23 @@ function AutoRedirectRoute() {
       completed: user.completed,
       onboarding_completed: user.onboarding_completed,
     } : null,
-    hasCompletedOnboardingResult: onboardingCompleted,
-    willRedirectToOnboarding: !onboardingCompleted
+    hasCompletedOnboardingResult: onboardingCompleted
   });
-  
-  // Track changes in onboarding status
-  useEffect(() => {
-    console.log('🔄 AutoRedirectRoute - useEffect triggered:', {
-      loading,
-      isNewUser,
-      onboardingCompleted,
-      willRedirect: !onboardingCompleted,
-      currentHash: window.location.hash
-    });
-    
-    // Force redirect if needed
-    if (!loading && !onboardingCompleted && window.location.hash !== '#/onboarding') {
-      console.log('🔄 AutoRedirectRoute - Force redirecting to onboarding...');
-      window.location.href = '#/onboarding';
-    }
-  }, [loading, onboardingCompleted, isNewUser]);
   
   if (loading) {
     console.log('⏳ AutoRedirectRoute - Still loading...');
     return <p>Loading…</p>;
   }
   
-  // If onboarding is not completed - redirect to onboarding
-  if (!onboardingCompleted) {
-    console.log('📝 AutoRedirectRoute - Onboarding not completed, redirecting to /onboarding');
-    console.log('🔄 AutoRedirectRoute - Rendering Navigate component to /onboarding');
-    
-    // Fallback: if Navigate doesn't work, try window.location
-    setTimeout(() => {
-      if (window.location.hash !== '#/onboarding') {
-        console.log('🔄 AutoRedirectRoute - Navigate failed, using window.location fallback');
-        window.location.href = '#/onboarding';
-      }
-    }, 100);
-    
+  // Scenario 1: New user after signup - redirect to onboarding
+  if (isNewUser) {
+    console.log('📝 AutoRedirectRoute - New user from signup, redirecting to /onboarding');
     return <Navigate to="/onboarding" replace />;
   }
   
-  // Redirect to dashboard if onboarding is completed
-  console.log('🎯 AutoRedirectRoute - Redirecting to /dashboard (onboarding check enabled)');
+  // For existing users, always redirect to dashboard
+  // Modal on Overview page will handle prompting for incomplete onboarding
+  console.log('🎯 AutoRedirectRoute - Redirecting to /dashboard');
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -218,6 +191,7 @@ function OnboardingGuard({ children }) {
 
 function DashboardGuard({ children }) {
   const { user, loading, hasCompletedOnboarding, isNewUser } = useAuth();
+  const location = useLocation();
   
   // Check onboarding status once
   const onboardingCompleted = hasCompletedOnboarding();
@@ -225,6 +199,7 @@ function DashboardGuard({ children }) {
   console.log('🛡️ DashboardGuard - Debug info:', {
     loading,
     isNewUser,
+    pathname: location.pathname,
     user: user ? {
       id: user.id,
       email: user.email,
@@ -238,13 +213,10 @@ function DashboardGuard({ children }) {
     return <p>Loading…</p>;
   }
   
-  // Якщо onboarding не завершено - перенаправляємо на onboarding
-  if (!onboardingCompleted) {
-    console.log('📝 DashboardGuard - Onboarding not completed, redirecting to /onboarding');
-    return <Navigate to="/onboarding" replace />;
-  }
-  
-  console.log('🎯 DashboardGuard - Allowing access to dashboard (onboarding check enabled)');
+  // Allow access to dashboard even if onboarding is not completed
+  // The modal on Overview page will handle prompting users to complete onboarding
+  // This allows users to access profile and other dashboard pages
+  console.log('🎯 DashboardGuard - Allowing access to dashboard (onboarding check disabled for dashboard access)');
   return children;
 }
 // 🔒 Wrap entire app in AuthProvider and NotificationProvider

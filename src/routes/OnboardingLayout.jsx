@@ -549,10 +549,11 @@ const OnboardingLayout = () => {
     saveProgress();
     
     showSuccess('Your progress has been saved. You can continue onboarding anytime from your dashboard.');
-    console.log('🚀 Navigating to dashboard...');
+    console.log('🚀 Navigating to dashboard (Overview)...');
     // Mark as not a new user so DashboardGuard allows access
     try { setIsNewUser(false); } catch {}
-    navigate('/dashboard');
+    // Navigate to dashboard (Overview/Home page)
+    navigate('/dashboard', { replace: true });
   };
 
   const completeOnboardingProcess = async () => {
@@ -616,10 +617,13 @@ const OnboardingLayout = () => {
       localStorage.removeItem('onboarding-completed');
       
       showSuccess('Welcome to Anatomous! Your profile has been set up successfully.');
-      // Redirect to dashboard after successful completion
+      // Redirect to dashboard (Overview/Home) after successful completion
+      console.log('🚀 Navigating to dashboard (Overview) after completing onboarding...');
       try {
-        navigate('/dashboard');
-      } catch {}
+        navigate('/dashboard', { replace: true });
+      } catch (error) {
+        console.error('❌ Error navigating to dashboard:', error);
+      }
     } catch (error) {
       console.error('❌ Error completing onboarding:', error);
       showError('Failed to complete setup. Please try again.');

@@ -1,10 +1,17 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../api/AuthContext";
+import { OnboardingIncompleteModal } from "../../components/OnboardingIncompleteModal";
 
 export default function DashboardHome(){
-  const user = getUser();
-  const userName = user.firstName;
-  const isNewOrIncomplete = user.onboardingCompleted === false;
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const userData = getUser();
+  const userName = userData.firstName;
+  const isNewOrIncomplete = userData.onboardingCompleted === false;
+  
+  const [onboardingModalOpen, setOnboardingModalOpen] = React.useState(false);
+  const [onboardingChecked, setOnboardingChecked] = React.useState(false);
 
   // Snapshot mock data (replace with API later)
   const riskScore = { label: 'Moderate Risk', color: '#e7b416', value: 62 };
@@ -31,6 +38,94 @@ export default function DashboardHome(){
   ]);
 
   const toggleAction = (id) => setActions(prev => prev.map(a => a.id===id ? { ...a, done:!a.done } : a));
+
+  // Check onboarding status on component mount
+  React.useEffect(() => {
+    async function checkOnboardingStatus() {
+      if (onboardingChecked) return; // Only check once
+      
+      try {
+        // Get user ID from various sources
+        let userId = null;
+        
+        // Try from useAuth user
+        if (user?.id) {
+          userId = user.id;
+        } else {
+          // Try to get user from localStorage
+          try {
+            const userFromStorage = localStorage.getItem('user');
+            if (userFromStorage) {
+              const parsedUser = JSON.parse(userFromStorage);
+              if (parsedUser?.id) {
+                userId = parsedUser.id;
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to parse user from localStorage:', e);
+          }
+        }
+        
+        if (!userId) {
+          console.warn('⚠️ No user ID available for onboarding check');
+          setOnboardingChecked(true);
+          return;
+        }
+
+        await checkOnboarding(userId);
+        setOnboardingChecked(true);
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        setOnboardingChecked(true);
+      }
+    }
+
+    async function checkOnboarding(userId) {
+      // Import OnboardingApi dynamically
+      const { OnboardingApi } = await import('../../api/onboardingApi.js');
+      
+      console.log('📊 Checking onboarding progress for user:', userId);
+      const onboardingProgress = await OnboardingApi.getProgress(userId);
+      const progress = onboardingProgress?.save_onboarding;
+      
+      console.log('📊 Onboarding progress:', progress);
+      
+      // Check if onboarding is incomplete (progress < 100% or not completed)
+      const isIncomplete = !progress?.completed && 
+        (!progress?.progress?.percentage || progress.progress.percentage < 100);
+      
+      if (isIncomplete) {
+        console.log('⚠️ Onboarding is incomplete, showing modal...');
+        setOnboardingModalOpen(true);
+      }
+    }
+
+    checkOnboardingStatus();
+  }, [user, onboardingChecked]);
+
+  function handleOnboardingContinue(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log('🔄 Continuing to onboarding page...');
+    
+    // Close modal immediately
+    setOnboardingModalOpen(false);
+    
+    // Use force=true parameter to bypass OnboardingGuard check
+    // This allows access to onboarding even if hasCompletedOnboarding() returns true
+    console.log('📍 Current hash before navigation:', window.location.hash);
+    
+    // Navigate with force parameter to bypass guard
+    navigate("/onboarding?force=true", { replace: true });
+    
+    console.log('✅ Navigation triggered to /onboarding?force=true');
+  }
+
+  function handleOnboardingSkip() {
+    setOnboardingModalOpen(false);
+  }
 
   const activity = [
     { id:1, time:'2h ago', text:'AI Insight generated: Hydration trend' },
@@ -171,6 +266,13 @@ export default function DashboardHome(){
         <div style={{ marginLeft:'auto' }} />
         <Link className="btn outline" to="/dashboard/insights">Explore dashboard</Link>
       </div>
+
+      {/* Onboarding Incomplete Modal */}
+      <OnboardingIncompleteModal
+        open={onboardingModalOpen}
+        onContinue={handleOnboardingContinue}
+        onSkip={handleOnboardingSkip}
+      />
     </div>
   );
 }

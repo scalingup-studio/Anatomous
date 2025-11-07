@@ -402,10 +402,14 @@ export function AuthProvider({ children }) {
       return false;
     }
     
-    // For existing users (login), always consider onboarding completed
-    // This ensures they go directly to dashboard
-    console.log('🔍 hasCompletedOnboarding check: Existing user from login, returning true (direct to dashboard)');
-    return true;
+    // Check actual onboarding status from user object
+    // Check both old and new field names for compatibility
+    const onboardingCompleted = user.onboarding_completed ?? user.completed ?? 
+                                 user.save_onboarding?.onboarding_completed ?? 
+                                 user.save_onboarding?.completed ?? false;
+    
+    console.log('🔍 hasCompletedOnboarding check: Existing user, onboarding_completed =', onboardingCompleted);
+    return onboardingCompleted;
   };
 
   // ✅ Added a function to check if the token will expire soon
