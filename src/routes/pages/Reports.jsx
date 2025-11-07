@@ -54,13 +54,17 @@ function DownloadReportsTab() {
   const last30Str = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
   const [start, setStart] = React.useState(last30Str);
   const [end, setEnd] = React.useState(todayStr);
+  const [loading, setLoading] = React.useState(false);
 
   const loadReports = React.useCallback(async () => {
     try {
+      setLoading(true);
       const res = await ReportsApi.listWithDate({ start_date: start, end_date: end, type });
       setReports(res.sort_result || res.all_reports_list || []);
     } catch (e) {
       setReports([]);
+    } finally {
+      setLoading(false);
     }
   }, [start, end, type]);
 
@@ -68,69 +72,163 @@ function DownloadReportsTab() {
     loadReports();
   }, [loadReports]);
 
+  // Quick date range presets
+  const setQuickRange = (days) => {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    setStart(startDate.toISOString().split('T')[0]);
+    setEnd(endDate.toISOString().split('T')[0]);
+  };
+
   return (
     <div className="card">
       <h3 style={{ marginTop: 0 }}>Download Reports</h3>
-      <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 12 }}>
-        <select value={type} onChange={(e)=>setType(e.target.value)} style={{ padding: "6px 10px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}>
-          <option value="all">All</option>
-          <option value="summary">Full Health Summary</option>
-          <option value="vitals">Vitals</option>
-        </select>
-        <DatePicker 
-          value={start} 
-          onChange={(val)=>{
-            setStart(val);
-            // If end date is before new start date, clear end date
-            if (end && val && end < val) {
-              setEnd('');
-            }
+      
+      {/* Filters row */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
+        gap: 12, 
+        marginTop: 8, 
+        marginBottom: 12,
+        alignItems: "end"
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Report Type</label>
+          <select 
+            value={type} 
+            onChange={(e)=>setType(e.target.value)} 
+            style={{ 
+              padding: "8px 12px", 
+              background: "rgba(17,17,17,.85)", 
+              border: "1px solid var(--border)", 
+              borderRadius: 8, 
+              color: "var(--text)", 
+              fontSize: 13,
+              width: "100%"
+            }}
+          >
+            <option value="all">All</option>
+            <option value="summary">Full Health Summary</option>
+            <option value="vitals">Vitals</option>
+          </select>
+        </div>
+        
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Start date</label>
+          <DatePicker 
+            value={start} 
+            onChange={(val)=>{
+              setStart(val);
+              // If end date is before new start date, clear end date
+              if (end && val && end < val) {
+                setEnd('');
+              }
+            }}
+            maxDate={end || undefined}
+          />
+        </div>
+        
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>End date</label>
+          <DatePicker 
+            value={end} 
+            onChange={(val)=>setEnd(val)}
+            minDate={start || undefined}
+          />
+        </div>
+        
+        <button 
+          className="btn outline" 
+          onClick={loadReports} 
+          disabled={loading}
+          style={{ 
+            height: "fit-content", 
+            alignSelf: "end",
+            minHeight: "40px",
+            whiteSpace: "nowrap"
           }}
-          maxDate={end || undefined}
-        />
-        <DatePicker 
-          value={end} 
-          onChange={(val)=>setEnd(val)}
-          minDate={start || undefined}
-        />
-        <button className="btn outline" onClick={loadReports}>Filter</button>
+        >
+          {loading ? 'Loading...' : 'Filter'}
+        </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {reports.map((r, idx) => (
-          <div key={(r.id ?? r.report_id ?? r.file_url ?? r.title ?? 'row') + '_' + idx} className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(0,186,206,0.15)", border: "1px solid var(--border)" }} />
-              <div>
-                <div style={{ fontWeight: 600 }}>{r.title || r.name || "Report"}</div>
-                <div style={{ fontSize: 12, color: "var(--hint)" }}>{r.date || r.created_at}</div>
+      {reports.length === 0 ? (
+        <div style={{ 
+          textAlign: "center", 
+          padding: "40px 20px", 
+          color: "var(--muted)",
+          fontSize: 14
+        }}>
+          {loading ? "Loading reports..." : "No reports found for selected filters"}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {reports.map((r, idx) => (
+            <div 
+              key={(r.id ?? r.report_id ?? r.file_url ?? r.title ?? 'row') + '_' + idx} 
+              className="card" 
+              style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                padding: 12,
+                gap: 12,
+                flexWrap: "wrap"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: "200px" }}>
+                <div style={{ 
+                  width: 40, 
+                  height: 40, 
+                  borderRadius: 8, 
+                  background: "rgba(0,186,206,0.15)", 
+                  border: "1px solid var(--border)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0
+                }}>
+                  <span style={{ fontSize: 18 }}>📄</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{r.title || r.name || "Report"}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {r.date || r.created_at ? (
+                      <span>📅 {r.date || r.created_at}</span>
+                    ) : null}
+                    {r.size ? (
+                      <span>💾 {r.size} KB</span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button
+                  className="btn outline small"
+                  onClick={() => {
+                    if (r.file_url) {
+                      const dateStr = r.date || new Date().toISOString().split('T')[0];
+                      const suggested = `${(r.title || 'Report').replace(/\s+/g,'_')}_${dateStr}.pdf`;
+                      ReportsApi.downloadFileUrl(r.file_url, suggested);
+                      return;
+                    }
+                    const reportId = r.report_id ?? r.id;
+                    if (reportId) {
+                      ReportsApi.download(reportId);
+                    }
+                  }}
+                  disabled={!r.file_url && !r.report_id && !r.id}
+                  title={!r.file_url && !r.report_id && !r.id ? 'No file available' : 'Download'}
+                >
+                  Download
+                </button>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12, color: "var(--muted)" }}>{r.size ? `${r.size} KB` : ""}</span>
-              <button
-                className="btn outline small"
-                onClick={() => {
-                  if (r.file_url) {
-                    const dateStr = r.date || new Date().toISOString().split('T')[0];
-                    const suggested = `${(r.title || 'Report').replace(/\s+/g,'_')}_${dateStr}.pdf`;
-                    ReportsApi.downloadFileUrl(r.file_url, suggested);
-                    return;
-                  }
-                  const reportId = r.report_id ?? r.id;
-                  if (reportId) {
-                    ReportsApi.download(reportId);
-                  }
-                }}
-                disabled={!r.file_url && !r.report_id && !r.id}
-                title={!r.file_url && !r.report_id && !r.id ? 'No file available' : 'Download'}
-              >
-                Download
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -226,32 +324,45 @@ function ShareWithProviderTab() {
       setStatus("Create a share link first.");
       return;
     }
+    if (!recipientEmail || !recipientEmail.trim()) {
+      setStatus("Please enter a recipient email address.");
+      return;
+    }
     setLoading(true);
     setStatus("");
     try {
       const res = await ReportsApi.sendShareEmail({
         share_id: share.id,
-        recipient_email: recipientEmail,
-        subject: subject || undefined,
-        custom_message: customMessage || undefined,
+        recipient_email: recipientEmail.trim(),
+        subject: subject?.trim() || "Health Report Shared With You",
+        custom_message: customMessage?.trim() || "",
         include_file_link: includeFileLink,
-        // Some templates expect explicit share URL variable
-        report_share_url: shareUrl || share?.share_url,
       });
-      setStatus(res?.message || "Email sent.");
+      setStatus(res?.message || "Email sent successfully.");
+      // Clear form after successful send
+      setRecipientEmail("");
+      setSubject("");
+      setCustomMessage("");
     } catch (e) {
-      setStatus(e?.message || "Failed to send email.");
+      const errorMessage = e?.message || "Failed to send email.";
+      const errorCode = e?.code || e?.response?.code;
+      // Check if it's a duplicate error
+      if (errorMessage.includes("Duplicate") || errorMessage.includes("duplicate") || errorCode === "ERROR_FATAL") {
+        setStatus("This email has already been sent for this share link. Please use a different email address or create a new share link.");
+      } else {
+        setStatus(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="card" style={{ maxWidth: 520 }}>
+    <div className="card" style={{ maxWidth: 600 }}>
       <h3 style={{ marginTop: 0 }}>Share with Provider</h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Report to Share</label>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Report to Share</label>
           <select
             value={String(selectedIdx)}
             onChange={(e)=>{
@@ -278,8 +389,9 @@ function ShareWithProviderTab() {
             )}
           </select>
         </div>
+        
         <div>
-          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Title</label>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Title</label>
           <input
             type="text"
             value={title}
@@ -288,70 +400,144 @@ function ShareWithProviderTab() {
             style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
           />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8, alignItems: "center" }}>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end" }}>
           <div>
-            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Expires</label>
-            <input
-              type="datetime-local"
-              value={expiresAt}
-              onChange={(e)=>setExpiresAt(e.target.value)}
-              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
-            />
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Expires (Optional)</label>
+            <div style={{ position: "relative" }}>
+              <DatePicker
+                value={expiresAt ? expiresAt.split('T')[0] : ''}
+                onChange={(val)=>{
+                  // If time was set, preserve it; otherwise set to end of day
+                  if (expiresAt && expiresAt.includes('T')) {
+                    const time = expiresAt.split('T')[1];
+                    setExpiresAt(val ? `${val}T${time}` : '');
+                  } else {
+                    setExpiresAt(val ? `${val}T23:59:59` : '');
+                  }
+                }}
+                placeholder="Select expiration date"
+              />
+            </div>
+          
           </div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--muted)" }}>
-            <input type="checkbox" checked={isVisible} onChange={(e)=>setIsVisible(e.target.checked)} />
-            Visible
-          </label>
+          <div style={{ display: "flex", alignItems: "center", minHeight: 44}}>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--muted)" }}>
+              <input type="checkbox" checked={isVisible} onChange={(e)=>setIsVisible(e.target.checked)} />
+              <span>Visible</span>
+            </label>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn outline" onClick={handleCreateOrUpdateShare} aria-disabled={loading}>
+        
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button 
+            className="btn primary" 
+            onClick={handleCreateOrUpdateShare} 
+            disabled={loading}
+            style={{ flex: 1, minWidth: "150px" }}
+          >
             {loading ? 'Saving…' : 'Create/Update Link'}
           </button>
-          <button className="btn" style={{ width: 120 }} onClick={handleCopyLink} disabled={!shareUrl && !share?.share_url}>Copy Link</button>
+          <button 
+            className="btn outline" 
+            onClick={handleCopyLink} 
+            disabled={!shareUrl && !share?.share_url}
+            style={{ minWidth: "120px" }}
+          >
+            Copy Link
+          </button>
         </div>
 
         {shareUrl || share?.share_url ? (
-          <div style={{ fontSize: 12, color: "var(--muted)" }}>
-            Share URL: <span style={{ wordBreak: 'break-all' }}>{shareUrl || share?.share_url}</span>
+          <div style={{ 
+            padding: 12, 
+            background: "rgba(0,186,206,0.1)", 
+            border: "1px solid var(--border)", 
+            borderRadius: 8,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8
+          }}>
+            <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Share URL:</div>
+            <div style={{ 
+              fontSize: 13, 
+              color: "var(--text)", 
+              wordBreak: 'break-all',
+              padding: 8,
+              background: "rgba(17,17,17,.5)",
+              borderRadius: 6,
+              fontFamily: "monospace"
+            }}>
+              {shareUrl || share?.share_url}
+            </div>
           </div>
         ) : null}
 
-        <div style={{ marginTop: 4, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Send via Email</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <input
-              type="email"
-              value={recipientEmail}
-              onChange={(e)=>setRecipientEmail(e.target.value)}
-              placeholder="recipient@example.com"
-              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
-            />
-            <input
-              type="text"
-              value={subject}
-              onChange={(e)=>setSubject(e.target.value)}
-              placeholder="Subject (optional)"
-              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
-            />
-            <textarea
-              value={customMessage}
-              onChange={(e)=>setCustomMessage(e.target.value)}
-              placeholder="Custom message (optional)"
-              rows={3}
-              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
-            />
+        <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Send via Email</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Recipient Email *</label>
+              <input
+                type="email"
+                value={recipientEmail}
+                onChange={(e)=>setRecipientEmail(e.target.value)}
+                placeholder="recipient@example.com"
+                style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Subject (Optional)</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e)=>setSubject(e.target.value)}
+                placeholder="Subject (optional)"
+                style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Custom Message (Optional)</label>
+              <textarea
+                value={customMessage}
+                onChange={(e)=>setCustomMessage(e.target.value)}
+                placeholder="Custom message (optional)"
+                rows={3}
+                style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, resize: "vertical" }}
+              />
+            </div>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: 'var(--muted)' }}>
               <input type="checkbox" checked={includeFileLink} onChange={(e)=>setIncludeFileLink(e.target.checked)} />
-              Include file link
+              <span>Include file link</span>
             </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn outline" onClick={handleSendEmail} disabled={loading || !recipientEmail || !share?.id}>Send</button>
-            </div>
+            <button 
+              className="btn primary" 
+              onClick={handleSendEmail} 
+              disabled={loading || !recipientEmail || !share?.id}
+              style={{ width: "100%", minHeight: "40px" }}
+            >
+              {loading ? 'Sending...' : 'Send Email'}
+            </button>
           </div>
         </div>
 
         {status ? (
-          <div style={{ fontSize: 12, color: status.toLowerCase().includes('fail') ? 'var(--error)' : 'var(--muted)' }}>{status}</div>
+          <div style={{ 
+            fontSize: 13, 
+            padding: 10, 
+            borderRadius: 8,
+            background: status.toLowerCase().includes('fail') || status.toLowerCase().includes('error') 
+              ? 'rgba(255, 59, 48, 0.1)' 
+              : 'rgba(0, 186, 206, 0.1)',
+            border: `1px solid ${status.toLowerCase().includes('fail') || status.toLowerCase().includes('error') 
+              ? 'var(--error)' 
+              : 'var(--primary)'}`,
+            color: status.toLowerCase().includes('fail') || status.toLowerCase().includes('error') 
+              ? 'var(--error)' 
+              : 'var(--text)'
+          }}>
+            {status}
+          </div>
         ) : null}
       </div>
     </div>
@@ -402,11 +588,11 @@ function ExportSettingsTab() {
   };
 
   return (
-    <div className="card" style={{ maxWidth: 520 }}>
+    <div className="card" style={{ maxWidth: 600 }}>
       <h3 style={{ marginTop: 0 }}>Export Settings</h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Report title</div>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Report Title</label>
           <input
             type="text"
             value={title}
@@ -415,59 +601,227 @@ function ExportSettingsTab() {
             style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
           />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20, alignItems: "start" }}>
           <div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Layout</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className={`btn small ${layout === "simple" ? "primary" : "outline"}`} onClick={()=>setLayout("simple")}>Simple</button>
-              <button className={`btn small ${layout === "detailed" ? "primary" : "outline"}`} onClick={()=>setLayout("detailed")}>Detailed</button>
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 10, fontWeight: 500 }}>Layout</label>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button 
+                onClick={()=>setLayout("simple")}
+                onMouseEnter={(e) => {
+                  if (layout !== "simple") {
+                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.3)";
+                    e.currentTarget.style.borderColor = "var(--primary)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (layout !== "simple") {
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }
+                }}
+                style={{ 
+                  flex: 1,
+                  padding: "10px 16px",
+                  background: "transparent",
+                  border: layout === "simple" ? "1px solid var(--primary)" : "1px solid var(--border)",
+                  borderRadius: 8,
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontWeight: layout === "simple" ? 500 : 400,
+                  cursor: "pointer",
+                  boxShadow: layout === "simple" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
+                  transition: "all 0.2s ease",
+                  outline: "none"
+                }}
+              >
+                Simple
+              </button>
+              <button 
+                onClick={()=>setLayout("detailed")}
+                onMouseEnter={(e) => {
+                  if (layout !== "detailed") {
+                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.3)";
+                    e.currentTarget.style.borderColor = "var(--primary)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (layout !== "detailed") {
+                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }
+                }}
+                style={{ 
+                  flex: 1,
+                  padding: "10px 16px",
+                  background: "transparent",
+                  border: layout === "detailed" ? "1px solid var(--primary)" : "1px solid var(--border)",
+                  borderRadius: 8,
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontWeight: layout === "detailed" ? 500 : 400,
+                  cursor: "pointer",
+                  boxShadow: layout === "detailed" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
+                  transition: "all 0.2s ease",
+                  outline: "none"
+                }}
+              >
+                Detailed
+              </button>
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Date Range</div>
+            <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 10, fontWeight: 500 }}>Date Range</label>
             <select
               value={dateRange}
               onChange={(e)=>setDateRange(e.target.value)}
-              style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, maxHeight: 32 }}
+              style={{ 
+                width: "100%", 
+                padding: "10px 12px", 
+                background: "rgba(17,17,17,.85)", 
+                border: "1px solid var(--border)", 
+                borderRadius: 8, 
+                color: "var(--text)", 
+                fontSize: 13, 
+                height: "37px",
+                cursor: "pointer",
+                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
+                transition: "all 0.2s ease",
+                outline: "none"
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--primary)";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 186, 206, 0.2)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
+              }}
             >
               <option value="all">All time</option>
               <option value="30">Last 30 days</option>
             </select>
           </div>
         </div>
+
         <div>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Output format</div>
+          <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 8, fontWeight: 500 }}>Output Format</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className={`btn small ${format === "pdf" ? "primary" : "outline"}`} onClick={()=>setFormat("pdf")}>PDF</button>
-            <button className={`btn small ${format === "csv" ? "primary" : "outline"}`} onClick={()=>setFormat("csv")}>CSV</button>
+            <button 
+              onClick={()=>setFormat("pdf")}
+              style={{ 
+                flex: 1,
+                padding: "8px 12px",
+                background: "transparent",
+                border: format === "pdf" ? "1px solid var(--primary)" : "1px solid var(--border)",
+                borderRadius: 8,
+                color: "var(--text)",
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: format === "pdf" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
+                transition: "box-shadow 0.2s, border-color 0.2s"
+              }}
+            >
+              PDF
+            </button>
+            <button 
+              onClick={()=>setFormat("csv")}
+              style={{ 
+                flex: 1,
+                padding: "8px 12px",
+                background: "transparent",
+                border: format === "csv" ? "1px solid var(--primary)" : "1px solid var(--border)",
+                borderRadius: 8,
+                color: "var(--text)",
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: format === "csv" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
+                transition: "box-shadow 0.2s, border-color 0.2s"
+              }}
+            >
+              CSV
+            </button>
           </div>
         </div>
+
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Sections to include</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <label style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500 }}>Sections to Include</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn ghost small" onClick={()=>setSections({ insights:true, vitals:true, labs:true, goals:true })}>Select all</button>
-              <button className="btn ghost small" onClick={()=>setSections({ insights:false, vitals:false, labs:false, goals:false })}>None</button>
+              <button 
+                className="btn ghost small" 
+                onClick={()=>setSections({ insights:true, vitals:true, labs:true, goals:true })}
+                style={{ fontSize: 11 }}
+              >
+                Select all
+              </button>
+              <button 
+                className="btn ghost small" 
+                onClick={()=>setSections({ insights:false, vitals:false, labs:false, goals:false })}
+                style={{ fontSize: 11 }}
+              >
+                None
+              </button>
             </div>
           </div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><input type="checkbox" checked={sections.vitals} onChange={(e)=>setSections(s=>({...s,vitals:e.target.checked}))} />Vitals</label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><input type="checkbox" checked={sections.labs} onChange={(e)=>setSections(s=>({...s,labs:e.target.checked}))} />Labs</label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><input type="checkbox" checked={sections.goals} onChange={(e)=>setSections(s=>({...s,goals:e.target.checked}))} />Goals</label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}><input type="checkbox" checked={sections.insights} onChange={(e)=>setSections(s=>({...s,insights:e.target.checked}))} />Insights</label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text)", cursor: "pointer" }}>
+              <input type="checkbox" checked={sections.vitals} onChange={(e)=>setSections(s=>({...s,vitals:e.target.checked}))} />
+              <span>Vitals</span>
+            </label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text)", cursor: "pointer" }}>
+              <input type="checkbox" checked={sections.labs} onChange={(e)=>setSections(s=>({...s,labs:e.target.checked}))} />
+              <span>Labs</span>
+            </label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text)", cursor: "pointer" }}>
+              <input type="checkbox" checked={sections.goals} onChange={(e)=>setSections(s=>({...s,goals:e.target.checked}))} />
+              <span>Goals</span>
+            </label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text)", cursor: "pointer" }}>
+              <input type="checkbox" checked={sections.insights} onChange={(e)=>setSections(s=>({...s,insights:e.target.checked}))} />
+              <span>Insights</span>
+            </label>
+          </div>
         </div>
-        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="checkbox" checked={autoGenerate} onChange={(e)=>setAutoGenerate(e.target.checked)} /> Auto-generate after new analysis
-        </label>
+
+        <div style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: "var(--text)", cursor: "pointer" }}>
+            <input type="checkbox" checked={autoGenerate} onChange={(e)=>setAutoGenerate(e.target.checked)} />
+            <span>Auto-generate after new analysis</span>
+          </label>
+        </div>
+
         {message && (
-          <div style={{ fontSize: 12, color: message.toLowerCase().includes('fail') ? 'var(--error)' : 'var(--muted)' }}>
+          <div style={{ 
+            fontSize: 13, 
+            padding: 10, 
+            borderRadius: 8,
+            background: message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')
+              ? 'rgba(255, 59, 48, 0.1)' 
+              : 'rgba(0, 186, 206, 0.1)',
+            border: `1px solid ${message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')
+              ? 'var(--error)' 
+              : 'var(--primary)'}`,
+            color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')
+              ? 'var(--error)' 
+              : 'var(--text)'
+          }}>
             {message}
           </div>
         )}
-        <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: 'center' }}>
-          <button className="btn outline" onClick={handleGenerate} disabled={loading || !title.trim()}>
-            {loading ? 'Generating…' : 'Generate'}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button 
+            className="btn primary" 
+            onClick={handleGenerate} 
+            disabled={loading || !title.trim()}
+            style={{ width: "100%", minHeight: "40px" }}
+          >
+            {loading ? 'Generating…' : 'Generate Report'}
           </button>
-          <div style={{ fontSize: 12, color: "var(--muted)" }}>You can download it from the list after it’s ready</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", textAlign: "center" }}>
+            You can download it from the list after it's ready
+          </div>
         </div>
       </div>
     </div>
