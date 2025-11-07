@@ -1,4 +1,5 @@
 import React from "react";
+import DatePicker from "../../components/DatePicker.jsx";
 import { ReportsApi } from "../../api/reportsApi";
 
 export default function DashboardReports() {
@@ -76,8 +77,22 @@ function DownloadReportsTab() {
           <option value="summary">Full Health Summary</option>
           <option value="vitals">Vitals</option>
         </select>
-        <input value={start} onChange={(e)=>setStart(e.target.value)} type="date" style={{ padding: "6px 10px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }} />
-        <input value={end} onChange={(e)=>setEnd(e.target.value)} type="date" style={{ padding: "6px 10px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }} />
+        <DatePicker 
+          value={start} 
+          onChange={(val)=>{
+            setStart(val);
+            // If end date is before new start date, clear end date
+            if (end && val && end < val) {
+              setEnd('');
+            }
+          }}
+          maxDate={end || undefined}
+        />
+        <DatePicker 
+          value={end} 
+          onChange={(val)=>setEnd(val)}
+          minDate={start || undefined}
+        />
         <button className="btn outline" onClick={loadReports}>Filter</button>
       </div>
 

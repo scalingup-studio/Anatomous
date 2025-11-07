@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { authRequest } from "../../api/apiClient.js";
 import { useAuth } from "../../api/AuthContext.jsx";
 import { useNotifications } from "../../api/NotificationContext.jsx";
+import DatePicker from "../../components/DatePicker.jsx";
 import { ProfilesApi } from "../../api/profilesApi.js";
 import { UploadFileApi } from "../../api/uploadFileApi.js";
 import { HealthApi } from "../../api/healthApi.js";
@@ -1291,7 +1292,7 @@ const calculateAgeFromDOB = (dob) => {
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Date of birth</span>
-                  <input type="date" name="dob" value={formValues.dob || ""} onChange={handleChange} />
+                  <DatePicker value={formValues.dob || ""} onChange={(val)=>handleChange({ target: { name: 'dob', value: val }})} />
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Gender Identity</span>
@@ -1739,13 +1740,12 @@ const calculateAgeFromDOB = (dob) => {
                     <label className="form-field" style={{ display:'flex', flexDirection:'column', gap: 6 }}>
                       <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>Diagnosis date</span>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <input 
-                          type="date" 
-                          value={addHistoryForm.diagnosis_date || ''} 
-                          onChange={(e)=>{
-                            setAddHistoryForm(v=>({...v, diagnosis_date: e.target.value, useToday: false}));
+                        <DatePicker
+                          value={addHistoryForm.diagnosis_date || ''}
+                          onChange={(val)=>{
+                            setAddHistoryForm(v=>({...v, diagnosis_date: val, useToday: false}));
                           }}
-                          style={{ flex: 1, padding: '10px 12px', fontSize: '14px' }}
+                          style={{ flex: 1 }}
                         />
                         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '13px', color: 'var(--muted)' }}>
                           <input 
@@ -1824,11 +1824,30 @@ const calculateAgeFromDOB = (dob) => {
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Start date</span>
-                      <input type="date" value={addHistoryForm.start_date || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, start_date: e.target.value}))} />
+                      <DatePicker 
+                        value={addHistoryForm.start_date || ''} 
+                        onChange={(val)=>{
+                          setAddHistoryForm(v=>{
+                            const updated = {...v, start_date: val};
+                            // If end_date exists and is before new start_date, clear it
+                            if (updated.end_date && val && updated.end_date < val) {
+                              updated.end_date = null;
+                            }
+                            return updated;
+                          });
+                        }}
+                        maxDate={addHistoryForm.end_date || undefined}
+                      />
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>End date</span>
-                      <input type="date" value={addHistoryForm.end_date || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, end_date: e.target.value || null}))} />
+                      <DatePicker 
+                        value={addHistoryForm.end_date || ''} 
+                        onChange={(val)=>{
+                          setAddHistoryForm(v=>({...v, end_date: val || null}));
+                        }}
+                        minDate={addHistoryForm.start_date || undefined}
+                      />
                     </label>
                     <label className="form-field" style={{ gridColumn:'1 / -1', display:'flex', flexDirection:'column' }}>
                       <span>Notes</span>
@@ -1866,7 +1885,7 @@ const calculateAgeFromDOB = (dob) => {
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Surgery date</span>
-                      <input type="date" value={addHistoryForm.surgery_date || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, surgery_date: e.target.value}))} />
+                      <DatePicker value={addHistoryForm.surgery_date || ''} onChange={(val)=>setAddHistoryForm(v=>({...v, surgery_date: val}))} />
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Surgeon</span>
@@ -1891,7 +1910,7 @@ const calculateAgeFromDOB = (dob) => {
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Vaccination date</span>
-                      <input type="date" value={addHistoryForm.vaccination_date || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, vaccination_date: e.target.value}))} />
+                      <DatePicker value={addHistoryForm.vaccination_date || ''} onChange={(val)=>setAddHistoryForm(v=>({...v, vaccination_date: val}))} />
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Lot number</span>
@@ -1899,7 +1918,7 @@ const calculateAgeFromDOB = (dob) => {
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Next due date</span>
-                      <input type="date" value={addHistoryForm.next_due_date || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, next_due_date: e.target.value}))} />
+                      <DatePicker value={addHistoryForm.next_due_date || ''} onChange={(val)=>setAddHistoryForm(v=>({...v, next_due_date: val}))} />
                     </label>
                   </>
                 )}
@@ -2095,7 +2114,8 @@ const calculateAgeFromDOB = (dob) => {
                     <label className="form-field">
                       <span>Date</span>
                       <input 
-                        type="date" 
+                        // Replace any remaining date inputs with DatePicker if needed
+                        type="text" 
                         value={healthData.date} 
                         onChange={(e) => handleHealthDataChange('date', e.target.value)}
                         required

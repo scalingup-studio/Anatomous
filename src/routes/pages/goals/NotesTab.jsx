@@ -1,4 +1,5 @@
 import React from "react";
+import DatePicker from "../../../components/DatePicker.jsx";
 import { Modal } from "../../../components/Modal.jsx";
 import { ConfirmDeleteModal } from "../../../components/ConfirmDeleteModal.jsx";
 import { useNotes } from "../../../hooks/useNotes.js";
@@ -23,11 +24,28 @@ export default function NotesTab() {
         <div className="form-row">
           <div className="form-field" style={{ width: 180 }}>
             <label>Start date</label>
-            <input type="date" value={filters.start_date} onChange={(e) => setFilters(v => ({ ...v, start_date: e.target.value }))} />
+            <DatePicker 
+              value={filters.start_date} 
+              onChange={(val) => {
+                setFilters(v => {
+                  const updated = { ...v, start_date: val };
+                  // If end_date is before new start_date, clear it
+                  if (updated.end_date && val && updated.end_date < val) {
+                    updated.end_date = '';
+                  }
+                  return updated;
+                });
+              }}
+              maxDate={filters.end_date || undefined}
+            />
           </div>
           <div className="form-field" style={{ width: 180 }}>
             <label>End date</label>
-            <input type="date" value={filters.end_date} onChange={(e) => setFilters(v => ({ ...v, end_date: e.target.value }))} />
+            <DatePicker 
+              value={filters.end_date} 
+              onChange={(val) => setFilters(v => ({ ...v, end_date: val }))}
+              minDate={filters.start_date || undefined}
+            />
           </div>
           <div className="form-field" style={{ width: 180 }}>
             <label>Mood</label>

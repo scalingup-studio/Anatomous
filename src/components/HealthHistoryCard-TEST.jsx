@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import DatePicker from "./DatePicker.jsx";
 
 const HealthHistoryCard = ({ 
   title, 
@@ -190,12 +191,9 @@ const HealthHistoryCard = ({
             {/* Медичні стани */}
             {title.includes("Condition") && (
               <>
-                <input
-                  type="date"
-                  placeholder="Diagnosis Date"
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <DatePicker
                   value={newItem.diagnosis_date || ""}
-                  onChange={(e) => handleInputChange("diagnosis_date", e.target.value)}
+                  onChange={(val) => handleInputChange("diagnosis_date", val)}
                 />
                 <select
                   className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -234,19 +232,21 @@ const HealthHistoryCard = ({
                   value={newItem.frequency || ""}
                   onChange={(e) => handleInputChange("frequency", e.target.value)}
                 />
-                <input
-                  type="date"
-                  placeholder="Start date"
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newItem.start_date || ""}
-                  onChange={(e) => handleInputChange("start_date", e.target.value)}
+                <DatePicker 
+                  value={newItem.start_date || ""} 
+                  onChange={(val) => {
+                    handleInputChange("start_date", val);
+                    // If end_date is before new start_date, clear it
+                    if (newItem.end_date && val && newItem.end_date < val) {
+                      handleInputChange("end_date", "");
+                    }
+                  }}
+                  maxDate={newItem.end_date || undefined}
                 />
-                <input
-                  type="date"
-                  placeholder="End date (optional)"
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newItem.end_date || ""}
-                  onChange={(e) => handleInputChange("end_date", e.target.value)}
+                <DatePicker 
+                  value={newItem.end_date || ""} 
+                  onChange={(val) => handleInputChange("end_date", val)}
+                  minDate={newItem.start_date || undefined}
                 />
               </>
             )}
@@ -268,12 +268,7 @@ const HealthHistoryCard = ({
             {/* Хірургічні втручання */}
             {title.includes("Surg") && (
               <>
-                <input
-                  type="date"
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newItem.surgery_date || ""}
-                  onChange={(e) => handleInputChange("surgery_date", e.target.value)}
-                />
+                <DatePicker value={newItem.surgery_date || ""} onChange={(val) => handleInputChange("surgery_date", val)} />
                 <input
                   type="text"
                   placeholder="Hospital"
@@ -294,19 +289,8 @@ const HealthHistoryCard = ({
             {/* Вакцинації */}
             {title.includes("Vaccin") && (
               <>
-                <input
-                  type="date"
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newItem.vaccination_date || ""}
-                  onChange={(e) => handleInputChange("vaccination_date", e.target.value)}
-                />
-                <input
-                  type="date"
-                  placeholder="Next due date"
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={newItem.next_due_date || ""}
-                  onChange={(e) => handleInputChange("next_due_date", e.target.value)}
-                />
+                <DatePicker value={newItem.vaccination_date || ""} onChange={(val) => handleInputChange("vaccination_date", val)} />
+                <DatePicker value={newItem.next_due_date || ""} onChange={(val) => handleInputChange("next_due_date", val)} />
                 <input
                   type="text"
                   placeholder="Administrator"

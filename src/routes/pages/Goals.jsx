@@ -1,4 +1,5 @@
 import React from "react";
+import DatePicker from "../../components/DatePicker.jsx";
 import "./Goals.css";
 import { useSearchParams } from "react-router-dom";
 import { GoalsApi } from "../../api/goalsApi";
@@ -171,7 +172,7 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
       <div className="form-row" style={{ width: "100%" }}>
         <div className="form-field" style={{ flex: 1 }}>
           <label>Target date</label>
-          <input type="date" placeholder="YYYY-MM-DD" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+          <DatePicker value={targetDate} onChange={(val) => setTargetDate(val)} />
         </div>
         <div className="form-field" style={{ width: 180 }}>
           <label>Status</label>
@@ -239,7 +240,7 @@ function AddGoalForm({ onCreate, loading }) {
       <div className="form-row">
         <div className="form-field" style={{ flex: 1 }}>
           <label>Target date</label>
-          <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+          <DatePicker value={targetDate} onChange={(val) => setTargetDate(val)} />
         </div>
         <div className="form-field" style={{ flex: 1 }}>
           <label>Type</label>
@@ -315,11 +316,28 @@ function HistoryTab() {
         </div>
         <div className="form-field" style={{ width: 180 }}>
           <label>Start date</label>
-          <input type="date" placeholder="YYYY-MM-DD" value={filters.start_date} onChange={(e) => setFilters(v => ({ ...v, start_date: e.target.value }))} />
+          <DatePicker 
+            value={filters.start_date} 
+            onChange={(val) => {
+              setFilters(v => {
+                const updated = { ...v, start_date: val };
+                // If end_date is before new start_date, clear it
+                if (updated.end_date && val && updated.end_date < val) {
+                  updated.end_date = '';
+                }
+                return updated;
+              });
+            }}
+            maxDate={filters.end_date || undefined}
+          />
         </div>
         <div className="form-field" style={{ width: 180 }}>
           <label>End date</label>
-          <input type="date" placeholder="YYYY-MM-DD" value={filters.end_date} onChange={(e) => setFilters(v => ({ ...v, end_date: e.target.value }))} />
+          <DatePicker 
+            value={filters.end_date} 
+            onChange={(val) => setFilters(v => ({ ...v, end_date: val }))}
+            minDate={filters.start_date || undefined}
+          />
         </div>
         <div style={{ alignSelf: "end" }}>
           <button className="btn secondary" onClick={load}>Filter</button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import DatePicker from "../../components/DatePicker.jsx";
 import HealthHistoryCard from "../../components/HealthHistoryCard-TEST";
 import { HealthHistoryApi } from "../../api/healthHistoryApi";
 import { useAuth } from "../../api/AuthContext";
@@ -192,18 +193,22 @@ const HealthHistoryPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Health History</h1>
         <div className="flex items-center space-x-2">
-          <input 
-            type="date" 
-            className="border rounded-md p-2 text-sm" 
-            value={dateRange.startDate}
-            onChange={(e) => handleDateRangeChange('startDate', e.target.value)}
+          <DatePicker 
+            value={dateRange.startDate} 
+            onChange={(val) => {
+              handleDateRangeChange('startDate', val);
+              // If endDate is before new startDate, clear it
+              if (dateRange.endDate && val && dateRange.endDate < val) {
+                handleDateRangeChange('endDate', '');
+              }
+            }}
+            maxDate={dateRange.endDate || undefined}
           />
           <span>→</span>
-          <input 
-            type="date" 
-            className="border rounded-md p-2 text-sm" 
-            value={dateRange.endDate}
-            onChange={(e) => handleDateRangeChange('endDate', e.target.value)}
+          <DatePicker 
+            value={dateRange.endDate} 
+            onChange={(val) => handleDateRangeChange('endDate', val)}
+            minDate={dateRange.startDate || undefined}
           />
         </div>
       </div>
