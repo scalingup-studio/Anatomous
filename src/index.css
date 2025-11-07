@@ -1,3 +1,41 @@
 @import url("../index.css");
 
 
+/* Flatpickr overrides for consistent styled English calendar */
+.flatpickr-calendar {
+  background: rgba(17,17,17,.98);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.flatpickr-day:hover, .flatpickr-day:focus { background: rgba(255,255,255,0.08); }
+.flatpickr-day.today { border-color: var(--primary); color: var(--text); }
+.flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange {
+  background: var(--primary);
+  color: #111;
+  border-color: var(--primary);
+}
+.flatpickr-months .flatpickr-month, .flatpickr-current-month .cur-month, .flatpickr-current-month .numInput {
+  color: var(--text);
+}
+.flatpickr-weekday { color: var(--muted); }
+.flatpickr-time input, .flatpickr-input[readonly] {
+  background: rgba(17,17,17,.85);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+}
+/* Hide original input when using altInput */
+.flatpickr-input:not(.flatpickr-alt-input) {
+  display: none !important;
+}
+/* Style the alt input */
+.flatpickr-input.flatpickr-alt-input {
+  background: rgba(17,17,17,.85);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+}

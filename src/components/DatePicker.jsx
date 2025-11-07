@@ -2,7 +2,9 @@ import React from "react";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/themes/dark.css";
 
-export default function DatePicker({ value, onChange, placeholder, minDate, maxDate, className, style, disabled, allowClear = false }) {
+const DatePicker = React.memo(function DatePicker({ value, onChange, placeholder, minDate, maxDate, className, style, disabled, allowClear = false }) {
+  const flatpickrRef = React.useRef(null);
+
   const parseLocalIsoDate = React.useCallback((iso) => {
     if (!iso || typeof iso !== 'string') return undefined;
     const parts = iso.split('-');
@@ -27,25 +29,57 @@ export default function DatePicker({ value, onChange, placeholder, minDate, maxD
     return parseLocalIsoDate(dateStr);
   }, [parseLocalIsoDate]);
 
+  // Memoize parsed dates to avoid recalculation
+  const parsedMinDate = React.useMemo(() => {
+    return minDate ? parseDateForFlatpickr(minDate) : undefined;
+  }, [minDate, parseDateForFlatpickr]);
+
+  const parsedMaxDate = React.useMemo(() => {
+    return maxDate ? parseDateForFlatpickr(maxDate) : undefined;
+  }, [maxDate, parseDateForFlatpickr]);
+
   const options = React.useMemo(() => ({
     locale: 'en',
-    dateFormat: "m/d/Y",
-    // Use a single visible input to avoid duplicates
-    allowInput: true,
-    minDate: minDate ? parseDateForFlatpickr(minDate) : undefined,
-    maxDate: maxDate ? parseDateForFlatpickr(maxDate) : undefined,
+    dateFormat: "Y-m-d", // Internal format for Flatpickr
+    altInput: true, // Use alternative input for display
+    altFormat: "m/d/Y", // Display format MM/DD/YYYY
+    allowInput: false, // Disable manual input to prevent format issues
+    minDate: parsedMinDate,
+    maxDate: parsedMaxDate,
     disableMobile: true,
-  }), [minDate, maxDate, parseDateForFlatpickr]);
+    // Disable time picker to avoid time in display
+    enableTime: false,
+    // Ensure consistent format
+    wrap: false,
+  }), [parsedMinDate, parsedMaxDate]);
+
+  // Memoize the parsed value to avoid recalculation on every render
+  const parsedValue = React.useMemo(() => {
+    return value ? parseLocalIsoDate(value) : "";
+  }, [value, parseLocalIsoDate]);
+
+  // Memoize onChange handler to prevent unnecessary re-renders
+  const handleChange = React.useCallback((dates) => {
+    const iso = dates?.[0] ? formatLocalIsoDate(dates[0]) : "";
+    if (onChange) {
+      onChange(iso);
+    }
+  }, [onChange, formatLocalIsoDate]);
+
+  // Store instance reference when ready
+  const handleReady = React.useCallback((selectedDates, dateStr, instance) => {
+    if (instance) {
+      flatpickrRef.current = instance;
+    }
+  }, []);
 
   return (
     <div className={className} style={style}>
       <Flatpickr
-        value={value ? parseLocalIsoDate(value) : ""}
+        value={parsedValue}
         options={options}
-        onChange={(dates) => {
-          const iso = dates?.[0] ? formatLocalIsoDate(dates[0]) : "";
-          onChange && onChange(iso);
-        }}
+        onChange={handleChange}
+        onReady={handleReady}
         placeholder={placeholder || "MM/DD/YYYY"}
         disabled={!!disabled}
       />
@@ -54,6 +88,8 @@ export default function DatePicker({ value, onChange, placeholder, minDate, maxD
       )}
     </div>
   );
-}
+});
+
+export default DatePicker;
 
 

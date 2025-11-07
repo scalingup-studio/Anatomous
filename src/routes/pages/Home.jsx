@@ -39,10 +39,19 @@ export default function DashboardHome(){
 
   const toggleAction = (id) => setActions(prev => prev.map(a => a.id===id ? { ...a, done:!a.done } : a));
 
-  // Check onboarding status on component mount
+  // Check onboarding status only after login (not on every navigation)
   React.useEffect(() => {
     async function checkOnboardingStatus() {
       if (onboardingChecked) return; // Only check once
+      
+      // Check if we should show modal (only after login, not on every navigation)
+      const shouldShowModal = localStorage.getItem('showOnboardingModalAfterLogin') === 'true';
+      
+      if (!shouldShowModal) {
+        console.log('ℹ️ Not showing onboarding modal - not after login');
+        setOnboardingChecked(true);
+        return;
+      }
       
       try {
         // Get user ID from various sources
@@ -69,6 +78,10 @@ export default function DashboardHome(){
         if (!userId) {
           console.warn('⚠️ No user ID available for onboarding check');
           setOnboardingChecked(true);
+          // Clear flag if no user ID
+          try {
+            localStorage.removeItem('showOnboardingModalAfterLogin');
+          } catch {}
           return;
         }
 
@@ -77,6 +90,10 @@ export default function DashboardHome(){
       } catch (error) {
         console.error('Error checking onboarding status:', error);
         setOnboardingChecked(true);
+        // Clear flag on error
+        try {
+          localStorage.removeItem('showOnboardingModalAfterLogin');
+        } catch {}
       }
     }
 
@@ -97,6 +114,11 @@ export default function DashboardHome(){
       if (isIncomplete) {
         console.log('⚠️ Onboarding is incomplete, showing modal...');
         setOnboardingModalOpen(true);
+      } else {
+        // Clear flag if onboarding is complete
+        try {
+          localStorage.removeItem('showOnboardingModalAfterLogin');
+        } catch {}
       }
     }
 
@@ -113,6 +135,11 @@ export default function DashboardHome(){
     // Close modal immediately
     setOnboardingModalOpen(false);
     
+    // Clear flag so modal won't show again on navigation
+    try {
+      localStorage.removeItem('showOnboardingModalAfterLogin');
+    } catch {}
+    
     // Use force=true parameter to bypass OnboardingGuard check
     // This allows access to onboarding even if hasCompletedOnboarding() returns true
     console.log('📍 Current hash before navigation:', window.location.hash);
@@ -125,6 +152,10 @@ export default function DashboardHome(){
 
   function handleOnboardingSkip() {
     setOnboardingModalOpen(false);
+    // Clear flag so modal won't show again on navigation
+    try {
+      localStorage.removeItem('showOnboardingModalAfterLogin');
+    } catch {}
   }
 
   const activity = [

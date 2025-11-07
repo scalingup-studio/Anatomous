@@ -207,6 +207,8 @@ export function AuthProvider({ children }) {
             if (payload?.exp) localStorage.setItem('authTokenExpiresAt', String(payload.exp * 1000));
           }
         } catch {}
+        // Set flag to show onboarding modal after login
+        localStorage.setItem('showOnboardingModalAfterLogin', 'true');
       } catch {}
       setIsNewUser(false); // This is a login, not a signup
       

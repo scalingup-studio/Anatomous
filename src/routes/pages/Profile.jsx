@@ -2113,12 +2113,9 @@ const calculateAgeFromDOB = (dob) => {
                     {/* Date */}
                     <label className="form-field">
                       <span>Date</span>
-                      <input 
-                        // Replace any remaining date inputs with DatePicker if needed
-                        type="text" 
-                        value={healthData.date} 
-                        onChange={(e) => handleHealthDataChange('date', e.target.value)}
-                        required
+                      <DatePicker 
+                        value={healthData.date || ''} 
+                        onChange={(val) => handleHealthDataChange('date', val)}
                       />
                     </label>
 

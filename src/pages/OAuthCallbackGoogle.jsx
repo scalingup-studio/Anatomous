@@ -48,6 +48,11 @@ export default function OAuthCallbackGoogle() {
         // Update auth context
         setAuthToken(refreshResult.authToken);
         setUser(refreshResult.user ?? null);
+        
+        // Set flag to show onboarding modal after login
+        try {
+          localStorage.setItem('showOnboardingModalAfterLogin', 'true');
+        } catch {}
 
         console.log('✅ Authentication successful!');
         setStatus('Success! Redirecting...');
