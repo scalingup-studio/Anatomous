@@ -11,9 +11,10 @@ import { tokenManager } from '../api/tokenManager';
 
 export default function OAuthCallbackGoogle() {
   const navigate = useNavigate();
-  const { setAuthToken, setUser } = useAuth();
+  const { setAuthToken, setUser, setIsNewUser } = useAuth();
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('Initializing...');
+  const [debugInfo, setDebugInfo] = useState(null);
 
   useEffect(() => {
     async function handleCallback() {
@@ -49,10 +50,31 @@ export default function OAuthCallbackGoogle() {
         setAuthToken(refreshResult.authToken);
         setUser(refreshResult.user ?? null);
         
-        // Set flag to show onboarding modal after login
-        try {
-          localStorage.setItem('showOnboardingModalAfterLogin', 'true');
-        } catch {}
+        // Check if this is a new user (onboarding not completed)
+        // Use the same logic as hasCompletedOnboarding() in AuthContext
+        const user = refreshResult.user ?? null;
+        const onboardingCompleted = user ? (
+          user.onboarding_completed ?? user.completed ?? 
+          user.save_onboarding?.onboarding_completed ?? 
+          user.save_onboarding?.completed ?? false
+        ) : false;
+        
+        const isNewUser = !user || !onboardingCompleted;
+        
+        if (isNewUser) {
+          console.log('🆕 New user detected via Google OAuth - redirecting to onboarding');
+          setIsNewUser(true);
+        } else {
+          console.log('👤 Existing user via Google OAuth - redirecting to dashboard');
+          setIsNewUser(false);
+        }
+        
+        // Set flag to show onboarding modal after login (only for existing users)
+        if (!isNewUser) {
+          try {
+            localStorage.setItem('showOnboardingModalAfterLogin', 'true');
+          } catch {}
+        }
 
         console.log('✅ Authentication successful!');
         setStatus('Success! Redirecting...');
@@ -60,9 +82,14 @@ export default function OAuthCallbackGoogle() {
         // Small delay so user sees success message
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        // Redirect to root - let AutoRedirectRoute handle onboarding check
-        console.log('🚀 Navigating to root...');
-        navigate('/', { replace: true });
+        // Redirect based on user status
+        if (isNewUser) {
+          console.log('🚀 Navigating to onboarding for new user...');
+          navigate('/onboarding', { replace: true });
+        } else {
+          console.log('🚀 Navigating to root (AutoRedirectRoute will handle)...');
+          navigate('/', { replace: true });
+        }
 
       } catch (err) {
         console.error('❌ OAuth callback error:', err);
@@ -84,6 +111,7 @@ export default function OAuthCallbackGoogle() {
         tokenManager.clearToken();
         setAuthToken(null);
         setUser(null);
+        setIsNewUser(false);
 
         // Redirect to login after showing error
         // setTimeout(() => {
@@ -99,7 +127,7 @@ export default function OAuthCallbackGoogle() {
     const timer = setTimeout(handleCallback, 200);
     return () => clearTimeout(timer);
 
-  }, [navigate, setAuthToken, setUser]);
+  }, [navigate, setAuthToken, setUser, setIsNewUser]);
 
   if (error) {
     return (
