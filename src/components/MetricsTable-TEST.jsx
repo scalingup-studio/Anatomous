@@ -1,4 +1,5 @@
 import React from "react";
+import DatePicker from "./DatePicker.jsx";
 
 const MetricsTable = ({ metrics = [], onChange, onSave }) => {
   if (!metrics.length) return <p>No health metrics available.</p>;
@@ -28,11 +29,7 @@ const MetricsTable = ({ metrics = [], onChange, onSave }) => {
           return (
             <tr key={key} style={{ borderBottom: "1px solid #ccc" }}>
               <td>
-                <input
-                  type="date"
-                  value={m.date || ""}
-                  onChange={(e) => onChange(key, "date", e.target.value)}
-                />
+                <DatePicker value={m.date || ""} onChange={(val) => onChange(key, "date", val)} />
               </td>
               <td>
                 <input

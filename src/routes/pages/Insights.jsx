@@ -8,6 +8,7 @@ import { TrendsApi } from "../../api/trendsApi";
 import { useNotifications } from "../../api/NotificationContext";
 import { Modal } from "../../components/Modal";
 import { useSearchParams } from "react-router-dom";
+import { CUSTOM_ENDPOINTS } from "../../api/apiConfig";
 import useOpenAI from "../../hooks/useOpenAI";
 
 // Normalize metric title: remove underscores and capitalize first letter
@@ -2038,6 +2039,30 @@ function UploadsTab() {
     setFileToDelete(null);
   };
 
+  // Open file URL in a new browser tab (prefer direct file.file.url)
+  const handleOpenInNewTab = async (file) => {
+    try {
+      // If API provided a direct file.file.url, open it directly in a new tab
+      const fileUrl = file?.file?.url || file?.file_url;
+      if (fileUrl) {
+        window.open(fileUrl, '_blank', 'noopener');
+        return;
+      }
+
+      // Fallback: open authenticated download URL in a new tab
+      const fileId = file.id || file.file_id;
+      if (!fileId) return;
+      const params = new URLSearchParams();
+      params.append('file_id', fileId);
+      if (user?.id) params.append('user_id', user.id);
+      const url = `${CUSTOM_ENDPOINTS.uploudFile.downloadFile}?${params.toString()}`;
+      window.open(url, '_blank', 'noopener');
+    } catch (e) {
+      console.error('Open in new tab error:', e);
+      showNotification('Failed to open file in new tab', 'error');
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Upload section */}
@@ -2178,6 +2203,7 @@ function UploadsTab() {
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0,186,206,0.05)"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    onClick={() => handleOpenInNewTab(file)}
                   >
                     <td style={{ padding: "12px 8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../api/AuthContext";
 import { OnboardingIncompleteModal } from "../../components/OnboardingIncompleteModal";
+import { getUserPlan, PLAN_TIERS } from "../../utils/subscriptionUtils.js";
 
 export default function DashboardHome(){
   const navigate = useNavigate();
@@ -171,8 +172,69 @@ export default function DashboardHome(){
     'Small wins compound: a 10-minute walk still counts.',
   ];
 
+  const userPlan = getUserPlan(user);
+  const isFreePlan = userPlan === PLAN_TIERS.STARTER;
+
   return (
     <div style={{ display:'grid', gap:16 }}>
+      {/* Upgrade Banner for Free Plan */}
+      {isFreePlan && (
+        <div 
+          className="card" 
+          style={{ 
+            display:'flex', 
+            alignItems:'center', 
+            justifyContent:'space-between', 
+            gap:12,
+            background: 'rgba(245, 166, 35, 0.1)',
+            border: '1px solid rgba(245, 166, 35, 0.3)',
+            padding: '16px 20px'
+          }} 
+          aria-label="Upgrade banner"
+        >
+          <div style={{ display:'flex', alignItems:'center', gap:12, flex:1 }}>
+            <div style={{ 
+              fontSize: 24,
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(245, 166, 35, 0.2)',
+              borderRadius: '50%',
+              flexShrink: 0
+            }}>
+              ⚠️
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:600, marginBottom:4, fontSize:14 }}>
+                You're on the Free plan. Upgrade to Core for more insights, saved chats, and goals.
+              </div>
+              <div style={{ color:'var(--muted)', fontSize:12, lineHeight:1.5 }}>
+                Unlock AI risk forecasts, PDF reports, custom goals, and more with Core plan.
+              </div>
+            </div>
+          </div>
+          <Link 
+            className="btn primary" 
+            to="/dashboard/subscriptions?tab=upgrade"
+            onClick={() => {
+              // Track upgrade banner click
+              console.log('📊 Upgrade banner clicked from Home dashboard');
+              if (window.gtag) {
+                window.gtag('event', 'upgrade_banner_click', {
+                  'event_category': 'subscription',
+                  'event_label': 'home_dashboard',
+                  'value': 1
+                });
+              }
+            }}
+          >
+            Upgrade Now
+          </Link>
+        </div>
+      )}
+
       {/* 1) Welcome banner */}
       <div className="card" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }} aria-label="Welcome banner">
         <div>

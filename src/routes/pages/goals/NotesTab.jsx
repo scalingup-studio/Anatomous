@@ -3,6 +3,7 @@ import DatePicker from "../../../components/DatePicker.jsx";
 import { Modal } from "../../../components/Modal.jsx";
 import { ConfirmDeleteModal } from "../../../components/ConfirmDeleteModal.jsx";
 import { useNotes } from "../../../hooks/useNotes.js";
+import { useNotifications } from "../../../api/NotificationContext.jsx";
 
 export default function NotesTab() {
   const {
@@ -17,6 +18,7 @@ export default function NotesTab() {
     formatDisplayDate,
     load,
   } = useNotes();
+  const { showNotification } = useNotifications();
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -49,7 +51,17 @@ export default function NotesTab() {
           </div>
           <div className="form-field" style={{ width: 180 }}>
             <label>Mood</label>
-            <input value={filters.mood_tag} onChange={(e) => setFilters(v => ({ ...v, mood_tag: e.target.value }))} placeholder="e.g. energetic" />
+            <input 
+              value={filters.mood_tag} 
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 200) {
+                  setFilters(v => ({ ...v, mood_tag: value }));
+                }
+              }}
+              maxLength={200}
+              placeholder="e.g. energetic (max 200)"
+            />
           </div>
           <div style={{ alignSelf: "end" }}>
             <button className="btn secondary" onClick={load}>Filter</button>
@@ -60,15 +72,58 @@ export default function NotesTab() {
       <div className="card" style={{ display: "grid", gap: 12 }}>
         <div className="form-field">
           <label>Write a note</label>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="How are you feeling today?" />
+          <textarea 
+            value={note} 
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value.length <= 500) {
+                setNote(value);
+              }
+            }}
+            maxLength={500}
+            placeholder="How are you feeling today? (max 500 characters)"
+            rows={4}
+          />
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+            {note.length}/500
+          </div>
         </div>
         <div className="form-row">
           <div className="form-field" style={{ width: 220 }}>
             <label>Mood tag</label>
-            <input value={mood} onChange={(e) => setMood(e.target.value)} placeholder="calm / energetic / tired" />
+            <input 
+              value={mood} 
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 200) {
+                  setMood(value);
+                }
+              }}
+              maxLength={200}
+              placeholder="calm / energetic / tired (max 200)"
+            />
+          
           </div>
           <div style={{ alignSelf: "end" }}>
-            <button className="btn primary" onClick={add} disabled={loading}>Save</button>
+            <button 
+              className="btn primary" 
+              onClick={() => {
+                // Validate note length (max 500 characters)
+                if (note.length > 500) {
+                  showNotification("Note cannot exceed 500 characters", "error");
+                  return;
+                }
+                // Validate mood tag length (max 200 characters)
+                if (mood.length > 200) {
+                  showNotification("Mood tag cannot exceed 200 characters", "error");
+                  return;
+                }
+                add();
+              }} 
+              disabled={loading}
+            >
+              Save
+            </button>
           </div>
         </div>
       </div>
@@ -119,18 +174,61 @@ export default function NotesTab() {
         <Modal open={!!selectedNote} title="Edit Note" onClose={() => setSelectedNote(null)}>
           <div className="form-field" style={{ width: "100%" }}>
             <label>Text</label>
-            <textarea value={selectedNote.text} onChange={(e) => setSelectedNote({ ...selectedNote, text: e.target.value })} />
+            <textarea 
+              value={selectedNote.text} 
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 500) {
+                  setSelectedNote({ ...selectedNote, text: value });
+                }
+              }}
+              maxLength={500}
+              rows={4}
+            />
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+              {selectedNote.text?.length || 0}/500
+            </div>
           </div>
           <div className="form-row" style={{ width: "100%" }}>
             <div className="form-field" style={{ width: "100%"}}>
               <label>Mood tag</label>
-              <input value={selectedNote.mood_tag || ""} onChange={(e) => setSelectedNote({ ...selectedNote, mood_tag: e.target.value })} />
+              <input 
+                value={selectedNote.mood_tag || ""} 
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= 200) {
+                    setSelectedNote({ ...selectedNote, mood_tag: value });
+                  }
+                }}
+                maxLength={200}
+              />
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+                {(selectedNote.mood_tag || "").length}/200
+              </div>
             </div>
           </div>
           <div style={{ display: "flex",  width: "100%" }}>
             <div style={{ display: "flex", justifyContent: "space-between", width: "100%"}}>
               <button className="btn secondary" onClick={() => setSelectedNote(null)}>Cancel</button>
-              <button className="btn primary" onClick={saveNote} disabled={loading}>Save</button>
+              <button 
+                className="btn primary" 
+                onClick={() => {
+                  // Validate note length (max 500 characters)
+                  if (selectedNote.text && selectedNote.text.length > 500) {
+                    showNotification("Note cannot exceed 500 characters", "error");
+                    return;
+                  }
+                  // Validate mood tag length (max 200 characters)
+                  if (selectedNote.mood_tag && selectedNote.mood_tag.length > 200) {
+                    showNotification("Mood tag cannot exceed 200 characters", "error");
+                    return;
+                  }
+                  saveNote();
+                }} 
+                disabled={loading}
+              >
+                Save
+              </button>
             </div>
           </div>
         </Modal>

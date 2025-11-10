@@ -5,6 +5,7 @@ import { useNotifications } from '../api/NotificationContext.jsx';
 import { OnboardingApi } from '../api/onboardingApi.js';
 import { ProfilesApi } from '../api/profilesApi.js';
 import { Logo } from '../components/Logo.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 import './OnboardingLayout.css';
 
 const OnboardingLayout = () => {
@@ -30,10 +31,11 @@ const OnboardingLayout = () => {
     phoneNumber: '',
     dateOfBirth: '',
     sexAtBirth: '',
-    genderIdentity: '',
     height: '',
     weight: '',
     zipCode: '',
+    heightUnit: 'cm',
+    weightUnit: 'kg',
 
     // Health Snapshot
     healthConditions: '',
@@ -334,7 +336,6 @@ const OnboardingLayout = () => {
         populatedFormData.email = personalData.email || populatedFormData.email;
         populatedFormData.phoneNumber = personalData.phone_number || populatedFormData.phoneNumber;
         populatedFormData.dateOfBirth = personalData.dob || populatedFormData.dateOfBirth;
-        populatedFormData.genderIdentity = personalData.gender || populatedFormData.genderIdentity;
         populatedFormData.sexAtBirth = personalData.sex_of_birth || populatedFormData.sexAtBirth;
         populatedFormData.height = personalData.height ? personalData.height.toString() : populatedFormData.height;
         populatedFormData.weight = personalData.weight ? personalData.weight.toString() : populatedFormData.weight;
@@ -412,7 +413,6 @@ const OnboardingLayout = () => {
         phoneNumber: profile?.phone_number || user?.phone_number || user?.phone || '',
         dateOfBirth: profile?.dob || '',
         sexAtBirth: profile?.sex_of_birth || user?.sex_of_birth || '',
-        genderIdentity: profile?.gender || user?.gender || '',
         height: profile?.height_cm ? profile.height_cm.toString() : '',
         weight: profile?.weight_kg ? profile.weight_kg.toString() : '',
         zipCode: profile?.zip_code || '',
@@ -452,7 +452,6 @@ const OnboardingLayout = () => {
         email: formData.email,
         phoneNumber: formData.phoneNumber,
         dateOfBirth: formData.dateOfBirth,
-        genderIdentity: formData.genderIdentity,
         sexAtBirth: formData.sexAtBirth,
         height: formData.height,
         weight: formData.weight,
@@ -727,22 +726,20 @@ const OnboardingLayout = () => {
                   type="tel"
                   value={formData.phoneNumber}
                   onChange={(e) => updateFormData('phoneNumber', e.target.value)}
-                  placeholder="Enter your phone number"
+                  placeholder="+1 555-555-1234"
                 />
               </div>
               
               <div className="form-field">
                 <label>Date of Birth *</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={formData.dateOfBirth}
-                  onChange={(e) => updateFormData('dateOfBirth', e.target.value)}
-                  required
+                  onChange={(val) => updateFormData('dateOfBirth', val)}
                 />
               </div>
               
               <div className="form-field">
-                <label>Sex at Birth *</label>
+                <label>Sex *</label>
                 <select
                   value={formData.sexAtBirth}
                   onChange={(e) => updateFormData('sexAtBirth', e.target.value)}
@@ -751,46 +748,9 @@ const OnboardingLayout = () => {
                   <option value="">Select</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              
-              <div className="form-field">
-                <label>Gender Identity</label>
-                <select
-                  value={formData.genderIdentity}
-                  onChange={(e) => updateFormData('genderIdentity', e.target.value)}
-                >
-                  <option value="">Select (optional)</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non-binary">Non-binary</option>
-                  <option value="transgender">Transgender</option>
-                  <option value="other">Other</option>
                   <option value="prefer-not-to-say">Prefer not to say</option>
                 </select>
               </div>
-              
-              <div className="form-field">
-                <label>Height (cm)</label>
-                <input
-                  type="number"
-                  value={formData.height}
-                  onChange={(e) => updateFormData('height', e.target.value)}
-                  placeholder="e.g., 175"
-                />
-              </div>
-              
-              <div className="form-field">
-                <label>Weight (kg)</label>
-                <input
-                  type="number"
-                  value={formData.weight}
-                  onChange={(e) => updateFormData('weight', e.target.value)}
-                  placeholder="e.g., 70"
-                />
-              </div>
-              
               <div className="form-field">
                 <label>ZIP Code</label>
                 <input
@@ -800,6 +760,91 @@ const OnboardingLayout = () => {
                   placeholder="e.g., 94105"
                 />
               </div>
+              
+              <div className="form-field">
+                <label>Height</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="number"
+                    value={formData.height}
+                    onChange={(e) => updateFormData('height', e.target.value)}
+                    placeholder={formData.heightUnit === 'cm' ? 'e.g., 175' : 'e.g., 69'}
+                    style={{ }}
+                  />
+                  <select
+                    value={formData.heightUnit}
+                    onChange={(e) => {
+                      const newUnit = e.target.value;
+                      // convert existing value
+                      const h = parseFloat(formData.height);
+                      if (!isNaN(h)) {
+                        if (formData.heightUnit === 'cm' && newUnit === 'in') {
+                          const inches = (h / 2.54).toFixed(1);
+                          updateFormData('height', inches);
+                        } else if (formData.heightUnit === 'in' && newUnit === 'cm') {
+                          const cm = (h * 2.54).toFixed(0);
+                          updateFormData('height', cm);
+                        }
+                      }
+                      updateFormData('heightUnit', newUnit);
+                    }}
+                  >
+                    <option value="cm">cm</option>
+                    <option value="in">in</option>
+                  </select>
+                </div>
+              </div>
+
+           
+              
+              <div className="form-field">
+                <label>Weight</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="number"
+                    value={formData.weight}
+                    onChange={(e) => updateFormData('weight', e.target.value)}
+                    placeholder={formData.weightUnit === 'kg' ? 'e.g., 70' : 'e.g., 154'}
+                    style={{  }}
+                  />
+                  <select
+                    value={formData.weightUnit}
+                    onChange={(e) => {
+                      const newUnit = e.target.value;
+                      const w = parseFloat(formData.weight);
+                      if (!isNaN(w)) {
+                        if (formData.weightUnit === 'kg' && newUnit === 'lb') {
+                          const lb = (w * 2.20462).toFixed(1);
+                          updateFormData('weight', lb);
+                        } else if (formData.weightUnit === 'lb' && newUnit === 'kg') {
+                          const kg = (w / 2.20462).toFixed(1);
+                          updateFormData('weight', kg);
+                        }
+                      }
+                      updateFormData('weightUnit', newUnit);
+                    }}
+                  >
+                    <option value="kg">kg</option>
+                    <option value="lb">lb</option>
+                  </select>
+                </div>
+              </div>
+                 {/* BMI auto-calculation */}
+                 <div className="form-field">
+                <label>BMI</label>
+                <div style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
+                  {(() => {
+                    const h = parseFloat(formData.height);
+                    const w = parseFloat(formData.weight);
+                    if (isNaN(h) || isNaN(w) || h <= 0 || w <= 0) return '—';
+                    const heightMeters = formData.heightUnit === 'cm' ? h / 100 : (h * 2.54) / 100;
+                    const weightKg = formData.weightUnit === 'kg' ? w : w / 2.20462;
+                    const bmi = weightKg / (heightMeters * heightMeters);
+                    return bmi ? bmi.toFixed(1) : '—';
+                  })()}
+                </div>
+              </div>
+            
             </div>
             
             <div className="step-navigation">
@@ -824,32 +869,38 @@ const OnboardingLayout = () => {
             <div className="form-fields">
               <div className="form-field">
                 <label>Known Health Conditions</label>
-                <textarea
-                  value={formData.healthConditions}
-                  onChange={(e) => updateFormData('healthConditions', e.target.value)}
-                  placeholder="List any health conditions you have (e.g., diabetes, hypertension, asthma)"
-                  rows={4}
-                />
+                <input list="conditions-list" placeholder="Start typing to autocomplete..." onChange={(e)=>updateFormData('healthConditions', e.target.value)} value={formData.healthConditions} />
+                <datalist id="conditions-list">
+                  <option value="diabetes" />
+                  <option value="hypertension" />
+                  <option value="asthma" />
+                  <option value="high cholesterol" />
+                  <option value="thyroid disorder" />
+                </datalist>
               </div>
               
               <div className="form-field">
                 <label>Current Medications (Optional)</label>
-                <textarea
-                  value={formData.medications}
-                  onChange={(e) => updateFormData('medications', e.target.value)}
-                  placeholder="List any medications you're currently taking"
-                  rows={3}
-                />
+                <input list="medications-list" placeholder="Start typing to autocomplete..." onChange={(e)=>updateFormData('medications', e.target.value)} value={formData.medications} />
+                <datalist id="medications-list">
+                  <option value="ibuprofen" />
+                  <option value="acetaminophen" />
+                  <option value="metformin" />
+                  <option value="lisinopril" />
+                  <option value="atorvastatin" />
+                </datalist>
               </div>
               
               <div className="form-field">
                 <label>Known Allergies (Optional)</label>
-                <textarea
-                  value={formData.allergies}
-                  onChange={(e) => updateFormData('allergies', e.target.value)}
-                  placeholder="List any allergies you have"
-                  rows={3}
-                />
+                <input list="allergies-list" placeholder="Start typing to autocomplete..." onChange={(e)=>updateFormData('allergies', e.target.value)} value={formData.allergies} />
+                <datalist id="allergies-list">
+                  <option value="penicillin" />
+                  <option value="peanuts" />
+                  <option value="shellfish" />
+                  <option value="pollen" />
+                  <option value="lactose" />
+                </datalist>
               </div>
             </div>
             
@@ -929,11 +980,9 @@ const OnboardingLayout = () => {
             
             <div className="form-field">
               <label>Target Date (Optional)</label>
-              <input
-                type="date"
+              <DatePicker
                 value={formData.targetDate}
-                onChange={(e) => updateFormData('targetDate', e.target.value)}
-                placeholder="When would you like to achieve these goals?"
+                onChange={(val) => updateFormData('targetDate', val)}
               />
             </div>
             
@@ -1051,8 +1100,7 @@ const OnboardingLayout = () => {
                   <p><strong>Email:</strong> {formData.email}</p>
                   <p><strong>Phone:</strong> {formData.phoneNumber}</p>
                   <p><strong>Date of Birth:</strong> {formData.dateOfBirth}</p>
-                  <p><strong>Sex at Birth:</strong> {formData.sexAtBirth}</p>
-                  {formData.genderIdentity && <p><strong>Gender Identity:</strong> {formData.genderIdentity}</p>}
+                  <p><strong>Sex:</strong> {formData.sexAtBirth}</p>
                   {formData.height && <p><strong>Height:</strong> {formData.height} cm</p>}
                   {formData.weight && <p><strong>Weight:</strong> {formData.weight} kg</p>}
                   {formData.zipCode && <p><strong>ZIP Code:</strong> {formData.zipCode}</p>}

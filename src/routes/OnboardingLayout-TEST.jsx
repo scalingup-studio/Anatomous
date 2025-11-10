@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import DatePicker from '../components/DatePicker.jsx';
 import {useNavigate} from 'react-router-dom';
 import {useAuth} from '../api/AuthContext.jsx';
 import {UserSettingsApi} from '../api/userSettingsApi.js';
@@ -324,15 +325,7 @@ const OnboardingPage = () => {
             <div className="form-grid">
               <div className="form-group">
                 <label>Date of Birth *</label>
-                <input
-                  type="date"
-                  value={formData.dob}
-                  onChange={(e) => {
-                    console.log('Date of birth changed:', e.target.value);
-                    handleInputChange('dob', e.target.value);
-                  }}
-                  max={new Date().toISOString().split('T')[0]} // Заборона вибору майбутніх дат
-                />
+                <DatePicker value={formData.dob} onChange={(val)=>handleInputChange('dob', val)} />
               </div>
               <div className="form-group">
                 <label>Height *</label>

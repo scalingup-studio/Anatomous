@@ -1,8 +1,10 @@
 import React from "react";
+import DatePicker from "../../../components/DatePicker.jsx";
 import "../Goals.css";
 import { Modal } from "../../../components/Modal.jsx";
 import { ConfirmDeleteModal } from "../../../components/ConfirmDeleteModal.jsx";
 import { useGoals } from "../../../hooks/useGoals.js";
+import { useNotifications } from "../../../api/NotificationContext.jsx";
 
 function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
   const formatDate = (v) => {
@@ -95,6 +97,7 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
   const [status, setStatus] = React.useState("on track");
   const [type, setType] = React.useState("");
   const [visibility, setVisibility] = React.useState("private");
+  const { showNotification } = useNotifications();
 
   React.useEffect(() => {
     if (!goal) return;
@@ -113,16 +116,41 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
       <div style={{ width: "100%", display: "grid", gap: 20 }}>
         <div className="form-field" style={{ width: "100%" }}>
           <label>Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input 
+            value={title} 
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value.length <= 200) {
+                setTitle(value);
+              }
+            }}
+            maxLength={200}
+          />
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+            {title.length}/200
+          </div>
         </div>
         <div className="form-field" style={{ width: "100%" }}>
           <label>Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          <textarea 
+            value={description} 
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value.length <= 500) {
+                setDescription(value);
+              }
+            }}
+            maxLength={500}
+            rows={4}
+          />
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+            {description.length}/500
+          </div>
         </div>
         <div className="form-row" style={{ width: "100%" }}>
           <div className="form-field" style={{ flex: 1 }}>
             <label>Target date</label>
-            <input type="date" placeholder="YYYY-MM-DD" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+            <DatePicker value={targetDate} onChange={(val) => setTargetDate(val)} />
           </div>
           <div className="form-field" style={{ width: 180 }}>
             <label>Status</label>
@@ -151,14 +179,26 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
           <button className="btn secondary" onClick={onClose}>Cancel</button>
           <button
             className="btn primary"
-            onClick={() => onSave({
-              title,
-              description,
-              status,
-              target_date: targetDate || undefined,
-              type,
-              visibility_scope: visibility,
-            })}
+            onClick={() => {
+              // Validate title length (max 200 characters)
+              if (title.length > 200) {
+                showNotification("Title cannot exceed 200 characters", "error");
+                return;
+              }
+              // Validate description length (max 500 characters)
+              if (description.length > 500) {
+                showNotification("Description cannot exceed 500 characters", "error");
+                return;
+              }
+              onSave({
+                title,
+                description,
+                status,
+                target_date: targetDate || undefined,
+                type,
+                visibility_scope: visibility,
+              });
+            }}
           >
             Save Changes
           </button>
@@ -174,6 +214,7 @@ function AddGoalForm({ onCreate, loading }) {
   const [targetDate, setTargetDate] = React.useState("");
   const [type, setType] = React.useState("");
   const [visibility, setVisibility] = React.useState("private");
+  const { showNotification } = useNotifications();
 
   const canSave = title.trim().length > 0;
 
@@ -181,16 +222,41 @@ function AddGoalForm({ onCreate, loading }) {
     <div className="card" style={{ display: "grid", gap: 12 }}>
       <div className="form-field">
         <label>Title</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Run 5km" />
+        <input 
+          value={title} 
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value.length <= 200) {
+              setTitle(value);
+            }
+          }}
+          maxLength={200}
+          placeholder="e.g. Run 5km (max 200 characters)"
+        />
+       
       </div>
       <div className="form-field">
         <label>Description</label>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Details" />
+        <textarea 
+          value={description} 
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value.length <= 500) {
+              setDescription(value);
+            }
+          }}
+          maxLength={500}
+          placeholder="Details (max 500 characters)"
+          rows={4}
+        />
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+            {description.length}/500
+          </div>
       </div>
       <div className="form-row">
         <div className="form-field" style={{ flex: 1 }}>
           <label>Target date</label>
-          <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+          <DatePicker value={targetDate} onChange={(val) => setTargetDate(val)} />
         </div>
         <div className="form-field" style={{ flex: 1 }}>
           <label>Type</label>
@@ -206,6 +272,16 @@ function AddGoalForm({ onCreate, loading }) {
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button className="btn primary" disabled={!canSave || loading} onClick={async () => {
+          // Validate title length (max 200 characters)
+          if (title.length > 200) {
+            showNotification("Title cannot exceed 200 characters", "error");
+            return;
+          }
+          // Validate description length (max 500 characters)
+          if (description.length > 500) {
+            showNotification("Description cannot exceed 500 characters", "error");
+            return;
+          }
           const ok = await onCreate({
             title,
             description,

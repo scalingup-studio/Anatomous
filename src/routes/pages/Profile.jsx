@@ -45,6 +45,8 @@ export default function DashboardProfile() {
     return allowed.includes(t) ? t : 'personal';
   })();
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [heightUnit, setHeightUnit] = useState('cm');
+  const [weightUnit, setWeightUnit] = useState('kg');
 
   useEffect(() => {
     const t = String(searchParams.get('tab') || '').toLowerCase();
@@ -236,24 +238,24 @@ export default function DashboardProfile() {
         <div style="padding: 24px;">
           <!-- Record Details -->
           <div style="background: rgba(17, 17, 17, 0.6); border: 1px solid #333333; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-            <h4 style="margin: 0 0 16px 0; color: #00bace; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+            <h4 style={{ margin: 0, color: '#00bace', fontSize: '14px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.05 }}>
               Record Details
             </h4>
-            <div style="space-y: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #333333;">
-                <span style="color: #777777; font-size: 13px; font-weight: 500;">Date:</span>
-                <span style="color: #ffffff; font-size: 13px; font-weight: 600;">${recordToDelete.date || 'Unknown'}</span>
+            <div style={{ spaceY: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 8, borderBottom: '1px solid #333333' }}>
+                <span style={{ color: '#777777', fontSize: '13px', fontWeight: 500 }}>Date:</span>
+                <span style={{ color: '#ffffff', fontSize: '13px', fontWeight: 600 }}>${recordToDelete.date || 'Unknown'}</span>
               </div>
               ${recordToDelete.heart_rate ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #333333;">
-                  <span style="color: #777777; font-size: 13px; font-weight: 500;">Heart Rate:</span>
-                  <span style="color: #ffffff; font-size: 13px; font-weight: 600;">${recordToDelete.heart_rate} bpm</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 8, borderBottom: '1px solid #333333' }}>
+                  <span style={{ color: '#777777', fontSize: '13px', fontWeight: 500 }}>Heart Rate:</span>
+                  <span style={{ color: '#ffffff', fontSize: '13px', fontWeight: 600 }}>${recordToDelete.heart_rate} bpm</span>
                 </div>
               ` : ''}
               ${recordToDelete.blood_pressure_systolic && recordToDelete.blood_pressure_diastolic ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0;">
-                  <span style="color: #777777; font-size: 13px; font-weight: 500;">Blood Pressure:</span>
-                  <span style="color: #ffffff; font-size: 13px; font-weight: 600;">${recordToDelete.blood_pressure_systolic}/${recordToDelete.blood_pressure_diastolic}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 8 }}>
+                  <span style={{ color: '#777777', fontSize: '13px', fontWeight: 500 }}>Blood Pressure:</span>
+                  <span style={{ color: '#ffffff', fontSize: '13px', fontWeight: 600 }}>${recordToDelete.blood_pressure_systolic}/${recordToDelete.blood_pressure_diastolic}</span>
                 </div>
               ` : ''}
             </div>
@@ -261,7 +263,7 @@ export default function DashboardProfile() {
         </div>
 
         <!-- Footer -->
-        <div style="padding: 20px 24px 24px; border-top: 1px solid #222222; background: rgba(17, 17, 17, 0.8); display: flex; gap: 12px; justify-content: flex-end;">
+        <div style={{ padding: '20px 24px 24px; border-top: 1px solid #222222; background: rgba(17, 17, 17, 0.8); display: flex; gap: 12px; justify-content: flex-end' }}>
           <button id="cancel-delete-btn" style="
             padding: 12px 20px;
             background: transparent;
@@ -1288,45 +1290,84 @@ const calculateAgeFromDOB = (dob) => {
                 {/* User ID hidden from UI by request */}
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Phone</span>
-                  <input name="phone_number" value={formValues.phone_number} onChange={handleChange} placeholder="+1 555-1234" />
+                  <input name="phone_number" value={formValues.phone_number} onChange={handleChange} placeholder="+1 555-555-1234" />
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Date of birth</span>
                   <DatePicker value={formValues.dob || ""} onChange={(val)=>handleChange({ target: { name: 'dob', value: val }})} />
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
-                  <span>Gender Identity</span>
-                  <select name="gender" value={formValues.gender || ""} onChange={handleChange}>
-                    <option value="">Not specified</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="non-binary">Non-binary</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                </label>
-                <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
-                  <span>Sex at Birth</span>
+                  <span>Sex</span>
                   <select name="sex_of_birth" value={formValues.sex_of_birth || ""} onChange={handleChange}>
                     <option value="">Not specified</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
-                    <option value="intersex">Intersex</option>
                     <option value="prefer-not-to-say">Prefer not to say</option>
                   </select>
-                </label>
-                <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6  }}>
-                  <span>Height (cm)</span>
-                  <input type="number" inputMode="numeric" name="height_cm" value={formValues.height_cm} onChange={handleChange} placeholder="e.g. 175" />
-                </label>
-                <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
-                  <span>Weight (kg)</span>
-                  <input type="number" inputMode="numeric" name="weight_kg" value={formValues.weight_kg} onChange={handleChange} placeholder="e.g. 70" />
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>ZIP Code</span>
                   <input name="zip_code" value={formValues.zip_code} onChange={handleChange} placeholder="e.g. 94105" />
                 </label>
+                <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6  }}>
+                  <span>Height</span>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input type="number" inputMode="numeric" name="height_cm" value={formValues.height_cm} onChange={handleChange} placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 69'} style={{ }} />
+                    <select value={heightUnit} onChange={(e)=>{
+                      const newUnit = e.target.value;
+                      const h = parseFloat(formValues.height_cm);
+                      if (!isNaN(h)) {
+                        if (heightUnit === 'cm' && newUnit === 'in') {
+                          // convert cm -> inches (store back in cm field for persistence)
+                          const cm = h; const inches = (cm / 2.54).toFixed(1);
+                          // store inches as cm converted value for consistency on save, but keep unit UI
+                          // Here we keep height_cm as cm internally; just changing unit UI won't change stored field
+                        } else if (heightUnit === 'in' && newUnit === 'cm') {
+                          // inches -> cm visual; no data transform needed since we store cm
+                        }
+                      }
+                      setHeightUnit(newUnit);
+                    }}>
+                      <option value="cm">cm</option>
+                      <option value="in">in</option>
+                    </select>
+                  </div>
+                </label>
+                <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
+                  <span>Weight</span>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input type="number" inputMode="numeric" name="weight_kg" value={formValues.weight_kg} onChange={handleChange} placeholder={weightUnit === 'kg' ? 'e.g. 70' : 'e.g. 154'} style={{ }} />
+                    <select value={weightUnit} onChange={(e)=>{
+                      const newUnit = e.target.value;
+                      const w = parseFloat(formValues.weight_kg);
+                      if (!isNaN(w)) {
+                        if (weightUnit === 'kg' && newUnit === 'lb') {
+                          // kg -> lb (we still store kg internally)
+                        } else if (weightUnit === 'lb' && newUnit === 'kg') {
+                          // lb -> kg UI
+                        }
+                      }
+                      setWeightUnit(newUnit);
+                    }}>
+                      <option value="kg">kg</option>
+                      <option value="lb">lb</option>
+                    </select>
+                  </div>
+                </label>
+                <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
+                  <span>BMI</span>
+                  <div style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
+                    {(() => {
+                      const hcm = parseFloat(formValues.height_cm);
+                      const wkg = parseFloat(formValues.weight_kg);
+                      if (isNaN(hcm) || isNaN(wkg) || hcm <=0 || wkg <=0) return '—';
+                      const m = hcm / 100;
+                      const bmi = wkg / (m*m);
+                      return bmi.toFixed(1);
+                    })()}
+                  </div>
+                </label>
+               
                 <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
                   <button type="submit" className="btn primary full" disabled={saving}>
                     {saving ? "Saving…" : "Save changes"}

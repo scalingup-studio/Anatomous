@@ -104,35 +104,84 @@ function PrivacyTab({ onSaved, onAction }){
   const [retention, setRetention] = React.useState('12m');
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirmType, setConfirmType] = React.useState('download');
+  
+  // AI processing preferences
+  const [aiHealthHistory, setAiHealthHistory] = React.useState(true);
+  const [aiHealthData, setAiHealthData] = React.useState(true);
+  const [aiMedicalRecords, setAiMedicalRecords] = React.useState(true);
+  const [aiNotes, setAiNotes] = React.useState(true);
 
   return (
-    <div className="card" style={{ maxWidth: 720 }}>
-      <h3 style={{ marginTop:0 }}>Privacy Preferences</h3>
-      <p style={{ marginTop:4, color:'var(--muted)', fontSize:12 }}>Control visibility, retention and AI processing of your data.</p>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <div className="form-field">
-          <label>Data visibility</label>
-          <select value={dataVisibility} onChange={(e)=>setDataVisibility(e.target.value)}>
-            <option value="default">Show all in app</option>
-            <option value="hide_vitals">Hide sensitive vitals</option>
-            <option value="minimal">Minimal display</option>
-          </select>
-        </div>
+    <div style={{ display:'grid', gap:16 }}>
+      <div className="card" style={{ maxWidth: 720 }}>
+        <h3 style={{ marginTop:0 }}>Privacy Preferences</h3>
+        <p style={{ marginTop:4, color:'var(--muted)', fontSize:12 }}>Control visibility, retention and AI processing of your data.</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div className="form-field">
+            <label>Data visibility</label>
+            <select value={dataVisibility} onChange={(e)=>setDataVisibility(e.target.value)}>
+              <option value="default">Show all in app</option>
+              <option value="hide_vitals">Hide sensitive vitals</option>
+              <option value="minimal">Minimal display</option>
+            </select>
+          </div>
 
-        <div className="form-field">
-          <label>Data retention</label>
-          <select value={retention} onChange={(e)=>setRetention(e.target.value)}>
-            <option value="6m">6 months</option>
-            <option value="12m">12 months</option>
-            <option value="24m">24 months</option>
-            <option value="forever">Keep until I delete</option>
-          </select>
-        </div>
+          <div className="form-field">
+            <label>Data retention</label>
+            <select value={retention} onChange={(e)=>setRetention(e.target.value)}>
+              <option value="6m">6 months</option>
+              <option value="12m">12 months</option>
+              <option value="24m">24 months</option>
+              <option value="forever">Keep until I delete</option>
+            </select>
+          </div>
 
-        <label className="checkbox" style={{ gridColumn:'1 / -1' }}><input type="checkbox" checked={aiOptIn} onChange={(e)=>setAiOptIn(e.target.checked)} /> <span>Allow AI processing for insights</span></label>
+          <label className="checkbox" style={{ gridColumn:'1 / -1' }}><input type="checkbox" checked={aiOptIn} onChange={(e)=>setAiOptIn(e.target.checked)} /> <span>Allow AI processing for insights</span></label>
+        </div>
       </div>
-      <button className="btn primary" style={{ width:180 , marginTop:16 }} onClick={()=>onSaved && onSaved()}>Save preferences</button>
-      <div style={{ height:16 }} />
+
+      {/* AI Processing Preferences */}
+      <div className="card" style={{ maxWidth: 720 }}>
+        <h3 style={{ marginTop:0 }}>AI Processing Preferences</h3>
+        <p style={{ marginTop:4, marginBottom:16, color:'var(--muted)', fontSize:12, lineHeight:1.5 }}>
+          Data processing preferences determine which types of information may be used by the AI engine to generate insights.
+        </p>
+        <div style={{ display:'grid', gap:12 }}>
+          <label className="checkbox">
+            <input 
+              type="checkbox" 
+              checked={aiHealthHistory} 
+              onChange={(e)=>setAiHealthHistory(e.target.checked)} 
+            /> 
+            <span>Health history information</span>
+          </label>
+          <label className="checkbox">
+            <input 
+              type="checkbox" 
+              checked={aiHealthData} 
+              onChange={(e)=>setAiHealthData(e.target.checked)} 
+            /> 
+            <span>Health data (metrics, e.g., last 7 days)</span>
+          </label>
+          <label className="checkbox">
+            <input 
+              type="checkbox" 
+              checked={aiMedicalRecords} 
+              onChange={(e)=>setAiMedicalRecords(e.target.checked)} 
+            /> 
+            <span>Medical record uploads (de-identified)</span>
+          </label>
+          <label className="checkbox">
+            <input 
+              type="checkbox" 
+              checked={aiNotes} 
+              onChange={(e)=>setAiNotes(e.target.checked)} 
+            /> 
+            <span>Notes/journal entries</span>
+          </label>
+        </div>
+        <button className="btn primary" style={{ width:180 , marginTop:16 }} onClick={()=>onSaved && onSaved()}>Save preferences</button>
+      </div>
       {/* Data management block */}
       <div className="card" style={{ maxWidth: 720 }}>
         <div style={{ fontWeight:600, marginBottom:8 }}>Data management</div>
@@ -141,11 +190,10 @@ function PrivacyTab({ onSaved, onAction }){
           <button className="btn danger" onClick={()=>{ setConfirmType('delete'); setConfirmOpen(true); }}>Delete my data</button>
         </div>
       </div>
-      <div style={{ height:12 }} />
-     
+      
 
       {/* Policy links separate block */}
-      <div style={{ height:16 }} />
+   
       <div className="card" style={{ maxWidth: 720 }}>
         <div style={{ fontWeight:600, marginBottom:8 }}>Policies & Help</div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>

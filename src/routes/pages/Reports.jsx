@@ -1,6 +1,9 @@
 import React from "react";
 import DatePicker from "../../components/DatePicker.jsx";
 import { ReportsApi } from "../../api/reportsApi";
+import { useAuth } from "../../api/AuthContext.jsx";
+import { hasFeatureAccess } from "../../utils/subscriptionUtils.js";
+import { UpgradePrompt } from "../../components/UpgradePrompt.jsx";
 
 export default function DashboardReports() {
   const [activeTab, setActiveTab] = React.useState("download");
@@ -234,6 +237,7 @@ function DownloadReportsTab() {
 }
 
 function ShareWithProviderTab() {
+  const { user } = useAuth();
   const [reports, setReports] = React.useState([]);
   const [selectedIdx, setSelectedIdx] = React.useState(0);
   const [expiresAt, setExpiresAt] = React.useState("");
@@ -243,6 +247,8 @@ function ShareWithProviderTab() {
   const [shareUrl, setShareUrl] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [status, setStatus] = React.useState("");
+  const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
+  const [upgradeFeature, setUpgradeFeature] = React.useState(null);
 
   const [recipientEmail, setRecipientEmail] = React.useState("");
   const [subject, setSubject] = React.useState("");
@@ -274,6 +280,13 @@ function ShareWithProviderTab() {
   }, [reports, selectedIdx]);
 
   const handleCreateOrUpdateShare = async () => {
+    // Check if user has access to Share with Providers
+    if (!hasFeatureAccess(user, 'shareWithProviders')) {
+      setUpgradeFeature('shareWithProviders');
+      setUpgradePromptOpen(true);
+      return;
+    }
+    
     const selected = reports[selectedIdx];
     const selectedReportId = selected?.report_id ?? selected?.id;
     if (!selectedReportId) {
@@ -540,11 +553,19 @@ function ShareWithProviderTab() {
           </div>
         ) : null}
       </div>
+      
+      <UpgradePrompt 
+        open={upgradePromptOpen} 
+        onClose={() => setUpgradePromptOpen(false)} 
+        feature={upgradeFeature}
+        user={user}
+      />
     </div>
   );
 }
 
 function ExportSettingsTab() {
+  const { user } = useAuth();
   const [layout, setLayout] = React.useState("detailed");
   const [dateRange, setDateRange] = React.useState("all"); // 'all' | '30'
   const [sections, setSections] = React.useState({ insights: false, vitals: true, labs: true, goals: true });
@@ -553,6 +574,8 @@ function ExportSettingsTab() {
   const [format, setFormat] = React.useState("pdf");
   const [loading, setLoading] = React.useState(false);
   const [message, setMessage] = React.useState("");
+  const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
+  const [upgradeFeature, setUpgradeFeature] = React.useState(null);
 
   const computedFilename = React.useMemo(() => {
     const safeTitle = String(title || 'Report').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '');
@@ -561,6 +584,13 @@ function ExportSettingsTab() {
   }, [title, format]);
 
   const handleGenerate = async () => {
+    // Check if user has access to PDF Reports
+    if (!hasFeatureAccess(user, 'reportsPdf')) {
+      setUpgradeFeature('reportsPdf');
+      setUpgradePromptOpen(true);
+      return;
+    }
+    
     try {
       setMessage("");
       setLoading(true);
@@ -606,68 +636,214 @@ function ExportSettingsTab() {
           <div>
             <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 10, fontWeight: 500 }}>Layout</label>
             <div style={{ display: "flex", gap: 10 }}>
-              <button 
-                onClick={()=>setLayout("simple")}
-                onMouseEnter={(e) => {
-                  if (layout !== "simple") {
-                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.3)";
-                    e.currentTarget.style.borderColor = "var(--primary)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (layout !== "simple") {
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
-                    e.currentTarget.style.borderColor = "var(--border)";
-                  }
-                }}
-                style={{ 
-                  flex: 1,
-                  padding: "10px 16px",
-                  background: "transparent",
-                  border: layout === "simple" ? "1px solid var(--primary)" : "1px solid var(--border)",
-                  borderRadius: 8,
-                  color: "var(--text)",
-                  fontSize: 13,
-                  fontWeight: layout === "simple" ? 500 : 400,
-                  cursor: "pointer",
-                  boxShadow: layout === "simple" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
-                  transition: "all 0.2s ease",
-                  outline: "none"
-                }}
-              >
-                Simple
-              </button>
-              <button 
-                onClick={()=>setLayout("detailed")}
-                onMouseEnter={(e) => {
-                  if (layout !== "detailed") {
-                    e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.3)";
-                    e.currentTarget.style.borderColor = "var(--primary)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (layout !== "detailed") {
-                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
-                    e.currentTarget.style.borderColor = "var(--border)";
-                  }
-                }}
-                style={{ 
-                  flex: 1,
-                  padding: "10px 16px",
-                  background: "transparent",
-                  border: layout === "detailed" ? "1px solid var(--primary)" : "1px solid var(--border)",
-                  borderRadius: 8,
-                  color: "var(--text)",
-                  fontSize: 13,
-                  fontWeight: layout === "detailed" ? 500 : 400,
-                  cursor: "pointer",
-                  boxShadow: layout === "detailed" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
-                  transition: "all 0.2s ease",
-                  outline: "none"
-                }}
-              >
-                Detailed
-              </button>
+              <div style={{ flex: 1, position: "relative" }}>
+                <button 
+                  onClick={()=>setLayout("simple")}
+                  onMouseEnter={(e) => {
+                    if (layout !== "simple") {
+                      e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.3)";
+                      e.currentTarget.style.borderColor = "var(--primary)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (layout !== "simple") {
+                      e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
+                      e.currentTarget.style.borderColor = "var(--border)";
+                    }
+                  }}
+                  style={{ 
+                    width: "100%",
+                    padding: "10px 16px",
+                    background: "transparent",
+                    border: layout === "simple" ? "1px solid var(--primary)" : "1px solid var(--border)",
+                    borderRadius: 8,
+                    color: "var(--text)",
+                    fontSize: 13,
+                    fontWeight: layout === "simple" ? 500 : 400,
+                    cursor: "pointer",
+                    boxShadow: layout === "simple" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
+                    transition: "all 0.2s ease",
+                    outline: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6
+                  }}
+                >
+                  <span>Simple</span>
+                  <div 
+                    style={{ 
+                      position: "relative",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      cursor: "help"
+                    }}
+                    onMouseEnter={(e) => {
+                      const tooltip = e.currentTarget.querySelector('.tooltip');
+                      if (tooltip) {
+                        tooltip.style.display = 'block';
+                        tooltip.style.visibility = 'visible';
+                        tooltip.style.opacity = '1';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      const tooltip = e.currentTarget.querySelector('.tooltip');
+                      if (tooltip) {
+                        tooltip.style.display = 'none';
+                        tooltip.style.visibility = 'hidden';
+                        tooltip.style.opacity = '0';
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <div className="tooltip" style={{
+                      display: "none",
+                      visibility: "hidden",
+                      opacity: 0,
+                      position: "absolute",
+                      bottom: "calc(100% + 8px)",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      padding: "8px 12px",
+                      background: "rgba(17, 17, 17, 0.98)",
+                      color: "var(--text)",
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                      borderRadius: 6,
+                      maxWidth: "200px",
+                      width: "max-content",
+                      zIndex: 10000,
+                      border: "1px solid var(--border)",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+                      pointerEvents: "none",
+                      transition: "opacity 0.2s ease",
+                      textAlign: "center"
+                    }}>
+                      Overview report with key insights and summaries
+                      <div style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        width: 0,
+                        height: 0,
+                        borderLeft: "6px solid transparent",
+                        borderRight: "6px solid transparent",
+                        borderTop: "6px solid rgba(17, 17, 17, 0.98)"
+                      }}></div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+              <div style={{ flex: 1, position: "relative" }}>
+                <button 
+                  onClick={()=>setLayout("detailed")}
+                  onMouseEnter={(e) => {
+                    if (layout !== "detailed") {
+                      e.currentTarget.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.3)";
+                      e.currentTarget.style.borderColor = "var(--primary)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (layout !== "detailed") {
+                      e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
+                      e.currentTarget.style.borderColor = "var(--border)";
+                    }
+                  }}
+                  style={{ 
+                    width: "100%",
+                    padding: "10px 16px",
+                    background: "transparent",
+                    border: layout === "detailed" ? "1px solid var(--primary)" : "1px solid var(--border)",
+                    borderRadius: 8,
+                    color: "var(--text)",
+                    fontSize: 13,
+                    fontWeight: layout === "detailed" ? 500 : 400,
+                    cursor: "pointer",
+                    boxShadow: layout === "detailed" ? "0 2px 8px rgba(0, 186, 206, 0.3)" : "0 2px 4px rgba(0, 0, 0, 0.2)",
+                    transition: "all 0.2s ease",
+                    outline: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6
+                  }}
+                >
+                  <span>Detailed</span>
+                  <div 
+                    style={{ 
+                      position: "relative",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      cursor: "help"
+                    }}
+                    onMouseEnter={(e) => {
+                      const tooltip = e.currentTarget.querySelector('.tooltip');
+                      if (tooltip) {
+                        tooltip.style.display = 'block';
+                        tooltip.style.visibility = 'visible';
+                        tooltip.style.opacity = '1';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      const tooltip = e.currentTarget.querySelector('.tooltip');
+                      if (tooltip) {
+                        tooltip.style.display = 'none';
+                        tooltip.style.visibility = 'hidden';
+                        tooltip.style.opacity = '0';
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}>
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <div className="tooltip" style={{
+                      display: "none",
+                      visibility: "hidden",
+                      opacity: 0,
+                      position: "absolute",
+                      bottom: "calc(100% + 8px)",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      padding: "8px 12px",
+                      background: "rgba(17, 17, 17, 0.98)",
+                      color: "var(--text)",
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                      borderRadius: 6,
+                      maxWidth: "200px",
+                      width: "max-content",
+                      zIndex: 10000,
+                      border: "1px solid var(--border)",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+                      pointerEvents: "none",
+                      transition: "opacity 0.2s ease",
+                      textAlign: "center"
+                    }}>
+                      Full analytics report including comparisons, metrics, and AI-generated commentary
+                      <div style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        width: 0,
+                        height: 0,
+                        borderLeft: "6px solid transparent",
+                        borderRight: "6px solid transparent",
+                        borderTop: "6px solid rgba(17, 17, 17, 0.98)"
+                      }}></div>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
           <div>
@@ -824,6 +1000,13 @@ function ExportSettingsTab() {
           </div>
         </div>
       </div>
+      
+      <UpgradePrompt 
+        open={upgradePromptOpen} 
+        onClose={() => setUpgradePromptOpen(false)} 
+        feature={upgradeFeature}
+        user={user}
+      />
     </div>
   );
 }
