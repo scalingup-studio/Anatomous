@@ -8,6 +8,8 @@ const useOpenAI = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [conversation, setConversation] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
+  const [previousChats, setPreviousChats] = useState([]);
   const { user } = useAuth();
 
   // Emergency keywords detection
@@ -113,10 +115,42 @@ const useOpenAI = () => {
         return "";
       }
       try {
+        // For new chat, send chat_id: null; for existing chat, send the chat_id (integer)
+        // Always send chat_id if it exists (not null/undefined), even if it's 0
+        let chatIdToSend = null;
+        if (currentChatId !== null && currentChatId !== undefined) {
+          // Convert to integer if it's a string or number
+          chatIdToSend = typeof currentChatId === 'string' 
+            ? (parseInt(currentChatId, 10) || 0) 
+            : (typeof currentChatId === 'number' ? currentChatId : 0);
+        }
+        
+        console.log('📤 Sending message with chat_id:', chatIdToSend, '(currentChatId:', currentChatId, ')');
+        
         response = await InsightApi.generateInsight({
           query: message,
-          metrics: [] // Add user metrics if available
+          metrics: {}, // Add user metrics if available
+          chat_id: chatIdToSend // null for new chats, or integer for existing chats
         });
+        
+        console.log('✅ generate-insight response:', response);
+        
+        // If response contains chat_id, update currentChatId
+        // Check multiple possible locations for chat_id
+        const newChatId = response?.chat_id !== undefined && response?.chat_id !== null
+          ? response.chat_id
+          : (response?.result?.chat_id !== undefined && response?.result?.chat_id !== null
+            ? response.result.chat_id
+            : (response?.data?.chat_id !== undefined && response?.data?.chat_id !== null
+              ? response.data.chat_id
+              : (response?.chatId !== undefined && response?.chatId !== null
+                ? response.chatId
+                : null)));
+        
+        if (newChatId !== null && newChatId !== undefined) {
+          console.log('🔄 Updating currentChatId to:', newChatId);
+          setCurrentChatId(newChatId);
+        }
       } catch (apiError) {
         console.error('API Error:', apiError);
         // If it's a 401 even after refresh, show auth error
@@ -203,6 +237,120 @@ const useOpenAI = () => {
   const clearConversation = useCallback(() => {
     setConversation([]);
     setError(null);
+    setCurrentChatId(null);
+  }, []);
+
+  const loadChat = useCallback(async (chatId) => {
+    if (!chatId) {
+      setConversation([]);
+      setCurrentChatId(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await InsightApi.getInsight(chatId);
+      
+      // Parse the response structure: { result: [...] }
+      // Each item in result array has: id, created_at, description, data_sources, chat_id
+      let insights = [];
+      
+      if (response?.result && Array.isArray(response.result)) {
+        insights = response.result;
+      } else if (Array.isArray(response)) {
+        insights = response;
+      } else if (response?.messages && Array.isArray(response.messages)) {
+        insights = response.messages;
+      } else if (response?.conversation && Array.isArray(response.conversation)) {
+        insights = response.conversation;
+      }
+      
+      // Convert insights array to conversation messages
+      // Sort by created_at (oldest first) to show chronological order
+      const sortedInsights = insights.sort((a, b) => {
+        const timeA = a.created_at || 0;
+        const timeB = b.created_at || 0;
+        return timeA - timeB;
+      });
+      
+      // Map insights to conversation format as dialog
+      // Each insight has: title (user question) and description (AI response)
+      const normalizedMessages = [];
+      
+      sortedInsights.forEach(insight => {
+        // Add user message (question) if title exists
+        if (insight.title && insight.title.trim()) {
+          normalizedMessages.push({
+            role: 'user',
+            content: insight.title,
+            id: insight.id ? `user-${insight.id}` : undefined,
+            created_at: insight.created_at,
+            chat_id: insight.chat_id
+          });
+        }
+        
+        // Add assistant message (answer) if description exists
+        if (insight.description && insight.description.trim()) {
+          normalizedMessages.push({
+            role: 'assistant',
+            content: insight.description || insight.content || insight.message || '',
+            id: insight.id,
+            created_at: insight.created_at,
+            metrics: insight.data_sources?.metrics || [],
+            chat_id: insight.chat_id
+          });
+        }
+      });
+      
+      setConversation(normalizedMessages);
+      setCurrentChatId(chatId);
+    } catch (err) {
+      console.error('Error loading chat:', err);
+      setError('Failed to load chat history');
+      setConversation([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load list of previous queries/insights for display
+  const loadPreviousQueries = useCallback(async (chatId) => {
+    if (!chatId) {
+      return [];
+    }
+
+    try {
+      const response = await InsightApi.getInsight(chatId);
+      
+      // Parse the response structure: { result: [...] }
+      let insights = [];
+      
+      if (response?.result && Array.isArray(response.result)) {
+        insights = response.result;
+      } else if (Array.isArray(response)) {
+        insights = response;
+      }
+      
+      // Sort by created_at (newest first) for display
+      const sortedInsights = insights.sort((a, b) => {
+        const timeA = a.created_at || 0;
+        const timeB = b.created_at || 0;
+        return timeB - timeA; // Newest first
+      });
+      
+      return sortedInsights.map(insight => ({
+        id: insight.id,
+        created_at: insight.created_at,
+        description: insight.description || '',
+        metrics: insight.data_sources?.metrics || [],
+        chat_id: insight.chat_id,
+        title: insight.title || ''
+      }));
+    } catch (err) {
+      console.error('Error loading previous queries:', err);
+      return [];
+    }
   }, []);
 
   return {
@@ -210,7 +358,13 @@ const useOpenAI = () => {
     error,
     conversation,
     sendMessage,
-    clearConversation
+    clearConversation,
+    currentChatId,
+    setCurrentChatId,
+    loadChat,
+    loadPreviousQueries,
+    previousChats,
+    setPreviousChats
   };
 };
 

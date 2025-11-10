@@ -8,6 +8,7 @@ import { TrendsApi } from "../../api/trendsApi";
 import { useNotifications } from "../../api/NotificationContext";
 import { Modal } from "../../components/Modal";
 import { useSearchParams } from "react-router-dom";
+import useOpenAI from "../../hooks/useOpenAI";
 
 // Normalize metric title: remove underscores and capitalize first letter
 function formatMetricTitle(input) {
@@ -758,10 +759,392 @@ export default function DashboardInsights() {
 }
 
 function AIInsightsTab() {
+  // Use shared hook instance for both components
+  const openAIHook = useOpenAI();
+  
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-     
-      <ChatComponent />
+      <ChatComponentWithHook hook={openAIHook} />
+      <PreviousQueriesList hook={openAIHook} />
+    </div>
+  );
+}
+
+// Wrapper to pass hook to ChatComponent
+function ChatComponentWithHook({ hook }) {
+  // Use the shared hook instance
+  const {
+    loading, 
+    error, 
+    conversation, 
+    sendMessage, 
+    clearConversation,
+    currentChatId,
+    loadChat,
+    loadPreviousQueries
+  } = hook;
+  
+  // Pass hook functions to ChatComponent via ref or context
+  // For now, we'll modify ChatComponent to accept hook as prop
+  return <ChatComponent sharedHook={hook} />;
+}
+
+function PreviousQueriesList({ hook }) {
+  const [chatIdInput, setChatIdInput] = useState('');
+  const [queries, setQueries] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // Use shared hook if provided, otherwise use own instance
+  const hookInstance = hook || useOpenAI();
+  const { loadChat, setCurrentChatId } = hookInstance;
+
+  const loadQueries = async (chatId) => {
+    // chat_id should be integer, default 0
+    let chatIdToUse = 0;
+    if (chatId !== null && chatId !== undefined) {
+      chatIdToUse = typeof chatId === 'string' ? parseInt(chatId, 10) || 0 : chatId;
+    } else if (chatIdInput.trim()) {
+      chatIdToUse = parseInt(chatIdInput.trim(), 10) || 0;
+    }
+    
+    console.log('🔄 loadQueries called with chat_id:', chatIdToUse);
+    
+    setLoading(true);
+    setError('');
+    try {
+      console.log('🔄 Loading previous queries for chat_id:', chatIdToUse);
+      
+      // Call /get-insight API with chat_id (integer, default 0)
+      const response = await InsightApi.getInsight(chatIdToUse);
+      
+      console.log('✅ get-insight response:', response);
+      
+      // Parse the response structure: { result: [...] }
+      let insights = [];
+      
+      if (response?.result && Array.isArray(response.result)) {
+        insights = response.result;
+        console.log('📊 Found insights in response.result:', insights.length);
+      } else if (Array.isArray(response)) {
+        insights = response;
+        console.log('📊 Found insights as array:', insights.length);
+      } else {
+        console.warn('⚠️ Unexpected response structure:', response);
+      }
+      
+      // Sort by created_at (newest first) for display
+      const sortedInsights = insights.sort((a, b) => {
+        const timeA = a.created_at || 0;
+        const timeB = b.created_at || 0;
+        return timeB - timeA; // Newest first
+      });
+      
+      // Map to display format
+      const formattedQueries = sortedInsights.map(insight => ({
+        id: insight.id,
+        created_at: insight.created_at,
+        description: insight.description || '',
+        metrics: insight.data_sources?.metrics || [],
+        chat_id: insight.chat_id,
+        title: insight.title || ''
+      }));
+      
+      console.log('📋 Formatted queries:', formattedQueries.length);
+      
+      setQueries(formattedQueries);
+      if (formattedQueries.length === 0 && chatIdToUse !== 0) {
+        setError('No queries found for this chat ID');
+      } else if (formattedQueries.length === 0) {
+        // No error if auto-loading
+        console.log('ℹ️ No queries found');
+      }
+    } catch (err) {
+      console.error('❌ Error loading previous queries:', err);
+      // Only show error if user explicitly requested load
+      if (chatIdToUse !== 0) {
+        setError(err?.message || 'Failed to load previous queries');
+      }
+      setQueries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-load previous queries on component mount
+  useEffect(() => {
+    console.log('🔄 PreviousQueriesList mounted, auto-loading previous queries...');
+    loadPreviousQueriesFromUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadPreviousQueriesFromUser = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      console.log('🔄 Loading previous queries from /get-insight-user...');
+      
+      // Call /get-insight-user to get all previous queries/insights
+      const response = await InsightApi.getInsightUser();
+      
+      console.log('✅ get-insight-user response:', response);
+      
+      // Parse the response structure: { result: [...] }
+      // Each item has: id, created_at, user_id, last_message_at, title, archived
+      let items = [];
+      
+      if (response?.result && Array.isArray(response.result)) {
+        items = response.result;
+        console.log('📊 Found items in response.result:', items.length);
+      } else if (Array.isArray(response)) {
+        items = response;
+        console.log('📊 Found items as array:', items.length);
+      } else {
+        console.warn('⚠️ Unexpected response structure:', response);
+      }
+      
+      // Sort by last_message_at or created_at (newest first)
+      const sortedItems = items.sort((a, b) => {
+        const timeA = a.last_message_at || a.created_at || 0;
+        const timeB = b.last_message_at || b.created_at || 0;
+        return timeB - timeA; // Newest first
+      });
+      
+      // Map to display format
+      const formattedQueries = sortedItems.map(item => ({
+        id: item.id,
+        created_at: item.created_at || item.last_message_at,
+        description: item.title || '',
+        metrics: [],
+        chat_id: item.id,
+        title: item.title || `Chat ${item.id}`,
+        archived: item.archived || false
+      }));
+      
+      console.log('📋 Formatted queries:', formattedQueries.length);
+      
+      setQueries(formattedQueries);
+      if (formattedQueries.length === 0) {
+        console.log('ℹ️ No previous queries found');
+      }
+    } catch (err) {
+      console.error('❌ Error loading previous queries:', err);
+      setError(err?.message || 'Failed to load previous queries');
+      setQueries([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoad = async () => {
+    console.log('🔵 handleLoad called, chatIdInput:', chatIdInput);
+    
+    if (!chatIdInput.trim()) {
+      console.log('⚠️ No chat ID provided');
+      setError('Please enter a chat ID');
+      return;
+    }
+
+    const chatId = parseInt(chatIdInput.trim(), 10);
+    if (isNaN(chatId)) {
+      setError('Chat ID must be a number');
+      return;
+    }
+
+    console.log('✅ Starting load with chat_id:', chatId);
+    await loadQueries(chatId);
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return String(timestamp);
+    }
+  };
+
+  const formatMetrics = (metrics) => {
+    if (!metrics || !Array.isArray(metrics) || metrics.length === 0) {
+      return null;
+    }
+    return metrics.map(m => `${m.metric_type}: ${m.value}`).join(', ');
+  };
+
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <h3 style={{ marginTop: 0, marginBottom: 12 }}>Previous Queries</h3>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input
+            type="text"
+            value={chatIdInput}
+            onChange={(e) => setChatIdInput(e.target.value)}
+            placeholder="Enter chat ID to load queries"
+            style={{
+              flex: 1,
+              padding: "8px 12px",
+              background: "rgba(17,17,17,.85)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              color: "var(--text)",
+              fontSize: 13
+            }}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleLoad();
+              }
+            }}
+          />
+          <button
+            onClick={(e) => {
+              console.log('🔵 Button clicked!', e);
+              e.preventDefault();
+              handleLoad();
+            }}
+            disabled={!chatIdInput.trim() || loading}
+            className="btn primary"
+            style={{ 
+              padding: "8px 16px",
+              fontSize: 13,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {loading ? 'Loading...' : 'Load'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{
+          padding: 12,
+          background: "rgba(255, 59, 48, 0.1)",
+          border: "1px solid var(--error)",
+          borderRadius: 8,
+          color: "var(--error)",
+          fontSize: 13
+        }}>
+          {error}
+        </div>
+      )}
+
+      {queries.length > 0 && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          maxHeight: '600px',
+          overflowY: 'auto',
+          paddingRight: 4
+        }}>
+          {queries.map((query, index) => (
+            <div
+              key={query.id || index}
+              style={{
+                padding: 16,
+                background: "rgba(0, 186, 206, 0.05)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                transition: 'all 0.2s',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(0, 186, 206, 0.1)";
+                e.currentTarget.style.borderColor = "var(--primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(0, 186, 206, 0.05)";
+                e.currentTarget.style.borderColor = "var(--border)";
+              }}
+              onClick={async () => {
+                // Load chat history and display in chat window
+                if (query.chat_id) {
+                  const chatId = typeof query.chat_id === 'string' 
+                    ? parseInt(query.chat_id, 10) 
+                    : query.chat_id;
+                  
+                  if (!isNaN(chatId)) {
+                    console.log('🔄 Loading chat history for chat_id:', chatId);
+                    try {
+                      // Load chat history through /get-insight API
+                      await loadChat(chatId);
+                      // Set currentChatId for continuing conversation
+                      setCurrentChatId(chatId);
+                      console.log('✅ Chat history loaded, chat_id set to:', chatId);
+                    } catch (err) {
+                      console.error('❌ Error loading chat history:', err);
+                      setError('Failed to load chat history');
+                    }
+                  }
+                }
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: 8,
+                gap: 8
+              }}>
+                <div style={{ flex: 1 }}>
+                  {query.title && (
+                    <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                      {query.title}
+                    </div>
+                  )}
+                  <div style={{
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    marginBottom: 8
+                  }}>
+                    {formatDate(query.created_at)}
+                  </div>
+                  {query.metrics && query.metrics.length > 0 && (
+                    <div style={{
+                      fontSize: 11,
+                      color: "var(--primary)",
+                      marginBottom: 8,
+                      padding: "4px 8px",
+                      background: "rgba(0, 186, 206, 0.1)",
+                      borderRadius: 4,
+                      display: 'inline-block'
+                    }}>
+                      {formatMetrics(query.metrics)}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{
+                fontSize: 13,
+                color: "var(--text)",
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }}>
+                {query.description || 'No description'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && queries.length === 0 && !error && (
+        <div style={{
+          textAlign: 'center',
+          padding: 40,
+          color: "var(--muted)",
+          fontSize: 14
+        }}>
+          Enter a chat ID and click "Load" to view previous queries
+        </div>
+      )}
     </div>
   );
 }

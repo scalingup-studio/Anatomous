@@ -72,7 +72,8 @@ export const CUSTOM_ENDPOINTS = {
     userHealthSummary: `${API_BASE}/user-health-summary`
   }, 
   insights: {
-    generateInsights: `${API_BASE}/generate-insight`
+    generateInsights: `${API_BASE}/generate-insight`,
+    getInsight: `${API_BASE}/get-insight`
   },
   checkThreshold: {
     checkThreshold: `${API_BASE}/check-threshold`
