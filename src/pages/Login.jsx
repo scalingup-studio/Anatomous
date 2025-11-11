@@ -15,8 +15,11 @@ import { ForgotPasswordModal } from "../components/ForgotPasswordModal.jsx";
 import { useAuth } from "../api/AuthContext";
 import { useNotifications } from "../api/NotificationContext.jsx";
 import NotificationSystem from "../components/NotificationSystem.jsx";
+import { ThemeToggle } from "../components/ThemeToggle.jsx";
+import { useTheme } from "../contexts/ThemeContext.jsx";
 
 export function LoginPage({ onOpenSignup }) {
+  const { isLight } = useTheme();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -106,6 +109,14 @@ export function LoginPage({ onOpenSignup }) {
 
   return (
     <div className="auth-layout">
+      <div style={{ 
+        position: "absolute", 
+        top: 20, 
+        right: 20, 
+        zIndex: 1000 
+      }}>
+        <ThemeToggle showLabel={true} size="default" />
+      </div>
       <section className="auth-card">
         <div style={{ marginBottom: 16 }}>
           <Logo height={56} className="logo-anatomous" />
@@ -208,10 +219,19 @@ export function LoginPage({ onOpenSignup }) {
               onClick={() => alert("Apple Sign-In integration depends on your backend")}
               disabled={loading}
             >
-              <img
-                src="https://upload.wikimedia.org/wikipedia/commons/3/31/Apple_logo_white.svg"
-                alt="Apple"
-              />
+              {isLight ? (
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg"
+                  alt="Apple"
+                  style={{ width: 18, height: 20, marginBottom: 4 }}
+                />
+              ) : (
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/3/31/Apple_logo_white.svg"
+                  alt="Apple"
+                  style={{ width: 18, height: 20, marginBottom: 4 }}
+                />
+              )}
               <span>Log in with Apple</span>
             </button>
           </div>
@@ -245,7 +265,7 @@ export function LoginPage({ onOpenSignup }) {
       </section>
 
       <aside className="artwork">
-        <img src={`${import.meta.env.BASE_URL}images/login_image.avif`} alt="Artwork" />
+        <img src={`${import.meta.env.BASE_URL}images/image_Pippit_202511112127.png`} alt="Artwork" />
       </aside>
 
       <NotificationSystem

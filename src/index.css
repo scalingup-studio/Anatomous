@@ -39,3 +39,142 @@
   padding: 8px 12px;
   width: 100%;
 }
+
+/* Light theme styles for Flatpickr */
+:root.light-theme .flatpickr-calendar {
+  background: rgba(249, 250, 251, 0.98);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+:root.light-theme .flatpickr-day:hover, 
+:root.light-theme .flatpickr-day:focus { 
+  background: rgba(0, 186, 206, 0.1); 
+}
+:root.light-theme .flatpickr-day.today { 
+  border-color: var(--primary); 
+  color: var(--text); 
+}
+:root.light-theme .flatpickr-day.selected, 
+:root.light-theme .flatpickr-day.startRange, 
+:root.light-theme .flatpickr-day.endRange {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+:root.light-theme .flatpickr-months .flatpickr-month, 
+:root.light-theme .flatpickr-current-month .cur-month, 
+:root.light-theme .flatpickr-current-month .numInput {
+  color: var(--text);
+}
+:root.light-theme .flatpickr-time input, 
+:root.light-theme .flatpickr-input[readonly] {
+  background: rgba(249, 250, 251, 0.8);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+}
+:root.light-theme .flatpickr-input.flatpickr-alt-input {
+  background: rgba(249, 250, 251, 0.8);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+}
+:root.light-theme .flatpickr-prev-month,
+:root.light-theme .flatpickr-next-month {
+  color: var(--text);
+}
+:root.light-theme .flatpickr-prev-month:hover,
+:root.light-theme .flatpickr-next-month:hover {
+  color: var(--primary);
+}
+:root.light-theme .flatpickr-day.flatpickr-disabled,
+:root.light-theme .flatpickr-day.prevMonthDay,
+:root.light-theme .flatpickr-day.nextMonthDay {
+  color: var(--hint);
+}
+
+/* Flatpickr: additional light theme fixes for visibility */
+:root.light-theme .flatpickr-months {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+:root.light-theme .flatpickr-months .flatpickr-month {
+  background: transparent;
+}
+/* Flatpickr: default (dark) weekdays row background */
+.flatpickr-calendar .flatpickr-weekdays,
+.flatpickr-weekdays {
+  background: rgba(17, 17, 17, 0.9) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 8px 0 !important;
+}
+.flatpickr-weekday {
+  color: var(--muted) !important;
+  background: transparent !important;
+}
+/* Flatpickr: light theme weekdays row background tweak */
+:root.light-theme .flatpickr-calendar .flatpickr-weekdays,
+:root.light-theme .flatpickr-weekdays {
+  background: rgba(241, 243, 245, 0.9) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 8px 0 !important;
+}
+:root.light-theme .flatpickr-calendar .flatpickr-weekday,
+:root.light-theme .flatpickr-weekday {
+  color: var(--text) !important;
+  background: transparent !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+:root.light-theme .flatpickr-day {
+  color: var(--text);
+}
+:root.light-theme .flatpickr-day:hover,
+:root.light-theme .flatpickr-day:focus {
+  background: rgba(0, 186, 206, 0.12);
+}
+:root.light-theme .flatpickr-day.inRange,
+:root.light-theme .flatpickr-day.nextMonthDay.inRange,
+:root.light-theme .flatpickr-day.prevMonthDay.inRange {
+  background: rgba(0, 186, 206, 0.08);
+  border-color: transparent;
+}
+:root.light-theme .flatpickr-day.flatpickr-disabled,
+:root.light-theme .flatpickr-day.prevMonthDay,
+:root.light-theme .flatpickr-day.nextMonthDay {
+  color: var(--hint);
+}
+:root.light-theme .flatpickr-current-month .cur-month,
+:root.light-theme .flatpickr-current-month .numInputWrapper .numInput {
+  color: var(--text);
+}
+:root.light-theme .flatpickr-prev-month svg,
+:root.light-theme .flatpickr-next-month svg {
+  fill: none;
+  stroke: var(--text);
+}
+:root.light-theme .flatpickr-prev-month:hover svg,
+:root.light-theme .flatpickr-next-month:hover svg {
+  stroke: var(--primary);
+}
+
+/* Flatpickr: remove default browser arrow from month/year dropdowns */
+.flatpickr-calendar select,
+.flatpickr-current-month select,
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month select.flatpickr-monthDropdown-months,
+.flatpickr-current-month .flatpickr-monthDropdown-months select,
+.flatpickr-current-month .numInputWrapper select,
+.flatpickr-current-month select.numInput {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-image: none !important;
+  background-repeat: no-repeat !important;
+  padding-right: 8px !important;
+}

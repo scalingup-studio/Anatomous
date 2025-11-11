@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import useOpenAI from '../hooks/useOpenAI';
+import { useTheme } from '../contexts/ThemeContext.jsx';
 import "../routes/pages/InsightsPage-TEST-CSS.css";
 
 const ChatComponent = ({ sharedHook }) => {
+  const { isLight } = useTheme();
   const [inputMessage, setInputMessage] = useState('');
   const [chatIdInput, setChatIdInput] = useState('');
   const [showChatSelector, setShowChatSelector] = useState(false);
@@ -155,7 +157,7 @@ const ChatComponent = ({ sharedHook }) => {
             style={{
               flex: 1,
               padding: "8px 12px",
-              background: "rgba(17,17,17,.85)",
+              background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)",
               border: "1px solid var(--border)",
               borderRadius: 8,
               color: "var(--text)",
@@ -186,7 +188,7 @@ const ChatComponent = ({ sharedHook }) => {
         <div style={{
           margin: 12,
           padding: 12,
-          background: "rgba(17,17,17,.5)",
+          background: isLight ? "rgba(241, 243, 245, 0.6)" : "rgba(17,17,17,.5)",
           border: "1px solid var(--border)",
           borderRadius: 8,
           maxHeight: "300px",

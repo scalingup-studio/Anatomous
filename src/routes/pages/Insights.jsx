@@ -10,6 +10,7 @@ import { Modal } from "../../components/Modal";
 import { useSearchParams } from "react-router-dom";
 import { CUSTOM_ENDPOINTS } from "../../api/apiConfig";
 import useOpenAI from "../../hooks/useOpenAI";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
 
 // Normalize metric title: remove underscores and capitalize first letter
 function formatMetricTitle(input) {
@@ -24,6 +25,7 @@ function formatMetricTitle(input) {
 
 // BarGraph Component with tooltips
 function BarGraph({ data, height = 120, color = "var(--primary)", gradientBg = "rgba(0,186,206,0.1)" }) {
+  const { isLight } = useTheme();
   const [tooltip, setTooltip] = useState(null);
   const containerRef = React.useRef(null);
 
@@ -113,7 +115,7 @@ function BarGraph({ data, height = 120, color = "var(--primary)", gradientBg = "
               left: clamped,
               bottom: "100%",
               transform: "translateY(-8px)",
-              background: "rgba(0,0,0,0.9)",
+              background: isLight ? "rgba(249, 250, 251, 0.95)" : "rgba(0,0,0,0.9)",
               backdropFilter: "blur(8px)",
               color: "var(--text)",
               padding: "6px 10px",
@@ -123,6 +125,7 @@ function BarGraph({ data, height = 120, color = "var(--primary)", gradientBg = "
               pointerEvents: "none",
               border: "1px solid var(--border)",
               zIndex: 2000,
+              boxShadow: isLight ? "0 4px 6px rgba(0,0,0,0.1)" : "none",
             }}
           >
             <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.label}</div>
@@ -171,7 +174,7 @@ function FlexBarChart({ data, height = 140, color = 'var(--primary)' }) {
         const w = ref.current?.clientWidth || 0;
         const left = Math.max(56, Math.min(w-56, tip.x));
         return (
-          <div style={{ position:'absolute', left, top:8, transform:'translateX(-50%)', background:'rgba(0,0,0,0.9)', color:'var(--text)', padding:'6px 10px', border:'1px solid var(--border)', borderRadius:6, fontSize:12, pointerEvents:'none', zIndex:3000, maxWidth:'90%', whiteSpace:'nowrap' }}>
+          <div style={{ position:'absolute', left, top:8, transform:'translateX(-50%)', background: isLight ? 'rgba(249, 250, 251, 0.95)' : 'rgba(0,0,0,0.9)', color:'var(--text)', padding:'6px 10px', border:'1px solid var(--border)', borderRadius:6, fontSize:12, pointerEvents:'none', zIndex:3000, maxWidth:'90%', whiteSpace:'nowrap', boxShadow: isLight ? '0 4px 6px rgba(0,0,0,0.1)' : 'none' }}>
             <div style={{ fontWeight:600, marginBottom:2 }}>{tip.label}</div>
             <div style={{ fontSize:11 }}>{tip.value}</div>
           </div>
@@ -183,6 +186,7 @@ function FlexBarChart({ data, height = 140, color = 'var(--primary)' }) {
 
 // Google Charts ColumnChart wrapper
 function GoogleColumnChart({ data, height = 180, color = '#00BACE' }) {
+  const { isLight } = useTheme();
   const containerRef = React.useRef(null);
 
   const loadGoogle = React.useCallback(() => {
@@ -228,8 +232,8 @@ function GoogleColumnChart({ data, height = 180, color = '#00BACE' }) {
       bar: { groupWidth: '85%' },
       height,
       chartArea: { left: 32, top: 12, width: '88%', height: '72%' },
-      hAxis: { textStyle: { color: '#9AA0A6', fontSize: 9 } },
-      vAxis: { textStyle: { color: '#9AA0A6', fontSize: 9 }, gridlines: { color: 'rgba(255,255,255,0.1)' } },
+      hAxis: { textStyle: { color: isLight ? '#6b7280' : '#9AA0A6', fontSize: 9 } },
+      vAxis: { textStyle: { color: isLight ? '#6b7280' : '#9AA0A6', fontSize: 9 }, gridlines: { color: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)' } },
       tooltip: { isHtml: false },
     };
 
@@ -555,7 +559,7 @@ function LineGraph({ data, height = 120, color = "var(--primary)", gradientBg = 
             left: `${Math.min(92, Math.max(8, (tooltip.x / data.length) * 100))}%`,
             bottom: "100%",
             transform: "translateY(-8px)",
-            background: "rgba(0,0,0,0.9)",
+            background: isLight ? "rgba(249, 250, 251, 0.95)" : "rgba(0,0,0,0.9)",
             backdropFilter: "blur(8px)",
             color: "var(--text)",
             padding: "6px 10px",
@@ -565,6 +569,7 @@ function LineGraph({ data, height = 120, color = "var(--primary)", gradientBg = 
             pointerEvents: "none",
             border: "1px solid var(--border)",
             zIndex: 2000,
+            boxShadow: isLight ? "0 4px 6px rgba(0,0,0,0.1)" : "none",
           }}
         >
           <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.label}</div>
@@ -577,6 +582,7 @@ function LineGraph({ data, height = 120, color = "var(--primary)", gradientBg = 
 
 // DonutChart Component
 function DonutChart({ data, size = 120, strokeWidth = 16 }) {
+  const { isLight } = useTheme();
   const [tooltip, setTooltip] = useState(null);
   
   if (!data || data.length === 0) {
@@ -671,7 +677,7 @@ function DonutChart({ data, size = 120, strokeWidth = 16 }) {
             left: "50%",
             bottom: "100%",
             transform: "translateX(-50%) translateY(-8px)",
-            background: "rgba(0,0,0,0.9)",
+            background: isLight ? "rgba(249, 250, 251, 0.95)" : "rgba(0,0,0,0.9)",
             backdropFilter: "blur(8px)",
             color: "var(--text)",
             padding: "6px 10px",
@@ -681,6 +687,7 @@ function DonutChart({ data, size = 120, strokeWidth = 16 }) {
             pointerEvents: "none",
             border: "1px solid var(--border)",
             zIndex: 1000,
+            boxShadow: isLight ? "0 4px 6px rgba(0,0,0,0.1)" : "none",
           }}
         >
           <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.label}</div>
@@ -692,6 +699,7 @@ function DonutChart({ data, size = 120, strokeWidth = 16 }) {
 }
 
 export default function DashboardInsights() {
+  const { isLight } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (() => {
     const t = String(searchParams.get('tab') || '').toLowerCase();
@@ -728,7 +736,13 @@ export default function DashboardInsights() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Sub-tabs navigation */}
-      <div style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 16 }}>
+      <div style={{ 
+        display: "flex", 
+        gap: 8, 
+        borderBottom: isLight ? "1px solid #ffffff" : "1px solid var(--border)", 
+        paddingBottom: 8, 
+        marginBottom: 16 
+      }}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -791,6 +805,7 @@ function ChatComponentWithHook({ hook }) {
 }
 
 function PreviousQueriesList({ hook }) {
+  const { isLight } = useTheme();
   const [chatIdInput, setChatIdInput] = useState('');
   const [queries, setQueries] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -992,7 +1007,7 @@ function PreviousQueriesList({ hook }) {
             style={{
               flex: 1,
               padding: "8px 12px",
-              background: "rgba(17,17,17,.85)",
+              background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)",
               border: "1px solid var(--border)",
               borderRadius: 8,
               color: "var(--text)",
@@ -1227,6 +1242,7 @@ function RecentInsightsCard() {
 }
 
 function TrendsTab() {
+  const { isLight } = useTheme();
   const [loading, setLoading] = useState(false);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [trends, setTrends] = useState(null);
@@ -1502,7 +1518,7 @@ function TrendsTab() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h3 style={{ marginTop: 0 }}>Recent Insights</h3>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              <select value={selectedMetric} onChange={(e)=>setSelectedMetric(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(17,17,17,.85)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
+              <select value={selectedMetric} onChange={(e)=>setSelectedMetric(e.target.value)} style={{ padding: '6px 10px', background: isLight ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17,17,17,.85)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
                 {metrics.map(m => (<option key={m} value={m}>{m}</option>))}
               </select>
               <button className="btn outline small" onClick={loadRecentInsights} disabled={recentLoading}>{recentLoading ? 'Loading…' : 'Refresh'}</button>
@@ -1517,7 +1533,7 @@ function TrendsTab() {
                   key={idx}
                   style={{
                     padding: 12,
-                    background: "rgba(0,186,206,0.1)",
+                    background: isLight ? "rgba(0,186,206,0.08)" : "rgba(0,186,206,0.1)",
                     border: "1px solid var(--border)",
                     borderRadius: 8,
                     minHeight: 100,
@@ -1530,7 +1546,7 @@ function TrendsTab() {
                 </div>
               ))}
               {(!recentItems.length) && [1,2,3,4].map((num) => (
-                <div key={`placeholder-${num}`} style={{ padding:12, background:"rgba(0,186,206,0.1)", border:"1px solid var(--border)", borderRadius:8, minHeight:100 }}>
+                <div key={`placeholder-${num}`} style={{ padding:12, background: isLight ? "rgba(0,186,206,0.08)" : "rgba(0,186,206,0.1)", border:"1px solid var(--border)", borderRadius:8, minHeight:100 }}>
                   <div style={{ fontWeight:600, marginBottom:8 }}>Insight #{num}</div>
                   <div style={{ fontSize:12, color:"var(--muted)" }}>No data yet.</div>
                 </div>
@@ -1583,7 +1599,7 @@ function TrendsTab() {
               onChange={(e) => setSelectedMetric(e.target.value)}
               style={{
                 padding: "6px 12px",
-                background: "rgba(17,17,17,.85)",
+                background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)",
                 border: "1px solid var(--border)",
                 borderRadius: 8,
                 color: "var(--text)",
@@ -2199,13 +2215,14 @@ function UploadsTab() {
                     style={{ 
                       borderBottom: "1px solid var(--border)",
                       transition: "background 0.2s",
-                      cursor: "pointer",
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0,186,206,0.05)"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    onClick={() => handleOpenInNewTab(file)}
                   >
-                    <td style={{ padding: "12px 8px" }}>
+                    <td 
+                      style={{ padding: "12px 8px", cursor: "pointer" }}
+                      onClick={() => handleOpenInNewTab(file)}
+                    >
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: 18 }}>📄</span>
                         <div>
@@ -2253,7 +2270,10 @@ function UploadsTab() {
                         <button
                           className="btn ghost small"
                           style={{ width: 32, height: 32, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                          onClick={() => handleDownload(file.id || file.file_id, file.filename || file.file_name)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(file.id || file.file_id, file.filename || file.file_name);
+                          }}
                           title="Download file"
                         >
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2265,7 +2285,10 @@ function UploadsTab() {
                         <button
                           className="btn ghost small"
                           style={{ width: 32, height: 32, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--error)" }}
-                          onClick={() => handleDeleteClick(file)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(file);
+                          }}
                           title="Delete file"
                         >
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./api/AuthContext.jsx";
 import { NotificationProvider } from "./api/NotificationContext.jsx";
+import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import { LoginPage } from "./pages/Login.jsx";
 import { SignupPage } from "./pages/Signup.jsx";
 import OAuthCallbackGoogle from "./pages/OAuthCallbackGoogle.jsx";
@@ -219,11 +220,13 @@ function DashboardGuard({ children }) {
   console.log('🎯 DashboardGuard - Allowing access to dashboard (onboarding check disabled for dashboard access)');
   return children;
 }
-// 🔒 Wrap entire app in AuthProvider and NotificationProvider
+// 🔒 Wrap entire app in AuthProvider, NotificationProvider, and ThemeProvider
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <AuthProvider>
-    <NotificationProvider>
-      <AppRouter />
-    </NotificationProvider>
-  </AuthProvider>
+  <ThemeProvider>
+    <AuthProvider>
+      <NotificationProvider>
+        <AppRouter />
+      </NotificationProvider>
+    </AuthProvider>
+  </ThemeProvider>
 );

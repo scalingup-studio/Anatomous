@@ -20,12 +20,35 @@ export const OnboardingApi = {
           gender: data.genderIdentity,
           sex_of_birth: data.sexAtBirth || '',
           height: data.height ? parseInt(data.height) : null,
+          height_type: (data.height_type ?? data.heightUnit ?? '') || '',
           weight: data.weight ? parseInt(data.weight) : null,
+          weight_type: (data.weight_type ?? data.weightUnit ?? '') || '',
           zip_code: data.zipCode || null
         }
       };
 
       console.log('💾 Saving personal info:', payload);
+      
+      // Debug: show what would be sent to profiles/{user_id}
+      try {
+        const apiBase = ENDPOINTS.profiles.getById('').replace(/\/profiles\/$/, '/profiles'); // derive base
+        const profileUrl = `${apiBase}/${payload.user_id}`;
+        const profilePayload = {
+          first_name: payload.data_json.first_name,
+          last_name: payload.data_json.last_name,
+          dob: payload.data_json.dob,
+          sex_of_birth: payload.data_json.sex_of_birth || '',
+          phone_number: payload.data_json.phone_number || '',
+          zip_code: payload.data_json.zip_code || '',
+          height_cm: payload.data_json.height ?? null,
+          height_type: payload.data_json.height_type || '',
+          weight_kg: payload.data_json.weight ?? null,
+          weight_type: payload.data_json.weight_type || ''
+        };
+        console.log('🔎 Debug POST →', profileUrl, 'with body:', profilePayload);
+      } catch (e) {
+        // swallow debug errors
+      }
       
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.personal, {
         method: "POST",
@@ -35,7 +58,25 @@ export const OnboardingApi = {
         },
         body: payload,
       });
-      
+      // Additionally patch profiles/{user_id} with explicit unit fields as requested
+      try {
+        const profilePatchUrl = ENDPOINTS.profiles.update(payload.user_id);
+        const patchBody = {
+          height_type: payload.data_json.height_type || '',
+          weight_type: payload.data_json.weight_type || ''
+        };
+        console.log('🛠️ PATCH →', profilePatchUrl, 'with body:', patchBody);
+        await authRequest(profilePatchUrl, {
+          method: "PATCH",
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: patchBody
+        });
+      } catch (e) {
+        console.warn('⚠️ Failed to PATCH profile units (will continue):', e?.message || e);
+      }
       return res?.result ?? res;
     } catch (error) {
       console.error('Error saving personal info:', error);

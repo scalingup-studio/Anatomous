@@ -16,7 +16,7 @@ function Tabs({ value, onChange }) {
     { key: "notes", label: "Notes" },
   ];
   return (
-    <div role="tablist" aria-label="Goals navigation" className="goals-tabs" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 16 }}>
+    <div role="tablist" aria-label="Goals navigation" className="goals-tabs" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
       {items.map((t) => (
         <button
           key={t.key}

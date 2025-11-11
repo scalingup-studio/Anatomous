@@ -2,6 +2,8 @@ import React from "react";
 import { Modal } from "../../components/Modal.jsx";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 import useOpenAI from "../../hooks/useOpenAI.js";
+import { ThemeToggle } from "../../components/ThemeToggle.jsx";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
 
 export default function DashboardSettings(){
   const [activeTab, setActiveTab] = React.useState("notifications");
@@ -9,7 +11,7 @@ export default function DashboardSettings(){
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-      <div className="dash-toolbar">
+      <div className="dash-toolbar" style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <h1 style={{ margin: 0 }}>Settings</h1>
       </div>
 
@@ -99,6 +101,7 @@ function NotificationsTab({ onSaved }){
 }
 
 function PrivacyTab({ onSaved, onAction }){
+  const { isLight } = useTheme();
   const [dataVisibility, setDataVisibility] = React.useState('default');
   const [aiOptIn, setAiOptIn] = React.useState(true);
   const [retention, setRetention] = React.useState('12m');
@@ -113,6 +116,21 @@ function PrivacyTab({ onSaved, onAction }){
 
   return (
     <div style={{ display:'grid', gap:16 }}>
+      {/* Appearance Settings */}
+      <div className="card" style={{ maxWidth: 720 }}>
+        <h3 style={{ marginTop:0 }}>Appearance</h3>
+        <p style={{ marginTop:4, marginBottom:16, color:'var(--muted)', fontSize:12, lineHeight:1.5 }}>
+          Choose your preferred theme for comfort and accessibility.
+        </p>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: '12px 0' }}>
+          <div>
+            <div style={{ fontWeight:600, marginBottom:4, fontSize:14 }}>Theme</div>
+            <div style={{ fontSize:12, color:'var(--muted)' }}>Switch between dark and light mode</div>
+          </div>
+          <ThemeToggle showLabel={true} size="default" />
+        </div>
+      </div>
+
       <div className="card" style={{ maxWidth: 720 }}>
         <h3 style={{ marginTop:0 }}>Privacy Preferences</h3>
         <p style={{ marginTop:4, color:'var(--muted)', fontSize:12 }}>Control visibility, retention and AI processing of your data.</p>
@@ -225,6 +243,7 @@ function PrivacyTab({ onSaved, onAction }){
 }
 
 function AccountTab({ onSaved, onAction }){
+  const { isLight } = useTheme();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [mfa, setMfa] = React.useState(false);
@@ -260,7 +279,12 @@ function AccountTab({ onSaved, onAction }){
      
 
       {/* Devices & Sessions */}
-      <div className="card" style={{ background:'rgba(0,0,0,.25)', maxWidth: 720 }}>
+      <div className="card" style={{ 
+        background: isLight 
+          ? 'rgba(241, 243, 245, 0.6)' 
+          : 'rgba(0,0,0,.25)', 
+        maxWidth: 720 
+      }}>
         <div style={{ fontWeight:600, marginBottom:8 }}>Devices & Sessions</div>
         {devices.map(d => (
           <div key={d.id} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid var(--border)' }}>
@@ -274,8 +298,23 @@ function AccountTab({ onSaved, onAction }){
       </div>
 
       {/* Danger Zone */}
-      <div className="card" style={{ border:'1px solid #532323', background:'rgba(180,30,30,.08)', marginBottom:16, maxWidth: 720 }}>
-        <div style={{ fontWeight:700, color:'#c33', marginBottom:8 }}>Danger Zone</div>
+      <div className="card" style={{ 
+        border: isLight
+          ? '1px solid rgba(239, 68, 68, 0.3)'
+          : '1px solid #532323', 
+        background: isLight
+          ? 'rgba(254, 242, 242, 0.8)'
+          : 'rgba(180,30,30,.08)', 
+        marginBottom:16, 
+        maxWidth: 720 
+      }}>
+        <div style={{ 
+          fontWeight:700, 
+          color: isLight ? '#dc2626' : '#c33', 
+          marginBottom:8 
+        }}>
+          Danger Zone
+        </div>
         <div style={{ display:'flex', gap:8 }}>
           <button className="btn outline" onClick={()=>{ setDangerType('deactivate'); setDangerOpen(true); }}>Deactivate account</button>
           <button className="btn danger" onClick={()=>{ setDangerType('delete'); setDangerOpen(true); }}>Delete account</button>

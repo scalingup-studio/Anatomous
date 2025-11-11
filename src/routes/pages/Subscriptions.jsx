@@ -90,7 +90,11 @@ function CurrentPlan() {
         <Badge>{active.tier}</Badge>
       </div>
 
-      <div className="card" style={{ background:'rgba(0,0,0,.25)' }}>
+      <div className="card" style={{ 
+        background: document.documentElement.classList.contains('light-theme') 
+          ? 'rgba(249, 250, 251, 0.6)' 
+          : 'rgba(0,0,0,.25)' 
+      }}>
         <div style={{ fontWeight:600, marginBottom:8 }}>Included features</div>
         <ul style={{ margin:0, paddingLeft:18 }}>
           {active.features.map((f, i) => (<li key={i}>✅ {f}</li>))}
@@ -324,6 +328,7 @@ function CurrentPlan() {
 
 function UpgradeOptions() {
   const [period, setPeriod] = React.useState("monthly");
+  const [hoveredRow, setHoveredRow] = React.useState(null);
   const monthly = period === "monthly";
   const plans = [
     { 
@@ -412,6 +417,7 @@ function UpgradeOptions() {
           const isFree = p.key === 'starter';
           const price = monthly ? p.priceMonthly : p.priceYearly;
           const pricePerMonth = monthly ? price : Math.round(price / 12);
+          const isLightTheme = document.documentElement.classList.contains('light-theme');
           
           return (
             <div 
@@ -423,7 +429,9 @@ function UpgradeOptions() {
                 gap:12, 
                 position:'relative',
                 border: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
-                background: p.recommended ? 'rgba(0, 186, 206, 0.05)' : 'rgba(17,17,17,.85)',
+                background: p.recommended 
+                  ? (isLightTheme ? 'rgba(0, 186, 206, 0.08)' : 'rgba(0, 186, 206, 0.05)')
+                  : (isLightTheme ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17,17,17,.85)'),
                 transition: 'all 0.2s',
                 cursor: 'pointer',
                 height: '100%'
@@ -431,13 +439,17 @@ function UpgradeOptions() {
               onMouseEnter={(e) => {
                 if (!p.recommended) {
                   e.currentTarget.style.border = '1px solid var(--primary)';
-                  e.currentTarget.style.background = 'rgba(0, 186, 206, 0.03)';
+                  e.currentTarget.style.background = isLightTheme 
+                    ? 'rgba(0, 186, 206, 0.1)' 
+                    : 'rgba(0, 186, 206, 0.03)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!p.recommended) {
                   e.currentTarget.style.border = '1px solid var(--border)';
-                  e.currentTarget.style.background = 'rgba(17,17,17,.85)';
+                  e.currentTarget.style.background = isLightTheme 
+                    ? 'rgba(249, 250, 251, 0.8)' 
+                    : 'rgba(17,17,17,.85)';
                 }
               }}
             >
@@ -478,7 +490,7 @@ function UpgradeOptions() {
                   )}
                 </div>
                 {p.subtitle && (
-                  <div style={{ fontSize:12, color:'var(--muted)' }}>{p.subtitle}</div>
+                  <div style={{ fontSize:12, color: isLightTheme ? '#4b5563' : 'var(--muted)', fontWeight: 500 }}>{p.subtitle}</div>
                 )}
               </div>
               
@@ -593,7 +605,12 @@ function UpgradeOptions() {
       )}
 
       {/* Full feature comparison */}
-      <div className="card" style={{ overflowX:'auto', marginTop: 8 }}>
+      <div className="card" style={{ 
+        overflowX:'auto', 
+        marginTop: 8,
+        WebkitOverflowScrolling: 'touch',
+        minWidth: 0
+      }}>
         <div style={{ 
           fontWeight:700, 
           marginBottom:16, 
@@ -612,75 +629,112 @@ function UpgradeOptions() {
           gap:1,
           border: '1px solid var(--border)',
           borderRadius: 8,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          minWidth: '600px' // Minimum width to enable horizontal scroll on mobile
         }}>
-          {/* Header row */}
-          <div style={{ 
-            padding:'14px 16px', 
-            fontWeight:600, 
-            background: 'rgba(0,0,0,.3)',
-            fontSize: 13
-          }}>
-            Features
-          </div>
-          {plans.map(p => (
-            <div 
-              key={p.key} 
-              style={{ 
-                padding:'14px 16px', 
-                fontWeight:600, 
-                textAlign:'center',
-                background: p.recommended ? 'rgba(0, 186, 206, 0.1)' : 'rgba(0,0,0,.3)',
-                fontSize: 13,
-                borderLeft: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
-                borderRight: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)'
-              }}
-            >
-              {p.name === 'Starter (Free)' ? 'Starter' : p.name}
-            </div>
-          ))}
-          {/* Rows */}
-          {featureMatrix.map((row, idx) => (
-            <React.Fragment key={idx}>
-              <div style={{ 
-                padding:'12px 16px', 
-                background: idx % 2 === 0 ? 'rgba(0,0,0,.15)' : 'rgba(0,0,0,.05)',
-                fontSize: 13,
-                display: 'flex',
-                alignItems: 'center'
-              }}>
-                {row.label}{row.suffix || ''}
-              </div>
-              {plans.map(p => (
-                <div 
-                  key={p.key+idx} 
-                  style={{ 
-                    padding:'12px 16px', 
-                    textAlign:'center',
-                    background: p.recommended 
-                      ? (idx % 2 === 0 ? 'rgba(0, 186, 206, 0.08)' : 'rgba(0, 186, 206, 0.05)')
-                      : (idx % 2 === 0 ? 'rgba(0,0,0,.15)' : 'rgba(0,0,0,.05)'),
-                    fontSize: 13,
-                    borderLeft: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
-                    borderRight: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {typeof row.keys[p.key] === 'boolean' ? (
-                    row.keys[p.key] ? (
-                      <span style={{ fontSize: 16 }}>✓</span>
-                    ) : (
-                      <span style={{ color: 'var(--muted)' }}>—</span>
-                    )
-                  ) : (
-                    <span style={{ fontSize: 12, fontWeight: 500 }}>{row.keys[p.key]}</span>
-                  )}
+          {(() => {
+            const isLightTheme = document.documentElement.classList.contains('light-theme');
+            return (
+              <>
+                {/* Header row */}
+                <div style={{ 
+                  padding:'14px 16px', 
+                  fontWeight:600, 
+                  background: isLightTheme ? 'rgba(241, 243, 245, 0.8)' : 'rgba(0,0,0,.3)',
+                  fontSize: 13
+                }}>
+                  Features
                 </div>
-              ))}
-            </React.Fragment>
-          ))}
+                {plans.map(p => (
+                  <div 
+                    key={p.key} 
+                    style={{ 
+                      padding:'14px 16px', 
+                      fontWeight:600, 
+                      textAlign:'center',
+                      background: p.recommended 
+                        ? (isLightTheme ? 'rgba(0, 186, 206, 0.12)' : 'rgba(0, 186, 206, 0.1)')
+                        : (isLightTheme ? 'rgba(241, 243, 245, 0.8)' : 'rgba(0,0,0,.3)'),
+                      fontSize: 13,
+                      borderLeft: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
+                      borderRight: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)'
+                    }}
+                  >
+                    {p.name === 'Starter (Free)' ? 'Starter' : p.name}
+                  </div>
+                ))}
+                {/* Rows */}
+                {featureMatrix.map((row, idx) => {
+                  const isHovered = hoveredRow === idx;
+                  const getRowBackground = (isEven, isRecommended) => {
+                    if (isHovered) {
+                      return isLightTheme 
+                        ? 'rgba(0, 186, 206, 0.15)' 
+                        : 'rgba(0, 186, 206, 0.12)';
+                    }
+                    if (isRecommended) {
+                      return isEven 
+                        ? (isLightTheme ? 'rgba(0, 186, 206, 0.1)' : 'rgba(0, 186, 206, 0.08)')
+                        : (isLightTheme ? 'rgba(0, 186, 206, 0.06)' : 'rgba(0, 186, 206, 0.05)');
+                    }
+                    return isEven 
+                      ? (isLightTheme ? 'rgba(249, 250, 251, 0.6)' : 'rgba(0,0,0,.15)')
+                      : (isLightTheme ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0,0,0,.05)');
+                  };
+                  
+                  return (
+                    <React.Fragment key={idx}>
+                      <div 
+                        style={{ 
+                          padding:'12px 16px', 
+                          background: getRowBackground(idx % 2 === 0, false),
+                          fontSize: 13,
+                          display: 'flex',
+                          alignItems: 'center',
+                          transition: 'background 0.2s ease',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={() => setHoveredRow(idx)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                      >
+                        {row.label}{row.suffix || ''}
+                      </div>
+                      {plans.map(p => (
+                        <div 
+                          key={p.key+idx} 
+                          style={{ 
+                            padding:'12px 16px', 
+                            textAlign:'center',
+                            background: getRowBackground(idx % 2 === 0, p.recommended),
+                            fontSize: 13,
+                            borderLeft: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
+                            borderRight: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'background 0.2s ease',
+                            cursor: 'pointer'
+                          }}
+                          onMouseEnter={() => setHoveredRow(idx)}
+                          onMouseLeave={() => setHoveredRow(null)}
+                        >
+                          {typeof row.keys[p.key] === 'boolean' ? (
+                            row.keys[p.key] ? (
+                              <span style={{ fontSize: 16 }}>✓</span>
+                            ) : (
+                              <span style={{ color: 'var(--muted)' }}>—</span>
+                            )
+                          ) : (
+                            <span style={{ fontSize: 12, fontWeight: 500 }}>{row.keys[p.key]}</span>
+                          )}
+                        </div>
+                      ))}
+                    </React.Fragment>
+                  );
+                })}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

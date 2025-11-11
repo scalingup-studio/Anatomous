@@ -5,6 +5,7 @@ import { useAuth } from "../api/AuthContext";
 import NotificationSystem from "../components/NotificationSystem.jsx";
 import { useNotifications } from "../api/NotificationContext.jsx";
 import { ProfilesApi } from "../api/profilesApi.js";
+import { ThemeToggle } from "../components/ThemeToggle.jsx";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ export default function DashboardLayout() {
         {/* Bottom group (above user info) */}
 
         <div className="dash-nav" style={{ borderTop:'1px solid var(--border, #ececec)', paddingTop:8 }}>
-        <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/subscriptions">Subscriptions</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/subscriptions">Subscriptions</NavLink>
 
           <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/settings">Settings</NavLink>
           <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/help">Help Center</NavLink>
@@ -69,6 +70,19 @@ export default function DashboardLayout() {
         notifications={notifications} 
         onRemove={removeNotification} 
       />
+      
+      {/* Fixed Theme Toggle in top right corner */}
+      <div style={{
+        position: 'fixed',
+        top: 20,
+        right: 20,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8
+      }}>
+        <ThemeToggle showLabel={false} size="small" />
+      </div>
     </div>
   );
 }

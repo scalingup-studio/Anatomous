@@ -174,3 +174,45 @@
   margin: 12px 20px;
   font-size: 13px;
 }
+
+/* Light theme styles */
+:root.light-theme .chat-container {
+  background: rgba(249, 250, 251, 0.8);
+}
+
+:root.light-theme .chat-header {
+  background: linear-gradient(135deg, rgba(0, 186, 206, .70), rgb(0 139 163 / 80%));
+  border-bottom: 1px solid var(--border);
+}
+
+:root.light-theme .clear-btn {
+  background: rgba(249, 250, 251, 0.9);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+:root.light-theme .clear-btn:hover {
+  background: rgba(0,186,206,0.12);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+:root.light-theme .ai-message .message-content {
+  background: rgba(241, 243, 245, 0.6);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+:root.light-theme .input-form {
+  background: rgba(249, 250, 251, 0.8);
+}
+
+:root.light-theme .message-input {
+  background: rgba(249, 250, 251, 0.9);
+  color: var(--text);
+}
+
+:root.light-theme .send-button:disabled {
+  background: rgba(241, 243, 245, 0.6);
+  border: 1px solid var(--border);
+}

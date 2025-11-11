@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { authRequest } from "../../api/apiClient.js";
 import { useAuth } from "../../api/AuthContext.jsx";
 import { useNotifications } from "../../api/NotificationContext.jsx";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
 import DatePicker from "../../components/DatePicker.jsx";
 import { ProfilesApi } from "../../api/profilesApi.js";
 import { UploadFileApi } from "../../api/uploadFileApi.js";
@@ -15,6 +16,7 @@ import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal.jsx";
 
 export default function DashboardProfile() {
   const navigate = useNavigate();
+  const { isLight } = useTheme();
   
   const { user, setUser } = useAuth();
   const { showSuccess, showError, showInfo } = useNotifications();
@@ -47,6 +49,8 @@ export default function DashboardProfile() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [heightUnit, setHeightUnit] = useState('cm');
   const [weightUnit, setWeightUnit] = useState('kg');
+  const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
+  const [bmiTooltipPosition, setBmiTooltipPosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const t = String(searchParams.get('tab') || '').toLowerCase();
@@ -928,6 +932,19 @@ const calculateAgeFromDOB = (dob) => {
         
         console.log('📊 Form data to set:', formData);
         setFormValues(formData);
+        // If API returns explicit unit types, reflect them in UI
+        try {
+          const apiHeightType = (dataToUse?.height_type || '').toString().toLowerCase();
+          const apiWeightType = (dataToUse?.weight_type || '').toString().toLowerCase();
+          if (apiHeightType === 'in' || apiHeightType === 'cm') {
+            setHeightUnit(apiHeightType);
+          }
+          if (apiWeightType === 'lb' || apiWeightType === 'kg') {
+            setWeightUnit(apiWeightType);
+          }
+          if (apiHeightType) console.log('📏 Height unit from API:', apiHeightType);
+          if (apiWeightType) console.log('⚖️ Weight unit from API:', apiWeightType);
+        } catch {}
         setError(null);
         
         if (!profileData) {
@@ -1099,7 +1116,9 @@ const calculateAgeFromDOB = (dob) => {
         gender: formValues.gender || "",
         sex_of_birth: formValues.sex_of_birth || "",
         height_cm: formValues.height_cm === "" ? 0 : Number(formValues.height_cm),
+        height_type: heightUnit || "",
         weight_kg: formValues.weight_kg === "" ? 0 : Number(formValues.weight_kg),
+        weight_type: weightUnit || "",
         zip_code: formValues.zip_code?.trim() || "",
         // Note: profile_photo is handled separately via photo upload API
       };
@@ -1216,7 +1235,7 @@ const calculateAgeFromDOB = (dob) => {
       {activeTab === 'personal' && (
       <div className="card" style={{ display: "flex", gap: 16, marginBottom: 24,  alignItems:'flex-start', maxWidth: 900}}>
         <div 
-          style={{ width: 120, height: 120, backgroundColor: "#0b0b0b", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border:'1px solid var(--border)', overflow:'hidden', cursor:'pointer', position:'relative' }}
+          style={{ width: 120, height: 120, backgroundColor: isLight ? "rgba(241, 243, 245, 0.8)" : "#0b0b0b", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border:'1px solid var(--border)', overflow:'hidden', cursor:'pointer', position:'relative' }}
           onClick={() => fileInputRef.current?.click()}
           role="button"
           title="Change photo"
@@ -1228,7 +1247,7 @@ const calculateAgeFromDOB = (dob) => {
             <span style={{ fontSize: 48 }}>👤</span>
           )}
           {uploadingPhoto && (
-            <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.45)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>Uploading…</div>
+            <div style={{ position:'absolute', inset:0, background: isLight ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.45)', color: isLight ? 'var(--text)' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>Uploading…</div>
           )}
           <input 
             ref={fileInputRef}
@@ -1356,16 +1375,229 @@ const calculateAgeFromDOB = (dob) => {
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>BMI</span>
-                  <div style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
-                    {(() => {
-                      const hcm = parseFloat(formValues.height_cm);
-                      const wkg = parseFloat(formValues.weight_kg);
-                      if (isNaN(hcm) || isNaN(wkg) || hcm <=0 || wkg <=0) return '—';
-                      const m = hcm / 100;
-                      const bmi = wkg / (m*m);
-                      return bmi.toFixed(1);
-                    })()}
-                  </div>
+                  {(() => {
+                    const hcm = parseFloat(formValues.height_cm);
+                    const wkg = parseFloat(formValues.weight_kg);
+                    if (isNaN(hcm) || isNaN(wkg) || hcm <=0 || wkg <=0) {
+                      return (
+                        <div style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
+                          —
+                        </div>
+                      );
+                    }
+                    const m = hcm / 100;
+                    const bmi = wkg / (m*m);
+                    const bmiValue = parseFloat(bmi.toFixed(1));
+                    
+                    // BMI categories (as per image)
+                    const getBMICategory = (bmi) => {
+                      if (bmi < 18.5) return { label: 'Weight Deficit', color: '#3b82f6', range: [16, 18.5] };
+                      if (bmi < 24) return { label: 'Norm', color: '#22c55e', range: [18.5, 24] };
+                      if (bmi < 30) return { label: 'Weight Over', color: '#84cc16', range: [24, 30] };
+                      if (bmi < 35) return { label: 'Obesity First Degree', color: '#fb923c', range: [30, 35] };
+                      if (bmi < 40) return { label: 'Obesity Second Degree', color: '#f97316', range: [35, 40] };
+                      return { label: 'Obesity Third Degree', color: '#dc2626', range: [40, 50] };
+                    };
+                    
+                    const category = getBMICategory(bmiValue);
+                    const minBMI = 16;
+                    const maxBMI = 45;
+                    const bmiPosition = ((bmiValue - minBMI) / (maxBMI - minBMI)) * 100;
+                    const clampedPosition = Math.max(0, Math.min(100, bmiPosition));
+                    
+                    const categories = [
+                      { label: 'WEIGHT DEFICIT', range: '16-18.5', color: '#3b82f6', start: 0, end: 8.62 },
+                      { label: 'NORM', range: '18.5-24', color: '#22c55e', start: 8.62, end: 27.59 },
+                      { label: 'WEIGHT OVER', range: '24-30', color: '#84cc16', start: 27.59, end: 48.28 },
+                      { label: 'OBESITY FIRST DEGREE', range: '30-35', color: '#fb923c', start: 48.28, end: 65.52 },
+                      { label: 'OBESITY SECOND DEGREE', range: '35-40', color: '#f97316', start: 65.52, end: 82.76 },
+                      { label: 'OBESITY THIRD DEGREE', range: '≥40', color: '#dc2626', start: 82.76, end: 100 }
+                    ];
+                    
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {/* BMI Scale */}
+                        <div style={{ position: 'relative', marginTop: 8 }}>
+                          <div style={{ 
+                            height: 16, 
+                            background: 'linear-gradient(to right, #3b82f6 0%, #3b82f6 8.62%, #22c55e 8.62%, #22c55e 27.59%, #84cc16 27.59%, #84cc16 48.28%, #fb923c 48.28%, #fb923c 65.52%, #f97316 65.52%, #f97316 82.76%, #dc2626 82.76%, #dc2626 100%)',
+                            borderRadius: 16,
+                            border: '1px solid var(--border)',
+                            position: 'relative',
+                            overflow: 'visible'
+                          }}>
+                            {/* Interactive segments */}
+                            {categories.map((cat, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  position: 'absolute',
+                                  left: `${cat.start}%`,
+                                  width: `${cat.end - cat.start}%`,
+                                  height: '100%',
+                                  cursor: 'pointer',
+                                  zIndex: 5,
+                                  opacity: bmiHoveredCategory === idx ? 0.8 : 1,
+                                  transition: 'opacity 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setBmiHoveredCategory(idx);
+                                  setBmiTooltipPosition({
+                                    x: rect.left + rect.width / 2,
+                                    y: rect.bottom + 10
+                                  });
+                                }}
+                                onMouseLeave={() => setBmiHoveredCategory(null)}
+                              />
+                            ))}
+                            
+                            {/* Vertical line indicator on the scale */}
+                            {bmiValue && (
+                              <div style={{
+                                position: 'absolute',
+                                left: `${clampedPosition}%`,
+                                top: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                width: '2px',
+                                height: '20px',
+                                background: '#ffffff',
+                                border: '1px solid #1e3a8a',
+                                borderRadius: '1px',
+                                zIndex: 15,
+                                boxShadow: '0 0 4px rgba(30, 58, 138, 0.5)'
+                              }} />
+                            )}
+                            {/* Current BMI indicator - rectangle with number */}
+                            {bmiValue && (
+                              <div 
+                                style={{
+                                  position: 'absolute',
+                                  left: `${clampedPosition}%`,
+                                  bottom: '100%',
+                                  transform: 'translateX(-50%)',
+                                  marginBottom: 4,
+                                  padding: '4px 8px',
+                                  background: '#1e3a8a',
+                                  color: '#ffffff',
+                                  borderRadius: 6,
+                                  fontSize: 8,
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                  zIndex: 10,
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                  cursor: 'pointer'
+                                }}
+                                onMouseEnter={(e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setBmiHoveredCategory('current');
+                                  setBmiTooltipPosition({
+                                    x: rect.left + rect.width / 2,
+                                    y: rect.bottom + 15
+                                  });
+                                }}
+                                onMouseLeave={() => setBmiHoveredCategory(null)}
+                              >
+                                {bmiValue.toFixed(1)}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Tooltip */}
+                          {bmiHoveredCategory !== null && (
+                            <div style={{
+                              position: 'fixed',
+                              left: `${bmiTooltipPosition.x}px`,
+                              top: `${bmiTooltipPosition.y}px`,
+                              transform: 'translate(-50%, 0)',
+                              padding: '10px 14px',
+                              background: isLight ? 'rgba(249, 250, 251, 0.98)' : 'rgba(17, 17, 17, 0.98)',
+                              color: 'var(--text)',
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 500,
+                              minWidth: '140px',
+                              zIndex: 1000,
+                              boxShadow: isLight ? '0 4px 12px rgba(0, 0, 0, 0.15)' : '0 4px 12px rgba(0, 0, 0, 0.4)',
+                              border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'}`,
+                              pointerEvents: 'none',
+                              backdropFilter: 'blur(8px)',
+                              WebkitBackdropFilter: 'blur(8px)'
+                            }}>
+                              {bmiHoveredCategory === 'current' ? (
+                                <>
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 8, 
+                                    marginBottom: 6 
+                                  }}>
+                                    <div style={{
+                                      width: 12,
+                                      height: 12,
+                                      borderRadius: '50%',
+                                      background: category.color,
+                                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                                      boxShadow: '0 0 4px rgba(0, 0, 0, 0.2)'
+                                    }} />
+                                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                      {category.label}
+                                    </div>
+                                  </div>
+                                  <div style={{ 
+                                    fontSize: 11, 
+                                    color: 'var(--muted)',
+                                    paddingLeft: 20,
+                                    lineHeight: 1.4
+                                  }}>
+                                    BMI Range: <strong style={{ color: 'var(--text)' }}>{category.range[0]}-{category.range[1]}</strong>
+                                  </div>
+                                  <div style={{ 
+                                    fontSize: 11, 
+                                    color: 'var(--muted)',
+                                    paddingLeft: 20,
+                                    marginTop: 4,
+                                    lineHeight: 1.4
+                                  }}>
+                                    Your BMI: <strong style={{ color: category.color }}>{bmiValue.toFixed(1)}</strong>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 8, 
+                                    marginBottom: 6 
+                                  }}>
+                                    <div style={{
+                                      width: 12,
+                                      height: 12,
+                                      borderRadius: '50%',
+                                      background: categories[bmiHoveredCategory].color,
+                                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                                      boxShadow: '0 0 4px rgba(0, 0, 0, 0.2)'
+                                    }} />
+                                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                      {categories[bmiHoveredCategory].label}
+                                    </div>
+                                  </div>
+                                  <div style={{ 
+                                    fontSize: 11, 
+                                    color: 'var(--muted)',
+                                    paddingLeft: 20,
+                                    lineHeight: 1.4
+                                  }}>
+                                    BMI Range: <strong style={{ color: 'var(--text)' }}>{categories[bmiHoveredCategory].range}</strong>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </label>
                
                 <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8 }}>
@@ -2805,16 +3037,7 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
               {description}
             </p>
           )}
-          {!lastUpdated && (
-            <p style={{ 
-              color: 'var(--muted)', 
-              fontSize: '11px', 
-              margin: '4px 0 0 0',
-              fontStyle: 'italic'
-            }}>
-              Not yet saved
-            </p>
-          )}
+       
         </div>
         <span style={{ 
           color: 'var(--muted)', 
@@ -2879,9 +3102,12 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
                   if (severity) infoParts.push(`Severity: ${severity}`);
                   if (notes) infoParts.push(notes);
 
+                  // Check if light theme is active
+                  const isLightTheme = document.documentElement.classList.contains('light-theme');
+
                   return (
                     <div key={uniqueKey} style={{
-                      backgroundColor: 'rgba(17, 17, 17, 0.6)',
+                      backgroundColor: isLightTheme ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17, 17, 17, 0.6)',
                       border: '1px solid var(--border)',
                       borderLeft: '2px solid var(--primary)',
                       borderRadius: '8px',
@@ -2890,7 +3116,8 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
                       justifyContent: 'space-between',
                       alignItems: 'flex-start',
                       gap: 12,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: isLightTheme ? '0 1px 2px rgba(0,0,0,.05)' : 'none'
                     }}
                       onClick={(e) => {
                         // Only edit if not clicking on delete button
@@ -2909,7 +3136,11 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
                           )}
                         </div>
                         {infoParts.length > 0 && (
-                          <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                          <div style={{ 
+                            fontSize: 13, 
+                            color: isLightTheme ? '#4b5563' : 'var(--muted)',
+                            lineHeight: 1.5
+                          }}>
                             {infoParts.join(' • ')}
                           </div>
                         )}

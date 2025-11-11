@@ -4,6 +4,7 @@ import { ReportsApi } from "../../api/reportsApi";
 import { useAuth } from "../../api/AuthContext.jsx";
 import { hasFeatureAccess } from "../../utils/subscriptionUtils.js";
 import { UpgradePrompt } from "../../components/UpgradePrompt.jsx";
+import { useTheme } from "../../contexts/ThemeContext.jsx";
 
 export default function DashboardReports() {
   const [activeTab, setActiveTab] = React.useState("download");
@@ -51,6 +52,7 @@ export default function DashboardReports() {
 }
 
 function DownloadReportsTab() {
+  const { isLight } = useTheme();
   const [reports, setReports] = React.useState([]);
   const [type, setType] = React.useState("all");
   const todayStr = new Date().toISOString().split('T')[0];
@@ -104,7 +106,7 @@ function DownloadReportsTab() {
             onChange={(e)=>setType(e.target.value)} 
             style={{ 
               padding: "8px 12px", 
-              background: "rgba(17,17,17,.85)", 
+              background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", 
               border: "1px solid var(--border)", 
               borderRadius: 8, 
               color: "var(--text)", 
@@ -238,6 +240,7 @@ function DownloadReportsTab() {
 
 function ShareWithProviderTab() {
   const { user } = useAuth();
+  const { isLight } = useTheme();
   const [reports, setReports] = React.useState([]);
   const [selectedIdx, setSelectedIdx] = React.useState(0);
   const [expiresAt, setExpiresAt] = React.useState("");
@@ -384,7 +387,7 @@ function ShareWithProviderTab() {
               const r = reports[idx];
               if (r) setTitle(r.title || r.name || "");
             }}
-            style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+            style={{ width: "100%", padding: "8px 12px", background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
           >
             {reports.length === 0 ? (
               <option value="" disabled>No reports found</option>
@@ -854,7 +857,7 @@ function ExportSettingsTab() {
               style={{ 
                 width: "100%", 
                 padding: "10px 12px", 
-                background: "rgba(17,17,17,.85)", 
+                background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", 
                 border: "1px solid var(--border)", 
                 borderRadius: 8, 
                 color: "var(--text)", 
