@@ -232,7 +232,7 @@ const useOpenAI = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, checkEmergencyContent]);
+  }, [user, checkEmergencyContent, currentChatId]);
 
   const clearConversation = useCallback(() => {
     setConversation([]);

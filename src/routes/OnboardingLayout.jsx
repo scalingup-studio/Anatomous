@@ -19,6 +19,8 @@ const OnboardingLayout = () => {
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const initializedRef = useRef(false);
+  const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
+  const [bmiTooltipPosition, setBmiTooltipPosition] = useState({ x: 0, y: 0 });
 
   const [formData, setFormData] = useState({
     // User ID for API calls
@@ -172,7 +174,9 @@ const OnboardingLayout = () => {
     setFormData(prev => {
       console.log('📋 Previous form data:', {
         firstName: prev.firstName,
-        lastName: prev.lastName
+        lastName: prev.lastName,
+        heightUnit: prev.heightUnit,
+        weightUnit: prev.weightUnit
       });
       
       const updated = {
@@ -187,6 +191,9 @@ const OnboardingLayout = () => {
         height: profileData.height_cm ? profileData.height_cm.toString() : prev.height,
         weight: profileData.weight_kg ? profileData.weight_kg.toString() : prev.weight,
         zipCode: profileData.zip_code || prev.zipCode,
+        // Preserve heightUnit and weightUnit - they should not be overwritten
+        heightUnit: prev.heightUnit || 'cm',
+        weightUnit: prev.weightUnit || 'kg',
       };
       
       console.log('📝 Updated form data:', {
@@ -340,6 +347,13 @@ const OnboardingLayout = () => {
         populatedFormData.height = personalData.height ? personalData.height.toString() : populatedFormData.height;
         populatedFormData.weight = personalData.weight ? personalData.weight.toString() : populatedFormData.weight;
         populatedFormData.zipCode = personalData.zip_code || populatedFormData.zipCode;
+        // Pick up measurement unit types if API provides them
+        if (personalData.height_type) {
+          populatedFormData.heightUnit = personalData.height_type === 'in' ? 'in' : 'cm';
+        }
+        if (personalData.weight_type) {
+          populatedFormData.weightUnit = personalData.weight_type === 'lb' ? 'lb' : 'kg';
+        }
         
         console.log('✅ Personal data populated from API');
       }
@@ -367,7 +381,7 @@ const OnboardingLayout = () => {
         const goalsData = progress.steps.health_goals.data;
         populatedFormData.targetDate = goalsData.target_date || populatedFormData.targetDate;
         populatedFormData.goalNotes = goalsData.description || populatedFormData.goalNotes;
-        populatedFormData.goalVisibility = goalsData.visibility_scope || populatedFormData.goalVisibility;
+        populatedFormData.goalVisibility = goalsData.visibility_scope || populatedFormData.goalVisibility || 'private';
       }
       
       // Privacy settings data
@@ -381,7 +395,14 @@ const OnboardingLayout = () => {
       }
       
       console.log('📝 Populated form data from API:', populatedFormData);
-      setFormData(populatedFormData);
+      // Merge instead of replace to preserve units and other defaults
+      setFormData(prev => ({
+        ...prev,
+        ...populatedFormData,
+        // Ensure measurement units are always defined
+        heightUnit: prev.heightUnit || 'cm',
+        weightUnit: prev.weightUnit || 'kg',
+      }));
       
     } catch (error) {
       console.error('❌ Error loading onboarding progress:', error);
@@ -510,6 +531,7 @@ const OnboardingLayout = () => {
   const nextStep = async () => {
     console.log('🔄 nextStep called, currentStep:', currentStep);
     if (currentStep < steps.length - 1) {
+      setLoading(true);
       try {
         console.log('💾 Saving step data for step:', currentStep);
         // Save current step data to server
@@ -526,6 +548,16 @@ const OnboardingLayout = () => {
       } catch (error) {
         console.error('Error saving step data:', error);
         showError('Failed to save step. Please try again.');
+        // Still allow user to continue even if save fails
+        setCompletedSteps(prev => new Set([...prev, currentStep]));
+        setCurrentStep(prev => {
+          const next = prev + 1;
+          console.log('📈 Moving from step', prev, 'to step', next, '(despite save error)');
+          return next;
+        });
+        saveProgress();
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -537,7 +569,16 @@ const OnboardingLayout = () => {
   };
 
   const goToStep = (stepIndex) => {
-    if (stepIndex <= currentStep || completedSteps.has(stepIndex)) {
+    // Allow navigation if:
+    // 1. Going to a previous or current step
+    // 2. Going to a completed step
+    // 3. Going to the last step (Review & Finish) if all previous steps are completed
+    const isLastStep = stepIndex === steps.length - 1;
+    const allPreviousCompleted = isLastStep 
+      ? Array.from({ length: stepIndex }).every((_, i) => completedSteps.has(i))
+      : false;
+    
+    if (stepIndex <= currentStep || completedSteps.has(stepIndex) || allPreviousCompleted) {
       setCurrentStep(stepIndex);
     }
   };
@@ -832,17 +873,305 @@ const OnboardingLayout = () => {
                  {/* BMI auto-calculation */}
                  <div className="form-field">
                 <label>BMI</label>
-                <div style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
-                  {(() => {
-                    const h = parseFloat(formData.height);
-                    const w = parseFloat(formData.weight);
-                    if (isNaN(h) || isNaN(w) || h <= 0 || w <= 0) return '—';
-                    const heightMeters = formData.heightUnit === 'cm' ? h / 100 : (h * 2.54) / 100;
-                    const weightKg = formData.weightUnit === 'kg' ? w : w / 2.20462;
-                    const bmi = weightKg / (heightMeters * heightMeters);
-                    return bmi ? bmi.toFixed(1) : '—';
-                  })()}
-                </div>
+                {(() => {
+                  const h = parseFloat(formData.height);
+                  const w = parseFloat(formData.weight);
+                  if (isNaN(h) || isNaN(w) || h <= 0 || w <= 0) {
+                    return (
+                      <div style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
+                        —
+                      </div>
+                    );
+                  }
+                  // Normalize units with sensible defaults
+                  const normalizedHeightUnit = formData.heightUnit || 'cm';
+                  const normalizedWeightUnit = formData.weightUnit || 'kg';
+
+                  // Convert height to meters
+                  let heightMeters;
+                  if (normalizedHeightUnit === 'cm') {
+                    heightMeters = h / 100; // cm to meters
+                  } else {
+                    // inches to meters: inches * 0.0254 = meters (direct conversion)
+                    heightMeters = h * 0.0254;
+                  }
+                  
+                  // Convert weight to kg
+                  const weightKg = normalizedWeightUnit === 'kg' ? w : w * 0.453592; // lb to kg (direct conversion)
+                  
+                  // Validate reasonable values before calculation
+                  // Height should be between 0.5m and 3m (reasonable human range)
+                  // Weight should be between 5kg and 500kg (reasonable human range)
+                  if (heightMeters < 0.5 || heightMeters > 3 || weightKg < 5 || weightKg > 500) {
+                    console.warn('BMI Calculation: Unusual values detected', {
+                      height: h,
+                      heightUnit: formData.heightUnit,
+                      heightMeters,
+                      weight: w,
+                      weightUnit: formData.weightUnit,
+                      weightKg
+                    });
+                  }
+                  
+                  // Calculate BMI: weight (kg) / height (m)^2
+                  const bmi = weightKg / (heightMeters * heightMeters);
+                  
+                  // Ensure BMI is valid and within reasonable range (10-60)
+                  let bmiValue = null;
+                  if (bmi && !isNaN(bmi) && isFinite(bmi) && bmi > 0 && bmi >= 10 && bmi <= 60) {
+                    bmiValue = parseFloat(bmi.toFixed(1));
+                  } else if (bmi && !isNaN(bmi) && isFinite(bmi) && bmi > 0) {
+                    // If BMI is outside reasonable range, still calculate but log warning
+                    console.warn('BMI Calculation: BMI outside normal range', {
+                      bmi,
+                      height: h,
+                      heightUnit: formData.heightUnit,
+                      weight: w,
+                      weightUnit: formData.weightUnit
+                    });
+                    bmiValue = parseFloat(bmi.toFixed(1));
+                  }
+                  
+                  // Debug logging
+                  console.log('BMI Calculation:', {
+                    height: h,
+                    heightUnit: normalizedHeightUnit,
+                    weight: w,
+                    weightUnit: normalizedWeightUnit,
+                    heightMeters: parseFloat(heightMeters.toFixed(3)),
+                    weightKg: parseFloat(weightKg.toFixed(2)),
+                    bmi: parseFloat(bmi.toFixed(2)),
+                    bmiValue
+                  });
+                  
+                  // BMI categories (as per image)
+                  const getBMICategory = (bmi) => {
+                    if (bmi < 18.5) return { label: 'Weight Deficit', color: '#3b82f6', range: [16, 18.5] };
+                    if (bmi < 24) return { label: 'Norm', color: '#22c55e', range: [18.5, 24] };
+                    if (bmi < 30) return { label: 'Weight Over', color: '#84cc16', range: [24, 30] };
+                    if (bmi < 35) return { label: 'Obesity First Degree', color: '#fb923c', range: [30, 35] };
+                    if (bmi < 40) return { label: 'Obesity Second Degree', color: '#f97316', range: [35, 40] };
+                    return { label: 'Obesity Third Degree', color: '#dc2626', range: [40, 50] };
+                  };
+                  
+                  const category = bmiValue ? getBMICategory(bmiValue) : null;
+                  const minBMI = 16;
+                  const maxBMI = 45;
+                  const bmiPosition = bmiValue ? ((bmiValue - minBMI) / (maxBMI - minBMI)) * 100 : 0;
+                  const clampedPosition = Math.max(0, Math.min(100, bmiPosition));
+                  
+                  const categories = [
+                    { label: 'WEIGHT DEFICIT', range: '16-18.5', color: '#3b82f6', start: 0, end: 8.62 },
+                    { label: 'NORM', range: '18.5-24', color: '#22c55e', start: 8.62, end: 27.59 },
+                    { label: 'WEIGHT OVER', range: '24-30', color: '#84cc16', start: 27.59, end: 48.28 },
+                    { label: 'OBESITY FIRST DEGREE', range: '30-35', color: '#fb923c', start: 48.28, end: 65.52 },
+                    { label: 'OBESITY SECOND DEGREE', range: '35-40', color: '#f97316', start: 65.52, end: 82.76 },
+                    { label: 'OBESITY THIRD DEGREE', range: '≥40', color: '#dc2626', start: 82.76, end: 100 }
+                  ];
+                  
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {/* BMI Scale */}
+                      <div style={{ position: 'relative', marginTop: 8 }}>
+                        <div style={{ 
+                          height: 16, 
+                          background: 'linear-gradient(to right, #3b82f6 0%, #3b82f6 8.62%, #22c55e 8.62%, #22c55e 27.59%, #84cc16 27.59%, #84cc16 48.28%, #fb923c 48.28%, #fb923c 65.52%, #f97316 65.52%, #f97316 82.76%, #dc2626 82.76%, #dc2626 100%)',
+                          borderRadius: 16,
+                          border: '1px solid var(--border)',
+                          position: 'relative',
+                          overflow: 'visible'
+                        }}>
+                          {/* Interactive segments */}
+                          {categories.map((cat, idx) => (
+                            <div
+                              key={idx}
+                              style={{
+                                position: 'absolute',
+                                left: `${cat.start}%`,
+                                width: `${cat.end - cat.start}%`,
+                                height: '100%',
+                                cursor: 'pointer',
+                                zIndex: 5,
+                                opacity: bmiHoveredCategory === idx ? 0.8 : 1,
+                                transition: 'opacity 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const viewportW = window.innerWidth || document.documentElement.clientWidth;
+                                const viewportH = window.innerHeight || document.documentElement.clientHeight;
+                                const estWidth = 200;   // estimated tooltip width
+                                const estHeight = 120;  // estimated tooltip height
+                                let x = rect.left + rect.width / 2;
+                                // Clamp X inside viewport with padding
+                                const padding = 12;
+                                x = Math.max(padding + estWidth / 2, Math.min(viewportW - padding - estWidth / 2, x));
+                                // Prefer show below; if not enough space, show above
+                                const spaceBelow = viewportH - rect.bottom;
+                                const y = spaceBelow > estHeight + 16 ? rect.bottom + 12 : rect.top - estHeight - 12;
+                                setBmiHoveredCategory(idx);
+                                setBmiTooltipPosition({ x, y });
+                              }}
+                              onMouseLeave={() => setBmiHoveredCategory(null)}
+                            />
+                          ))}
+                          
+                          {/* Vertical line indicator on the scale */}
+                          {bmiValue && (
+                            <div style={{
+                              position: 'absolute',
+                              left: `${clampedPosition}%`,
+                              top: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              width: '2px',
+                              height: '36px',
+                              background: '#ffffff',
+                              border: '1px solid #1e3a8a',
+                              borderRadius: '1px',
+                              zIndex: 15,
+                              boxShadow: '0 0 4px rgba(30, 58, 138, 0.5)'
+                            }} />
+                          )}
+                          {/* Current BMI indicator - rectangle with number */}
+                          {bmiValue && (
+                            <div 
+                              style={{
+                                position: 'absolute',
+                                left: `${clampedPosition}%`,
+                                bottom: '100%',
+                                transform: 'translateX(-50%)',
+                                marginBottom: 4,
+                                padding: '4px 8px',
+                                background: '#1e3a8a',
+                                color: '#ffffff',
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                                zIndex: 10,
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                                cursor: 'pointer'
+                              }}
+                              onMouseEnter={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const viewportW = window.innerWidth || document.documentElement.clientWidth;
+                                const viewportH = window.innerHeight || document.documentElement.clientHeight;
+                                const estWidth = 200;
+                                const estHeight = 120;
+                                let x = rect.left + rect.width / 2;
+                                const padding = 12;
+                                x = Math.max(padding + estWidth / 2, Math.min(viewportW - padding - estWidth / 2, x));
+                                const spaceBelow = viewportH - rect.bottom;
+                                const y = spaceBelow > estHeight + 16 ? rect.bottom + 12 : rect.top - estHeight - 12;
+                                setBmiHoveredCategory('current');
+                                setBmiTooltipPosition({ x, y });
+                              }}
+                              onMouseLeave={() => setBmiHoveredCategory(null)}
+                            >
+                              {bmiValue !== null && !isNaN(bmiValue) ? bmiValue.toFixed(1) : '—'}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Tooltip */}
+                        {bmiHoveredCategory !== null && (
+                          <div style={{
+                            position: 'fixed',
+                            left: `${bmiTooltipPosition.x}px`,
+                            top: `${bmiTooltipPosition.y}px`,
+                            transform: 'translate(-50%, 0)',
+                            padding: '10px 14px',
+                            background: 'rgba(17, 17, 17, 0.98)',
+                            color: '#ffffff',
+                            borderRadius: 8,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            minWidth: '140px',
+                            maxWidth: '240px',
+                            zIndex: 1000,
+                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            pointerEvents: 'none',
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)'
+                          }}>
+                            {bmiHoveredCategory === 'current' ? (
+                              <>
+                                <div style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 8, 
+                                  marginBottom: 6 
+                                }}>
+                                  <div style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: '50%',
+                                    background: category?.color || '#3b82f6',
+                                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                                    boxShadow: '0 0 4px rgba(0, 0, 0, 0.2)'
+                                  }} />
+                                  <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                    {category?.label || 'BMI'}
+                                  </div>
+                                </div>
+                                {category?.range && (
+                                  <div style={{ 
+                                    fontSize: 11, 
+                                    color: '#cccccc',
+                                    paddingLeft: 20,
+                                    lineHeight: 1.4
+                                  }}>
+                                    BMI Range: <strong style={{ color: '#ffffff' }}>{category.range[0]}-{category.range[1]}</strong>
+                                  </div>
+                                )}
+                                {bmiValue && (
+                                  <div style={{ 
+                                    fontSize: 11, 
+                                    color: '#cccccc',
+                                    paddingLeft: 20,
+                                    marginTop: 4,
+                                    lineHeight: 1.4
+                                  }}>
+                                    Your BMI: <strong style={{ color: category?.color || '#3b82f6' }}>{bmiValue.toFixed(1)}</strong>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <div style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 8, 
+                                  marginBottom: 6 
+                                }}>
+                                  <div style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: '50%',
+                                    background: categories[bmiHoveredCategory].color,
+                                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                                    boxShadow: '0 0 4px rgba(0, 0, 0, 0.2)'
+                                  }} />
+                                  <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                    {categories[bmiHoveredCategory].label}
+                                  </div>
+                                </div>
+                                <div style={{ 
+                                  fontSize: 11, 
+                                  color: '#cccccc',
+                                  paddingLeft: 20,
+                                  lineHeight: 1.4
+                                }}>
+                                  BMI Range: <strong style={{ color: '#ffffff' }}>{categories[bmiHoveredCategory].range}</strong>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             
             </div>
@@ -1209,12 +1538,22 @@ const OnboardingLayout = () => {
         {/* Left Sidebar */}
         <aside className="onboarding-sidebar">
           <nav className="steps-navigation">
-            {steps.map((step, index) => (
+            {steps.map((step, index) => {
+              // Enable the last "Review & Finish" step once all previous are completed
+              const allPreviousCompleted = Array.from({ length: index }).every((_, i) => completedSteps.has(i));
+              const isReviewStep = index === steps.length - 1;
+              const isDisabled = isReviewStep
+                ? !allPreviousCompleted // allow review once all previous are done
+                : (index > currentStep && !completedSteps.has(index));
+              return (
               <button
                 key={step.id}
                 className={`step-item ${index === currentStep ? 'active' : ''} ${completedSteps.has(index) ? 'completed' : ''}`}
                 onClick={() => goToStep(index)}
-                disabled={index > currentStep && !completedSteps.has(index)}
+                disabled={isDisabled}
+                aria-label={`${index + 1}. ${step.title}${step.description ? ' — ' + step.description : ''}`}
+                title={`${index + 1}. ${step.title}${step.description ? ' — ' + step.description : ''}`}
+                aria-current={index === currentStep ? 'step' : undefined}
               >
                 <div className="step-number">
                   {completedSteps.has(index) ? '✓' : index + 1}
@@ -1224,7 +1563,7 @@ const OnboardingLayout = () => {
                   <div className="step-description">{step.description}</div>
                 </div>
               </button>
-            ))}
+            )})}
           </nav>
         </aside>
 
