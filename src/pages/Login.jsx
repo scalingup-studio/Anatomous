@@ -109,11 +109,11 @@ export function LoginPage({ onOpenSignup }) {
 
   return (
     <div className="auth-layout">
-      <div style={{ 
+      <div className="theme-toggle-container" style={{ 
         position: "absolute", 
         top: 20, 
         right: 20, 
-        zIndex: 1000 
+        zIndex: 9 
       }}>
         <ThemeToggle showLabel={true} size="default" />
       </div>

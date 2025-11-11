@@ -917,6 +917,25 @@ const calculateAgeFromDOB = (dob) => {
         console.log('📊 Profile data:', profileData);
         console.log('📊 User data:', user);
         
+        // Get unit types from API
+        const apiHeightType = (dataToUse?.height_type || 'cm').toString().toLowerCase();
+        const apiWeightType = (dataToUse?.weight_type || 'kg').toString().toLowerCase();
+        
+        // Convert values for display based on unit types
+        let heightForDisplay = (dataToUse?.height_cm ?? "") === 0 ? "" : (dataToUse?.height_cm ?? "");
+        let weightForDisplay = (dataToUse?.weight_kg ?? "") === 0 ? "" : (dataToUse?.weight_kg ?? "");
+        
+        // If stored values are in cm/kg but user prefers other units, convert for display
+        if (apiHeightType === 'in' && heightForDisplay && !isNaN(heightForDisplay)) {
+          // Convert cm to inches for display
+          heightForDisplay = parseFloat((heightForDisplay / 2.54).toFixed(1));
+        }
+        
+        if (apiWeightType === 'lb' && weightForDisplay && !isNaN(weightForDisplay)) {
+          // Convert kg to pounds for display
+          weightForDisplay = parseFloat((weightForDisplay * 2.20462).toFixed(1));
+        }
+        
         const formData = {
           first_name: dataToUse?.first_name || dataToUse?.firstName || "",
           last_name: dataToUse?.last_name || dataToUse?.lastName || "",
@@ -924,18 +943,16 @@ const calculateAgeFromDOB = (dob) => {
           dob: dataToUse?.dob || dataToUse?.date_of_birth || "",
           gender: dataToUse?.gender || "",
           sex_of_birth: dataToUse?.sex_of_birth || "",
-          height_cm: (dataToUse?.height_cm ?? "") === 0 ? "" : (dataToUse?.height_cm ?? ""),
-          weight_kg: (dataToUse?.weight_kg ?? "") === 0 ? "" : (dataToUse?.weight_kg ?? ""),
+          height_cm: heightForDisplay,
+          weight_kg: weightForDisplay,
           zip_code: dataToUse?.zip_code ?? "",
           user_id: dataToUse?.user_id || user?.id || "",
         };
         
         console.log('📊 Form data to set:', formData);
         setFormValues(formData);
-        // If API returns explicit unit types, reflect them in UI
+        // Set unit types in UI
         try {
-          const apiHeightType = (dataToUse?.height_type || '').toString().toLowerCase();
-          const apiWeightType = (dataToUse?.weight_type || '').toString().toLowerCase();
           if (apiHeightType === 'in' || apiHeightType === 'cm') {
             setHeightUnit(apiHeightType);
           }
@@ -1107,6 +1124,20 @@ const calculateAgeFromDOB = (dob) => {
         }
       }
 
+      // Convert values to cm/kg for storage if they were entered in other units
+      let heightToSave = formValues.height_cm === "" ? 0 : Number(formValues.height_cm);
+      let weightToSave = formValues.weight_kg === "" ? 0 : Number(formValues.weight_kg);
+      
+      if (heightUnit === 'in' && heightToSave > 0) {
+        // Convert inches to cm for storage
+        heightToSave = parseFloat((heightToSave * 2.54).toFixed(1));
+      }
+      
+      if (weightUnit === 'lb' && weightToSave > 0) {
+        // Convert pounds to kg for storage
+        weightToSave = parseFloat((weightToSave / 2.20462).toFixed(1));
+      }
+      
       // Prepare profile data payload (excluding photo - photo is handled separately)
       const basePayload = {
         first_name: formValues.first_name?.trim(),
@@ -1115,9 +1146,9 @@ const calculateAgeFromDOB = (dob) => {
         dob: formValues.dob || null,
         gender: formValues.gender || "",
         sex_of_birth: formValues.sex_of_birth || "",
-        height_cm: formValues.height_cm === "" ? 0 : Number(formValues.height_cm),
+        height_cm: heightToSave,
         height_type: heightUnit || "",
-        weight_kg: formValues.weight_kg === "" ? 0 : Number(formValues.weight_kg),
+        weight_kg: weightToSave,
         weight_type: weightUnit || "",
         zip_code: formValues.zip_code?.trim() || "",
         // Note: profile_photo is handled separately via photo upload API
@@ -1335,15 +1366,16 @@ const calculateAgeFromDOB = (dob) => {
                     <select value={heightUnit} onChange={(e)=>{
                       const newUnit = e.target.value;
                       const h = parseFloat(formValues.height_cm);
-                      if (!isNaN(h)) {
+                      if (!isNaN(h) && h > 0) {
+                        let newValue = h;
                         if (heightUnit === 'cm' && newUnit === 'in') {
-                          // convert cm -> inches (store back in cm field for persistence)
-                          const cm = h; const inches = (cm / 2.54).toFixed(1);
-                          // store inches as cm converted value for consistency on save, but keep unit UI
-                          // Here we keep height_cm as cm internally; just changing unit UI won't change stored field
+                          // convert cm -> inches
+                          newValue = parseFloat((h / 2.54).toFixed(1));
                         } else if (heightUnit === 'in' && newUnit === 'cm') {
-                          // inches -> cm visual; no data transform needed since we store cm
+                          // convert inches -> cm
+                          newValue = parseFloat((h * 2.54).toFixed(1));
                         }
+                        setFormValues(prev => ({ ...prev, height_cm: newValue.toString() }));
                       }
                       setHeightUnit(newUnit);
                     }}>
@@ -1359,12 +1391,16 @@ const calculateAgeFromDOB = (dob) => {
                     <select value={weightUnit} onChange={(e)=>{
                       const newUnit = e.target.value;
                       const w = parseFloat(formValues.weight_kg);
-                      if (!isNaN(w)) {
+                      if (!isNaN(w) && w > 0) {
+                        let newValue = w;
                         if (weightUnit === 'kg' && newUnit === 'lb') {
-                          // kg -> lb (we still store kg internally)
+                          // convert kg -> pounds
+                          newValue = parseFloat((w * 2.20462).toFixed(1));
                         } else if (weightUnit === 'lb' && newUnit === 'kg') {
-                          // lb -> kg UI
+                          // convert pounds -> kg
+                          newValue = parseFloat((w / 2.20462).toFixed(1));
                         }
+                        setFormValues(prev => ({ ...prev, weight_kg: newValue.toString() }));
                       }
                       setWeightUnit(newUnit);
                     }}>
@@ -1376,17 +1412,36 @@ const calculateAgeFromDOB = (dob) => {
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>BMI</span>
                   {(() => {
-                    const hcm = parseFloat(formValues.height_cm);
-                    const wkg = parseFloat(formValues.weight_kg);
-                    if (isNaN(hcm) || isNaN(wkg) || hcm <=0 || wkg <=0) {
+                    const h = parseFloat(formValues.height_cm);
+                    const w = parseFloat(formValues.weight_kg);
+                    if (isNaN(h) || isNaN(w) || h <=0 || w <=0) {
                       return (
                         <div style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 8 }}>
                           —
                         </div>
                       );
                     }
-                    const m = hcm / 100;
-                    const bmi = wkg / (m*m);
+                    
+                    // Convert height to meters based on current unit
+                    let heightMeters;
+                    if (heightUnit === 'cm') {
+                      heightMeters = h / 100; // cm to meters
+                    } else {
+                      // inches to meters: inches * 0.0254
+                      heightMeters = h * 0.0254;
+                    }
+                    
+                    // Convert weight to kg based on current unit
+                    let weightKg;
+                    if (weightUnit === 'kg') {
+                      weightKg = w;
+                    } else {
+                      // lb to kg: pounds * 0.453592
+                      weightKg = w * 0.453592;
+                    }
+                    
+                    // Calculate BMI: weight (kg) / height (m)^2
+                    const bmi = weightKg / (heightMeters * heightMeters);
                     const bmiValue = parseFloat(bmi.toFixed(1));
                     
                     // BMI categories (as per image)

@@ -72,11 +72,11 @@ export default function DashboardLayout() {
       />
       
       {/* Fixed Theme Toggle in top right corner */}
-      <div style={{
+      <div className="theme-toggle-container" style={{
         position: 'fixed',
         top: 20,
         right: 20,
-        zIndex: 1000,
+        zIndex: 9,
         display: 'flex',
         alignItems: 'center',
         gap: 8

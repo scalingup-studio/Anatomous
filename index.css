@@ -1007,6 +1007,14 @@ textarea::placeholder {
     left: 10px;
     max-width: none;
   }
+  
+  /* Ensure ThemeToggle is visible on mobile */
+  .theme-toggle-container {
+    position: fixed !important;
+    top: 10px !important;
+    right: 10px !important;
+    z-index: 999 !important;
+  }
 }
 
 /* Dashboard */
@@ -1110,6 +1118,14 @@ img.brand-logo { display:block; height:28px; }
   .hamburger.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); transition: transform .2s ease; }
   .hamburger.open span:nth-child(2) { opacity: 0; transition: opacity .2s ease; }
   .hamburger.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); transition: transform .2s ease; }
+  
+  /* Ensure ThemeToggle is visible on mobile in dashboard */
+  .theme-toggle-container {
+    position: fixed !important;
+    top: 10px !important;
+    right: 10px !important;
+    z-index: 999 !important;
+  }
 }
 
 /* Modal Styles */

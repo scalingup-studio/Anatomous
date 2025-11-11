@@ -897,7 +897,7 @@ const OnboardingLayout = () => {
                   }
                   
                   // Convert weight to kg
-                  const weightKg = normalizedWeightUnit === 'kg' ? w : w * 0.453592; // lb to kg (direct conversion)
+                  const weightKg = normalizedWeightUnit === 'kg' ? w : w * 0.453592; // lb to kg: pounds * 0.453592
                   
                   // Validate reasonable values before calculation
                   // Height should be between 0.5m and 3m (reasonable human range)
