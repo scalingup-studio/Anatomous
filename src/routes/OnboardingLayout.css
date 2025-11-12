@@ -280,6 +280,59 @@
   margin-bottom: 32px;
 }
 
+/* Dropdown list styles for dark theme */
+.onboarding-main [style*="position: absolute"][style*="backgroundColor"] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.onboarding-main [style*="position: absolute"][style*="backgroundColor"]::-webkit-scrollbar {
+  width: 8px;
+}
+
+.onboarding-main [style*="position: absolute"][style*="backgroundColor"]::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.onboarding-main [style*="position: absolute"][style*="backgroundColor"]::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+.onboarding-main [style*="position: absolute"][style*="backgroundColor"]::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Hover effect for dropdown items */
+.onboarding-main [style*="position: absolute"] > div[style*="cursor: pointer"]:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Dropdown list background */
+.onboarding-main .dropdown-list {
+  background-color: rgba(17, 17, 17, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Light theme support for dropdown */
+:root.light-theme .onboarding-main .dropdown-list {
+  background-color: rgba(249, 250, 251, 0.98) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+}
+
+@media (min-width: 769px) {
+  .checkbox-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  
+  .onboarding-step-content {
+    max-width: 800px;
+  }
+}
+
 /* Review Sections */
 .review-sections {
   display: flex;

@@ -40,9 +40,9 @@ const OnboardingLayout = () => {
     weightUnit: 'kg',
 
     // Health Snapshot
-    healthConditions: '',
-    medications: '',
-    allergies: '',
+    healthConditions: [],
+    medications: [],
+    allergies: [],
 
     // Lifestyle & Habits
     lifestyleHabits: [],
@@ -72,27 +72,29 @@ const OnboardingLayout = () => {
 
   const lifestyleOptions = [
     'Sedentary lifestyle',
-    'Regular exercise',
+    'Exercises regularly',
     'High stress',
-    'Irregular sleep',
-    'Smokes or vapes',
-    'Drinks alcohol',
-    'Special diet (e.g., keto, plant-based)',
-    'Works night shifts',
     'Manages a chronic condition',
+    'Irregular sleep patterns',
+    'Smokes tobacco',
+    'Uses vaping products',
+    'Drinks alcohol',
+    'Consumes caffeine daily',
+    'Follows a special diet (e.g., keto, plant-based)',
+    'Works night shifts',
     'Prefers natural or alternative medicine'
   ];
 
   const healthGoalOptions = [
-    'Lose weight',
-    'Gain muscle',
-    'Improve sleep',
-    'Reduce stress',
-    'Manage a condition',
-    'Improve energy',
-    'Optimize performance',
-    'Prevent disease',
-    'General wellness'
+    'Weight management',
+    'Increase muscle strength or tone',
+    'Improve sleep quality',
+    'Reduce stress levels',
+    'Improve daily energy',
+    'Better manage a health condition',
+    'Enhance physical or mental performance',
+    'Prevent future illness or disease',
+    'General wellness and balance'
   ];
 
   // Load user profile from database
@@ -362,9 +364,19 @@ const OnboardingLayout = () => {
       if (progress.steps.health_snapshot?.completed && progress.steps.health_snapshot.data) {
         const healthData = progress.steps.health_snapshot.data;
         if (healthData.health_snapshot) {
-          populatedFormData.healthConditions = healthData.health_snapshot.health_conditions || populatedFormData.healthConditions;
-          populatedFormData.medications = healthData.health_snapshot.medications || populatedFormData.medications;
-          populatedFormData.allergies = healthData.health_snapshot.allergies || populatedFormData.allergies;
+          // Convert strings to arrays if needed
+          const parseToArray = (value) => {
+            if (!value) return [];
+            if (Array.isArray(value)) return value;
+            if (typeof value === 'string') {
+              // Handle comma-separated strings
+              return value.split(',').map(item => item.trim()).filter(item => item.length > 0);
+            }
+            return [];
+          };
+          populatedFormData.healthConditions = parseToArray(healthData.health_snapshot.health_conditions) || populatedFormData.healthConditions;
+          populatedFormData.medications = parseToArray(healthData.health_snapshot.medications) || populatedFormData.medications;
+          populatedFormData.allergies = parseToArray(healthData.health_snapshot.allergies) || populatedFormData.allergies;
         }
       }
       
@@ -437,9 +449,9 @@ const OnboardingLayout = () => {
         height: profile?.height_cm ? profile.height_cm.toString() : '',
         weight: profile?.weight_kg ? profile.weight_kg.toString() : '',
         zipCode: profile?.zip_code || '',
-        healthConditions: '',
-        medications: '',
-        allergies: '',
+        healthConditions: [],
+        medications: [],
+        allergies: [],
         lifestyleHabits: [],
         healthGoals: [],
         otherGoal: '',
@@ -492,6 +504,25 @@ const OnboardingLayout = () => {
   const updateFormData = (field, value) => {
     console.log(`🔄 Updating form field ${field} to:`, value);
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Helper function to add item to array field
+  const addArrayItem = (field, item) => {
+    if (!item || !item.trim()) return;
+    const trimmedItem = item.trim();
+    setFormData(prev => {
+      const currentArray = Array.isArray(prev[field]) ? prev[field] : [];
+      if (currentArray.includes(trimmedItem)) return prev; // Don't add duplicates
+      return { ...prev, [field]: [...currentArray, trimmedItem] };
+    });
+  };
+
+  // Helper function to remove item from array field
+  const removeArrayItem = (field, item) => {
+    setFormData(prev => {
+      const currentArray = Array.isArray(prev[field]) ? prev[field] : [];
+      return { ...prev, [field]: currentArray.filter(i => i !== item) };
+    });
   };
 
   const toggleArrayItem = (field, item) => {
@@ -616,7 +647,10 @@ const OnboardingLayout = () => {
       }
       
       // Save health snapshot if it has any data
-      if (formData.healthConditions || formData.medications || formData.allergies) {
+      const hasHealthConditions = Array.isArray(formData.healthConditions) ? formData.healthConditions.length > 0 : formData.healthConditions;
+      const hasMedications = Array.isArray(formData.medications) ? formData.medications.length > 0 : formData.medications;
+      const hasAllergies = Array.isArray(formData.allergies) ? formData.allergies.length > 0 : formData.allergies;
+      if (hasHealthConditions || hasMedications || hasAllergies) {
         console.log('💾 Saving health snapshot...');
         await OnboardingApi.saveHealthSnapshot(formData);
       }
@@ -1190,46 +1224,512 @@ const OnboardingLayout = () => {
         );
 
       case 2: // Health Snapshot
+        // Multi-select component helper
+        const MultiSelectField = ({ field, label, datalistId, options, placeholder }) => {
+          const [inputValue, setInputValue] = useState('');
+          const [showDropdown, setShowDropdown] = useState(false);
+          const [highlightedIndex, setHighlightedIndex] = useState(-1);
+          const inputRef = useRef(null);
+          const dropdownRef = useRef(null);
+          const selectedItems = Array.isArray(formData[field]) ? formData[field] : [];
+          
+          // Helper function to capitalize first letter
+          const capitalizeFirst = (str) => {
+            if (!str) return str;
+            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+          };
+          
+          // Sort and filter out already selected items from the options list
+          const sortedOptions = [...options].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+          const availableOptions = sortedOptions.filter(option => !selectedItems.includes(option));
+          
+          // Filter options based on input value
+          const filteredOptions = availableOptions.filter(option =>
+            option.toLowerCase().includes(inputValue.toLowerCase())
+          );
+          
+          const handleKeyDown = (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
+                // Select highlighted option
+                addArrayItem(field, filteredOptions[highlightedIndex]);
+                setInputValue('');
+                setShowDropdown(false);
+                setHighlightedIndex(-1);
+              } else if (inputValue.trim() && !selectedItems.includes(inputValue.trim())) {
+                // Add typed value
+                addArrayItem(field, inputValue.trim());
+                setInputValue('');
+                setShowDropdown(false);
+              }
+            } else if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setShowDropdown(true);
+              setHighlightedIndex(prev => 
+                prev < filteredOptions.length - 1 ? prev + 1 : prev
+              );
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setHighlightedIndex(prev => prev > 0 ? prev - 1 : -1);
+            } else if (e.key === 'Escape') {
+              setShowDropdown(false);
+              setHighlightedIndex(-1);
+            }
+          };
+          
+          const handleInputChange = (e) => {
+            setInputValue(e.target.value);
+            setShowDropdown(true);
+            setHighlightedIndex(-1);
+          };
+          
+          const handleInputFocus = () => {
+            setShowDropdown(true);
+          };
+          
+          const handleInputBlur = (e) => {
+            // Delay to allow click on dropdown item
+            setTimeout(() => {
+              if (!dropdownRef.current?.contains(document.activeElement)) {
+                setShowDropdown(false);
+                setHighlightedIndex(-1);
+                // If input has a valid option, add it
+                const trimmedValue = inputValue.trim();
+                if (trimmedValue && options.includes(trimmedValue) && !selectedItems.includes(trimmedValue)) {
+                  addArrayItem(field, trimmedValue);
+                  setInputValue('');
+                }
+              }
+            }, 200);
+          };
+          
+          const handleOptionClick = (option) => {
+            addArrayItem(field, option);
+            setInputValue('');
+            setShowDropdown(false);
+            setHighlightedIndex(-1);
+            inputRef.current?.focus();
+          };
+          
+          const handleAddClick = () => {
+            const trimmedValue = inputValue.trim();
+            if (trimmedValue && !selectedItems.includes(trimmedValue)) {
+              addArrayItem(field, trimmedValue);
+              setInputValue('');
+              setShowDropdown(false);
+            }
+          };
+          
+          return (
+            <div className="form-field" style={{ margin: 0 }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '12px', 
+                fontSize: '16px', 
+                fontWeight: 600,
+                color: 'var(--text)'
+              }}>
+                {label}
+              </label>
+              
+              {/* Selected items as tags */}
+              {selectedItems.length > 0 && (
+                <div style={{ 
+                  display: 'flex', 
+                  flexWrap: 'wrap', 
+                  gap: '10px', 
+                  marginBottom: '16px',
+                  padding: '12px',
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))',
+                  minHeight: '50px',
+                  transition: 'all 0.2s ease'
+                }}>
+                  {selectedItems.map((item, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 14px',
+                        backgroundColor: 'var(--primary)',
+                        color: '#fff',
+                        borderRadius: '20px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        userSelect: 'none',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                      }}
+                      onClick={() => removeArrayItem(field, item)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--primary-hover, #d32f2f)';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.15)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--primary)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }}
+                    >
+                      <span>{capitalizeFirst(item)}</span>
+                      <span 
+                        style={{ 
+                          fontSize: '16px', 
+                          lineHeight: 1,
+                          fontWeight: 'bold',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '18px',
+                          height: '18px',
+                          marginLeft: '4px',
+                          opacity: 0.9,
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '0.9';
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                        }}
+                      >
+                        ×
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {/* Input with dropdown */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '10px', 
+                alignItems: 'flex-start',
+                position: 'relative',
+                zIndex: showDropdown ? 99999 : 1
+              }}>
+                <div style={{ 
+                  position: 'relative', 
+                  flex: 1,
+                  zIndex: showDropdown ? 99999 : 1
+                }}>
+                  <input
+                    ref={inputRef}
+                    placeholder={placeholder}
+                    value={inputValue}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--primary)';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(211, 47, 47, 0.1)';
+                      handleInputFocus();
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--border)';
+                      e.target.style.boxShadow = 'none';
+                      handleInputBlur(e);
+                    }}
+                    style={{ 
+                      width: '100%',
+                      padding: '12px 16px',
+                      paddingRight: '40px',
+                      fontSize: '15px',
+                      border: '2px solid var(--border)',
+                      borderRadius: '10px',
+                      backgroundColor: 'var(--background)',
+                      color: 'var(--text)',
+                      transition: 'all 0.2s ease',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      position: 'relative',
+                      zIndex: showDropdown ? 99999 : 'auto'
+                    }}
+                  />
+                  {/* Dropdown arrow icon */}
+                  <div style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--muted)',
+                    fontSize: '12px',
+                    transition: 'transform 0.2s ease',
+                    zIndex: 1
+                  }}>
+                    ▼
+                  </div>
+                  
+                  {/* Dropdown list */}
+                  {showDropdown && filteredOptions.length > 0 && (
+                    <div
+                      ref={dropdownRef}
+                      className="dropdown-list"
+                      onMouseDown={(e) => e.preventDefault()}
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        left: 0,
+                        right: 0,
+                        backgroundColor: 'rgba(17, 17, 17, 0.98)',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '10px',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
+                        zIndex: 999999,
+                        marginTop: '0'
+                      }}
+                    >
+                      {filteredOptions.map((option, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => handleOptionClick(option)}
+                          onMouseEnter={() => setHighlightedIndex(idx)}
+                          onMouseLeave={() => setHighlightedIndex(-1)}
+                          style={{
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            backgroundColor: highlightedIndex === idx 
+                              ? 'var(--primary)' 
+                              : 'transparent',
+                            color: highlightedIndex === idx 
+                              ? '#fff' 
+                              : 'var(--text)',
+                            transition: 'all 0.15s ease',
+                            borderBottom: idx < filteredOptions.length - 1 
+                              ? '1px solid var(--border)' 
+                              : 'none',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          {capitalizeFirst(option)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* No results message */}
+                  {showDropdown && inputValue.trim() && filteredOptions.length === 0 && (
+                    <div
+                      className="dropdown-list"
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 4px)',
+                        left: 0,
+                        right: 0,
+                        backgroundColor: 'rgba(17, 17, 17, 0.98)',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '10px',
+                        padding: '16px',
+                        color: 'var(--muted)',
+                        fontSize: '14px',
+                        textAlign: 'center',
+                        zIndex: 999999,
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+                      }}
+                    >
+                      No matching options found. You can still add "{inputValue.trim()}" manually.
+                    </div>
+                  )}
+                </div>
+                {inputValue.trim() && !selectedItems.includes(inputValue.trim()) && (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={handleAddClick}
+                    style={{
+                      padding: '12px 24px',
+                      fontSize: '15px',
+                      fontWeight: 600,
+                      borderRadius: '10px',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
+                  >
+                    Add
+                  </button>
+                )}
+              </div>
+              
+              {/* Helper text */}
+              <div style={{ 
+                marginTop: '8px', 
+                fontSize: '13px', 
+                color: 'var(--muted)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>💡</span>
+                <span>Type to search, use arrow keys to navigate, press Enter to select, or click an option. Click tags to remove.</span>
+              </div>
+            </div>
+          );
+        };
+        
+        // Define options for each field
+        const conditionsOptions = [
+          "diabetes", "type 1 diabetes", "type 2 diabetes", "prediabetes",
+          "hypertension", "high blood pressure", "asthma", "high cholesterol",
+          "hyperlipidemia", "thyroid disorder", "hypothyroidism", "hyperthyroidism",
+          "heart disease", "coronary artery disease", "arrhythmia", "atrial fibrillation",
+          "arthritis", "osteoarthritis", "rheumatoid arthritis", "depression",
+          "anxiety", "anxiety disorder", "migraine", "chronic pain",
+          "fibromyalgia", "COPD", "chronic obstructive pulmonary disease", "sleep apnea",
+          "obstructive sleep apnea", "kidney disease", "chronic kidney disease", "liver disease",
+          "gastroesophageal reflux disease", "GERD", "irritable bowel syndrome", "IBS",
+          "inflammatory bowel disease", "Crohn's disease", "ulcerative colitis", "osteoporosis",
+          "anemia", "iron deficiency anemia", "epilepsy", "seizure disorder",
+          "multiple sclerosis", "Parkinson's disease", "Alzheimer's disease", "dementia",
+          "psoriasis", "eczema", "atopic dermatitis", "cancer",
+          "cancer survivor", "HIV", "HIV positive", "hepatitis",
+          "hepatitis B", "hepatitis C", "autoimmune disease", "lupus",
+          "systemic lupus erythematosus", "Sjögren's syndrome", "celiac disease", "gluten intolerance"
+        ];
+        
+        const medicationsOptions = [
+          "ibuprofen", "Advil", "Motrin", "acetaminophen", "Tylenol", "aspirin",
+          "naproxen", "Aleve", "metformin", "Glucophage", "insulin", "lisinopril",
+          "Prinivil", "Zestril", "atorvastatin", "Lipitor", "simvastatin", "Zocor",
+          "rosuvastatin", "Crestor", "pravastatin", "Pravachol", "amlodipine", "Norvasc",
+          "metoprolol", "Lopressor", "Toprol", "atenolol", "Tenormin", "carvedilol",
+          "Coreg", "losartan", "Cozaar", "valsartan", "Diovan", "olmesartan",
+          "Benicar", "hydrochlorothiazide", "HCTZ", "furosemide", "Lasix", "levothyroxine",
+          "Synthroid", "Levoxyl", "omeprazole", "Prilosec", "pantoprazole", "Protonix",
+          "esomeprazole", "Nexium", "lansoprazole", "Prevacid", "ranitidine", "Zantac",
+          "famotidine", "Pepcid", "sertraline", "Zoloft", "citalopram", "Celexa",
+          "escitalopram", "Lexapro", "fluoxetine", "Prozac", "paroxetine", "Paxil",
+          "venlafaxine", "Effexor", "duloxetine", "Cymbalta", "bupropion", "Wellbutrin",
+          "trazodone", "Desyrel", "alprazolam", "Xanax", "lorazepam", "Ativan",
+          "clonazepam", "Klonopin", "diazepam", "Valium", "gabapentin", "Neurontin",
+          "pregabalin", "Lyrica", "amitriptyline", "Elavil", "warfarin", "Coumadin",
+          "apixaban", "Eliquis", "rivaroxaban", "Xarelto", "dabigatran", "Pradaxa",
+          "clopidogrel", "Plavix", "Baby Aspirin", "montelukast", "Singulair", "albuterol",
+          "ProAir", "Ventolin", "fluticasone", "Flonase", "budesonide", "Pulmicort",
+          "prednisone", "Deltasone", "prednisolone", "methylprednisolone", "Medrol",
+          "methimazole", "Tapazole", "propylthiouracil", "PTU", "glipizide", "Glucotrol",
+          "glyburide", "DiaBeta", "glimepiride", "Amaryl", "pioglitazone", "Actos",
+          "sitagliptin", "Januvia", "semaglutide", "Ozempic", "Wegovy", "liraglutide",
+          "Victoza", "dulaglutide", "Trulicity", "insulin glargine", "Lantus", "insulin lispro",
+          "Humalog", "insulin aspart", "Novolog", "allopurinol", "Zyloprim", "colchicine",
+          "Colcrys", "probenecid", "Probalan", "febuxostat", "Uloric", "tramadol",
+          "Ultram", "hydrocodone", "Vicodin", "oxycodone", "OxyContin", "Percocet",
+          "morphine", "codeine", "fentanyl", "Duragesic", "tizanidine", "Zanaflex",
+          "cyclobenzaprine", "Flexeril", "baclofen", "Lioresal", "methocarbamol", "Robaxin",
+          "diphenhydramine", "Benadryl", "cetirizine", "Zyrtec", "loratadine", "Claritin",
+          "fexofenadine", "Allegra", "levocetirizine", "Xyzal", "fluticasone nasal",
+          "mometasone nasal", "Nasonex", "budesonide nasal", "Rhinocort", "azelastine",
+          "Astelin", "olopatadine", "Patanol", "ketotifen", "Zaditor", "epinephrine",
+          "EpiPen", "Auvi-Q"
+        ];
+        
+        const allergiesOptions = [
+          "penicillin", "amoxicillin", "ampicillin", "sulfa drugs", "sulfonamides",
+          "trimethoprim-sulfamethoxazole", "Bactrim", "cephalosporins", "cefazolin",
+          "ceftriaxone", "Rocephin", "tetracycline", "doxycycline", "minocycline",
+          "erythromycin", "azithromycin", "Zithromax", "clarithromycin", "Biaxin",
+          "vancomycin", "Vancocin", "clindamycin", "Cleocin", "ciprofloxacin", "Cipro",
+          "levofloxacin", "Levaquin", "moxifloxacin", "Avelox", "aspirin", "ibuprofen",
+          "Advil", "naproxen", "Aleve", "acetaminophen", "Tylenol", "codeine", "morphine",
+          "fentanyl", "lidocaine", "Xylocaine", "procaine", "Novocain", "bupivacaine",
+          "Marcaine", "insulin", "contrast dye", "iodine", "latex", "rubber", "peanuts",
+          "tree nuts", "almonds", "walnuts", "cashews", "pecans", "pistachios", "hazelnuts",
+          "Brazil nuts", "macadamia nuts", "shellfish", "shrimp", "crab", "lobster",
+          "scallops", "mussels", "clams", "oysters", "fish", "salmon", "tuna", "cod",
+          "halibut", "eggs", "milk", "dairy", "lactose", "casein", "whey", "soy",
+          "soybeans", "wheat", "gluten", "barley", "rye", "oats", "sesame", "sesame seeds",
+          "mustard", "sulfites", "sulfur dioxide", "pollen", "tree pollen", "grass pollen",
+          "weed pollen", "ragweed", "birch pollen", "oak pollen", "maple pollen", "elm pollen",
+          "cedar pollen", "mountain cedar", "dust mites", "dust", "mold", "mold spores",
+          "pet dander", "cat dander", "dog dander", "cats", "dogs", "horses", "birds",
+          "cockroaches", "bees", "wasp stings", "hornet stings", "yellow jacket stings",
+          "fire ant stings", "mosquito bites", "nickel", "gold", "cobalt", "chromium",
+          "fragrance", "perfume", "cosmetics", "hair dye", "henna", "formaldehyde", "parabens"
+        ];
+        
         return (
           <div className="onboarding-step-content">
-            <h2>Health Snapshot</h2>
-            <p className="step-description">Help us understand your current health status.</p>
+            <div style={{ marginBottom: '32px' }}>
+              <h2 style={{ marginBottom: '8px', fontSize: '28px', fontWeight: 600 }}>Health Snapshot</h2>
+              <p className="step-description" style={{ fontSize: '15px', color: 'var(--muted)', lineHeight: '1.6' }}>
+                Help us understand your current health status. You can add multiple items to each category.
+              </p>
+            </div>
             
-            <div className="form-fields">
-              <div className="form-field">
-                <label>Known Health Conditions</label>
-                <input list="conditions-list" placeholder="Start typing to autocomplete..." onChange={(e)=>updateFormData('healthConditions', e.target.value)} value={formData.healthConditions} />
-                <datalist id="conditions-list">
-                  <option value="diabetes" />
-                  <option value="hypertension" />
-                  <option value="asthma" />
-                  <option value="high cholesterol" />
-                  <option value="thyroid disorder" />
-                </datalist>
+            <div className="form-fields" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              <div style={{ 
+                padding: '24px', 
+                backgroundColor: 'var(--card-bg, var(--background))',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+              }}>
+                <MultiSelectField
+                  field="healthConditions"
+                  label="Known Health Conditions"
+                  datalistId="conditions-list"
+                  options={conditionsOptions}
+                  placeholder="Type to search or select from list..."
+                />
               </div>
               
-              <div className="form-field">
-                <label>Current Medications (Optional)</label>
-                <input list="medications-list" placeholder="Start typing to autocomplete..." onChange={(e)=>updateFormData('medications', e.target.value)} value={formData.medications} />
-                <datalist id="medications-list">
-                  <option value="ibuprofen" />
-                  <option value="acetaminophen" />
-                  <option value="metformin" />
-                  <option value="lisinopril" />
-                  <option value="atorvastatin" />
-                </datalist>
+              <div style={{ 
+                padding: '24px', 
+                backgroundColor: 'var(--card-bg, var(--background))',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+              }}>
+                <MultiSelectField
+                  field="medications"
+                  label="Current Medications (Optional)"
+                  datalistId="medications-list"
+                  options={medicationsOptions}
+                  placeholder="Type medication name or select from list..."
+                />
               </div>
               
-              <div className="form-field">
-                <label>Known Allergies (Optional)</label>
-                <input list="allergies-list" placeholder="Start typing to autocomplete..." onChange={(e)=>updateFormData('allergies', e.target.value)} value={formData.allergies} />
-                <datalist id="allergies-list">
-                  <option value="penicillin" />
-                  <option value="peanuts" />
-                  <option value="shellfish" />
-                  <option value="pollen" />
-                  <option value="lactose" />
-                </datalist>
+              <div style={{ 
+                padding: '24px', 
+                backgroundColor: 'var(--card-bg, var(--background))',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+              }}>
+                <MultiSelectField
+                  field="allergies"
+                  label="Known Allergies (Optional)"
+                  datalistId="allergies-list"
+                  options={allergiesOptions}
+                  placeholder="Type allergy name or select from list..."
+                />
               </div>
             </div>
             
@@ -1440,9 +1940,15 @@ const OnboardingLayout = () => {
               <div className="review-section">
                 <h3>Health Information</h3>
                 <div className="review-content">
-                  {formData.healthConditions && <p><strong>Health Conditions:</strong> {formData.healthConditions}</p>}
-                  {formData.medications && <p><strong>Medications:</strong> {formData.medications}</p>}
-                  {formData.allergies && <p><strong>Allergies:</strong> {formData.allergies}</p>}
+                  {Array.isArray(formData.healthConditions) && formData.healthConditions.length > 0 && (
+                    <p><strong>Health Conditions:</strong> {formData.healthConditions.join(', ')}</p>
+                  )}
+                  {Array.isArray(formData.medications) && formData.medications.length > 0 && (
+                    <p><strong>Medications:</strong> {formData.medications.join(', ')}</p>
+                  )}
+                  {Array.isArray(formData.allergies) && formData.allergies.length > 0 && (
+                    <p><strong>Allergies:</strong> {formData.allergies.join(', ')}</p>
+                  )}
                 </div>
                 <button className="btn ghost small" onClick={() => goToStep(2)}>Edit</button>
               </div>
