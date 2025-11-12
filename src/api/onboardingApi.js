@@ -99,12 +99,13 @@ export const OnboardingApi = {
       };
       
       const payload = {
-        user_id: data.userId || data.user_id,
         step: "health_snapshot",
-        health_snapshot: {
-          health_conditions: ensureArray(data.healthConditions),
-          medications: ensureArray(data.medications),
-          allergies: ensureArray(data.allergies),
+        data_json: {
+          health_snapshot: {
+            health_conditions: ensureArray(data.healthConditions),
+            medications: ensureArray(data.medications),
+            allergies: ensureArray(data.allergies),
+          }
         }
       };
 
