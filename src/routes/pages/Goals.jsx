@@ -16,29 +16,66 @@ function Tabs({ value, onChange }) {
     { key: "notes", label: "Notes" },
   ];
   return (
-    <div role="tablist" aria-label="Goals navigation" className="goals-tabs" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
-      {items.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => onChange(t.key)}
-          role="tab"
-          aria-selected={value === t.key}
-          style={{
-            padding: "8px 16px",
-            border: "none",
-            background: "transparent",
-            color: value === t.key ? "var(--primary)" : "var(--muted)",
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: value === t.key ? 600 : 400,
-            borderBottom: value === t.key ? "2px solid var(--primary)" : "2px solid transparent",
-            transition: "all 0.2s",
-          }}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
+    <>
+      <style>{`
+        .goals-tabs {
+          display: flex;
+          gap: 8px;
+          border-bottom: 1px solid var(--border);
+          padding-bottom: 8px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .goals-tabs::-webkit-scrollbar {
+          display: none;
+        }
+        .goals-tabs button {
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+          .goals-tabs {
+            gap: 6px;
+          }
+          .goals-tabs button {
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .goals-tabs button {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+          }
+        }
+      `}</style>
+      <div role="tablist" aria-label="Goals navigation" className="goals-tabs">
+        {items.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => onChange(t.key)}
+            role="tab"
+            aria-selected={value === t.key}
+            style={{
+              padding: "8px 16px",
+              border: "none",
+              background: "transparent",
+              color: value === t.key ? "var(--primary)" : "var(--muted)",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: value === t.key ? 600 : 400,
+              borderBottom: value === t.key ? "2px solid var(--primary)" : "2px solid transparent",
+              transition: "all 0.2s",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -381,7 +418,7 @@ function HistoryTab() {
   };
 
   return (
-    <div className="card" style={{ display: "grid", gap: 12 }}>
+    <div className="card history-filters" style={{ display: "grid", gap: 12 }}>
       <div className="form-row">
         <div className="form-field" style={{ width: 180 }}>
           <label>Status</label>
@@ -424,12 +461,22 @@ function HistoryTab() {
       {items?.length > 0 && (
         <div style={{ display: "grid", gap: 8 }}>
           {items.map((g) => (
-            <div key={g.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{g.title}</div>
-                {g.completed_at && <div style={{ color: "var(--muted)", fontSize: 13 }}>Completed: {new Date(g.completed_at).toLocaleDateString()}</div>}
+            <div key={g.id} className="card history-goal-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>{g.title}</div>
+                {g.completed_at && (() => {
+                  try {
+                    const d = new Date(g.completed_at);
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const year = d.getFullYear();
+                    return <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Completed: {`${month}/${day}/${year}`}</div>;
+                  } catch {
+                    return <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Completed: {g.completed_at}</div>;
+                  }
+                })()}
               </div>
-              <button className="btn outline small" onClick={() => readd(g)}>Re-add</button>
+              <button className="btn outline small" onClick={() => readd(g)} style={{ flexShrink: 0 }}>Re-add</button>
             </div>
           ))}
         </div>
@@ -463,6 +510,13 @@ export default function GoalsPage() {
       sp.set('tab', next);
       return sp;
     }, { replace: true });
+    // Scroll to top when tab changes
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Also try to scroll dash-content if available
+    const dashContent = document.querySelector('.dash-content');
+    if (dashContent) {
+      dashContent.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (

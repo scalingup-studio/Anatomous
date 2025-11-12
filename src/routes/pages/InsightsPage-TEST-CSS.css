@@ -287,3 +287,42 @@
   background: rgba(241, 243, 245, 0.6);
   border: 1px solid var(--border);
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .input-container .send-button {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    padding: 2px !important;
+  }
+  
+  .input-container .send-button svg {
+    max-width: 36px !important;
+    max-height: 36px !important;
+  }
+  
+  .input-container {
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .input-container .send-button {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    padding: 2px !important;
+  }
+  
+  .input-container .send-button svg {
+    max-width: 32px !important;
+    max-height: 32px !important;
+  }
+  
+  .input-container {
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+}

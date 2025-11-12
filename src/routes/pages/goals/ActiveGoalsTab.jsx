@@ -12,7 +12,11 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
     try {
       const d = new Date(v);
       if (Number.isNaN(d.getTime())) return String(v);
-      return d.toLocaleDateString();
+      // Format to US format (MM/DD/YYYY)
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${month}/${day}/${year}`;
     } catch {
       return String(v);
     }
@@ -25,11 +29,11 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
   }[String(goal.status || "on track").toLowerCase()] || "secondary";
 
   return (
-    <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <div>
-        <div style={{ fontWeight: 600 }}>{goal.title}</div>
+    <div className="card goal-item" style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 200 }}>
+        <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>{goal.title}</div>
         {goal.description && (
-          <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>{goal.description}</div>
+          <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4, wordBreak: 'break-word' }}>{goal.description}</div>
         )}
         <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 6, display:'flex', gap:12, flexWrap:'wrap' }}>
           {(() => {
@@ -45,7 +49,7 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
           })()}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="goal-actions" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         {(() => {
           const current = String(goal.status || 'on track').toLowerCase();
           const all = ["on track", "completed", "paused", "archived"];
@@ -54,6 +58,7 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
             <select
               value={current}
               onChange={(e) => onUpdate(goal, { status: e.target.value })}
+              className="status-select"
               style={{ height: 32, minWidth: 160 }}
               aria-label="Change status"
             >
@@ -113,7 +118,7 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
 
   return (
     <Modal open={open} title="Edit Goal" onClose={onClose}>
-      <div style={{ width: "100%", display: "grid", gap: 20 }}>
+      <div className="edit-goal-modal" style={{ width: "100%", display: "grid", gap: 20 }}>
         <div className="form-field" style={{ width: "100%" }}>
           <label>Title</label>
           <input 
@@ -175,8 +180,8 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
             </select>
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%" }}>
-          <button className="btn secondary" onClick={onClose}>Cancel</button>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%", flexWrap: 'wrap' }}>
+          <button className="btn secondary" onClick={onClose} style={{ flex: 1, minWidth: '120px' }}>Cancel</button>
           <button
             className="btn primary"
             onClick={() => {
@@ -199,6 +204,7 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
                 visibility_scope: visibility,
               });
             }}
+            style={{ flex: 1, minWidth: '120px' }}
           >
             Save Changes
           </button>
@@ -219,7 +225,7 @@ function AddGoalForm({ onCreate, loading }) {
   const canSave = title.trim().length > 0;
 
   return (
-    <div className="card" style={{ display: "grid", gap: 12 }}>
+    <div className="card goals-form" style={{ display: "grid", gap: 12 }}>
       <div className="form-field">
         <label>Title</label>
         <input 
@@ -233,7 +239,9 @@ function AddGoalForm({ onCreate, loading }) {
           maxLength={200}
           placeholder="e.g. Run 5km (max 200 characters)"
         />
-       
+        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+          {title.length}/200
+        </div>
       </div>
       <div className="form-field">
         <label>Description</label>
@@ -249,9 +257,9 @@ function AddGoalForm({ onCreate, loading }) {
           placeholder="Details (max 500 characters)"
           rows={4}
         />
-          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
-            {description.length}/500
-          </div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
+          {description.length}/500
+        </div>
       </div>
       <div className="form-row">
         <div className="form-field" style={{ flex: 1 }}>
@@ -270,7 +278,7 @@ function AddGoalForm({ onCreate, loading }) {
           </select>
         </div>
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: 'wrap' }}>
         <button className="btn primary" disabled={!canSave || loading} onClick={async () => {
           // Validate title length (max 200 characters)
           if (title.length > 200) {
@@ -297,7 +305,7 @@ function AddGoalForm({ onCreate, loading }) {
             setType("");
             setVisibility("private");
           }
-        }}>Add Goal</button>
+        }} style={{ width: '100%', minWidth: '120px' }}>Add Goal</button>
       </div>
     </div>
   );

@@ -90,19 +90,28 @@ export const OnboardingApi = {
    */
   async saveHealthSnapshot(data) {
     try {
+      // Ensure arrays are properly formatted
+      const ensureArray = (arr) => {
+        if (!arr) return [];
+        if (Array.isArray(arr)) return arr.filter(item => item && item.trim());
+        if (typeof arr === 'string') return arr.split(',').map(item => item.trim()).filter(item => item.length > 0);
+        return [];
+      };
+      
       const payload = {
         user_id: data.userId || data.user_id,
         step: "health_snapshot",
-        data_json: {
-          health_snapshot: {
-            health_conditions: data.healthConditions || '',
-            medications: data.medications || '',
-            allergies: data.allergies || '',
-          }
+        health_snapshot: {
+          health_conditions: ensureArray(data.healthConditions),
+          medications: ensureArray(data.medications),
+          allergies: ensureArray(data.allergies),
         }
       };
 
-      console.log('💾 Saving health snapshot:', payload);
+      console.log('💾 Saving health snapshot');
+      console.log('📤 Request URL:', CUSTOM_ENDPOINTS.onboarding.healthSnapshot);
+      console.log('📦 Request Body (payload):', JSON.stringify(payload, null, 2));
+      console.log('📦 Request Body (object):', payload);
       
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.healthSnapshot, {
         method: "POST",

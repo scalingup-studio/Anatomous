@@ -22,7 +22,43 @@ export default function DashboardReports() {
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 16 }}>
+      <style>{`
+        .reports-tabs {
+          display: flex;
+          gap: 8px;
+          border-bottom: 1px solid var(--border);
+          padding-bottom: 8px;
+          margin-bottom: 16px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .reports-tabs::-webkit-scrollbar {
+          display: none;
+        }
+        .reports-tabs button {
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+          .reports-tabs {
+            gap: 6px;
+          }
+          .reports-tabs button {
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .reports-tabs button {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+          }
+        }
+      `}</style>
+      <div className="reports-tabs">
         {tabs.map((tab) => (
           <button
             key={tab.id}

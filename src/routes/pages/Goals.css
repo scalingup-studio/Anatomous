@@ -11,27 +11,114 @@
 @media (max-width: 768px) {
   .goal-item {
     flex-direction: column;
-    align-items: stretch;
-    gap: 10px !important;
+    align-items: flex-start;
+    gap: 12px !important;
+    display: flex;
   }
   .goal-actions {
     justify-content: space-between;
-  }
-  .status-select {
-    min-width: 0 !important;
     width: 100%;
+    flex-wrap: wrap;
+    flex-direction: row;
+  }
+  .goal-actions select {
+   
+    flex: 1;
+    min-width: 120px;
+  }
+  .goal-actions .icon-button {
+    flex-shrink: 0;
   }
 }
 
 /* Create form responsive tweaks */
 @media (max-width: 768px) {
-  .goals-form .form-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
+  .goals-form .form-row,
+  .form-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
   }
-  .goals-form .form-field {
+  .goals-form .form-field,
+  .form-field {
     width: 100% !important;
+  }
+  .goals-form .form-field[style*="width: 160"],
+  .goals-form .form-field[style*="width: 180"] {
+    width: 100% !important;
+  }
+  .goals-form button[class*="btn primary"] {
+    width: 100% !important;
+  }
+}
+
+/* History tab filters responsive */
+@media (max-width: 768px) {
+  .history-filters .form-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .history-filters .form-field {
+    width: 100% !important;
+  }
+  .history-filters button {
+    width: 100%;
+  }
+}
+
+/* Edit modal responsive */
+@media (max-width: 768px) {
+  .edit-goal-modal .form-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .edit-goal-modal .form-field {
+    width: 100% !important;
+  }
+  .edit-goal-modal .form-field[style*="width: 180"] {
+    width: 100% !important;
+  }
+  .edit-goal-modal .btn {
+    width: 100%;
+  }
+}
+
+/* Goal item card responsive */
+@media (max-width: 480px) {
+  .goal-item {
+    padding: 12px !important;
+  }
+  .goal-item > div:first-child {
+    width: 100%;
+  }
+  .goal-actions {
+    flex-direction: column;
+    gap: 8px;
+    flex-direction: row;
+  }
+  .goal-actions select {
+    width: 100% !important;
+  }
+  .goal-actions .icon-button {
+    width: 45%;
+    justify-content: center;
+  }
+}
+
+/* History tab items responsive */
+@media (max-width: 768px) {
+  .history-goal-item {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .history-goal-item > div:first-child {
+    width: 100%;
+  }
+  .history-goal-item button {
+    width: 100%;
   }
 }
 

@@ -149,7 +149,7 @@ const OnboardingLayout = () => {
       } else {
         // Force update form data when profile is loaded
         console.log('🔄 Profile loaded, updating form data...');
-        updateFormWithProfileData(profileData);
+        await updateFormWithProfileData(profileData);
       }
       
     } catch (error) {
@@ -160,8 +160,8 @@ const OnboardingLayout = () => {
     }
   };
 
-  // Update form data with profile data
-  const updateFormWithProfileData = (profileData) => {
+  // Update form data with profile data (similar to Profile.jsx logic)
+  const updateFormWithProfileData = async (profileData) => {
     console.log('🔄 Updating form with profile data:', profileData);
     console.log('🔍 Profile data fields:', {
       first_name: profileData.first_name,
@@ -170,8 +170,75 @@ const OnboardingLayout = () => {
       gender: profileData.gender,
       height_cm: profileData.height_cm,
       weight_kg: profileData.weight_kg,
+      height_type: profileData.height_type,
+      weight_type: profileData.weight_type,
       zip_code: profileData.zip_code
     });
+    
+    // Try to get unit types from profile data first
+    let apiHeightType = profileData?.height_type 
+      ? profileData.height_type.toString().toLowerCase().trim() 
+      : null;
+    let apiWeightType = profileData?.weight_type 
+      ? profileData.weight_type.toString().toLowerCase().trim() 
+      : null;
+    
+    console.log('📏 Initial height_type from profile:', apiHeightType);
+    console.log('⚖️ Initial weight_type from profile:', apiWeightType);
+    
+    // If not found in profile, try to get from user context
+    if (!apiHeightType || !apiWeightType) {
+      if (user?.save_onboarding?.steps?.personal?.data) {
+        const personalData = user.save_onboarding.steps.personal.data;
+        if (!apiHeightType && personalData.height_type) {
+          apiHeightType = personalData.height_type.toString().toLowerCase().trim();
+        }
+        if (!apiWeightType && personalData.weight_type) {
+          apiWeightType = personalData.weight_type.toString().toLowerCase().trim();
+        }
+        console.log('📏 Height type from user context:', apiHeightType);
+        console.log('⚖️ Weight type from user context:', apiWeightType);
+      }
+    }
+    
+    // If still not found, try to get from onboarding API
+    if (!apiHeightType || !apiWeightType) {
+      try {
+        const onboardingProgress = await OnboardingApi.getProgress(user.id);
+        const personalData = onboardingProgress?.save_onboarding?.steps?.personal?.data;
+        if (personalData) {
+          if (!apiHeightType && personalData.height_type) {
+            apiHeightType = personalData.height_type.toString().toLowerCase().trim();
+          }
+          if (!apiWeightType && personalData.weight_type) {
+            apiWeightType = personalData.weight_type.toString().toLowerCase().trim();
+          }
+          console.log('📏 Height type from onboarding API:', apiHeightType);
+          console.log('⚖️ Weight type from onboarding API:', apiWeightType);
+        }
+      } catch (onboardingError) {
+        console.warn('⚠️ Failed to load units from onboarding API:', onboardingError.message);
+      }
+    }
+    
+    // Validate and set default units
+    const validHeightUnit = (apiHeightType === 'in' || apiHeightType === 'cm') ? apiHeightType : 'cm';
+    const validWeightUnit = (apiWeightType === 'lb' || apiWeightType === 'kg') ? apiWeightType : 'kg';
+    
+    // Get stored values
+    // NOTE: height_cm and weight_kg are just field names - the actual unit is determined by height_type/weight_type
+    // If height_type is "in", then height_cm contains inches (not cm)
+    // If weight_type is "lb", then weight_kg contains pounds (not kg)
+    let heightStored = (profileData?.height_cm ?? "") === 0 ? "" : (profileData?.height_cm ?? "");
+    let weightStored = (profileData?.weight_kg ?? "") === 0 ? "" : (profileData?.weight_kg ?? "");
+    
+    // Values are already in the correct units as specified by height_type/weight_type
+    // No conversion needed - just use the values as-is
+    let heightForDisplay = heightStored;
+    let weightForDisplay = weightStored;
+    
+    console.log(`📏 Height: ${heightStored} (unit: ${validHeightUnit})`);
+    console.log(`⚖️ Weight: ${weightStored} (unit: ${validWeightUnit})`);
     
     setFormData(prev => {
       console.log('📋 Previous form data:', {
@@ -189,13 +256,13 @@ const OnboardingLayout = () => {
         email: profileData.email || prev.email,
         phoneNumber: profileData.phone_number || prev.phoneNumber,
         dateOfBirth: profileData.dob || prev.dateOfBirth,
-        sexAtBirth: profileData.gender || prev.sexAtBirth,
-        height: profileData.height_cm ? profileData.height_cm.toString() : prev.height,
-        weight: profileData.weight_kg ? profileData.weight_kg.toString() : prev.weight,
+        sexAtBirth: profileData.gender || profileData.sex_of_birth || prev.sexAtBirth,
+        height: heightForDisplay === "" ? "" : heightForDisplay.toString(),
+        weight: weightForDisplay === "" ? "" : weightForDisplay.toString(),
         zipCode: profileData.zip_code || prev.zipCode,
-        // Preserve heightUnit and weightUnit - they should not be overwritten
-        heightUnit: prev.heightUnit || 'cm',
-        weightUnit: prev.weightUnit || 'kg',
+        // Set units based on API data
+        heightUnit: validHeightUnit,
+        weightUnit: validWeightUnit,
       };
       
       console.log('📝 Updated form data:', {
@@ -208,6 +275,8 @@ const OnboardingLayout = () => {
         sexAtBirth: updated.sexAtBirth,
         height: updated.height,
         weight: updated.weight,
+        heightUnit: updated.heightUnit,
+        weightUnit: updated.weightUnit,
         zipCode: updated.zipCode
       });
       
@@ -1930,8 +1999,8 @@ const OnboardingLayout = () => {
                   <p><strong>Phone:</strong> {formData.phoneNumber}</p>
                   <p><strong>Date of Birth:</strong> {formData.dateOfBirth}</p>
                   <p><strong>Sex:</strong> {formData.sexAtBirth}</p>
-                  {formData.height && <p><strong>Height:</strong> {formData.height} cm</p>}
-                  {formData.weight && <p><strong>Weight:</strong> {formData.weight} kg</p>}
+                  {formData.height && <p><strong>Height:</strong> {formData.height} {formData.heightUnit || 'cm'}</p>}
+                  {formData.weight && <p><strong>Weight:</strong> {formData.weight} {formData.weightUnit || 'kg'}</p>}
                   {formData.zipCode && <p><strong>ZIP Code:</strong> {formData.zipCode}</p>}
                 </div>
                 <button className="btn ghost small" onClick={() => goToStep(1)}>Edit</button>

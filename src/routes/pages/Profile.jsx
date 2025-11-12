@@ -11,6 +11,7 @@ import { UploadFileApi } from "../../api/uploadFileApi.js";
 import { HealthApi } from "../../api/healthApi.js";
 import { ENDPOINTS, CUSTOM_ENDPOINTS } from "../../api/apiConfig.js";
 import { HealthHistoryApi, HealthHistoryConsolidated } from "../../api/healthHistoryApi.js";
+import { OnboardingApi } from "../../api/onboardingApi.js";
 import HealthHistoryCard from "../../components/HealthHistoryCard-TEST.jsx";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal.jsx";
 
@@ -49,6 +50,7 @@ export default function DashboardProfile() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [heightUnit, setHeightUnit] = useState('cm');
   const [weightUnit, setWeightUnit] = useState('kg');
+  const [temperatureUnit, setTemperatureUnit] = useState('C'); // 'C' for Celsius, 'F' for Fahrenheit
   const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
   const [bmiTooltipPosition, setBmiTooltipPosition] = useState({ x: 0, y: 0 });
 
@@ -68,6 +70,27 @@ export default function DashboardProfile() {
       sp.set('tab', next);
       return sp;
     }, { replace: true });
+    // Scroll to top when tab changes
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Also try to scroll dash-content if available
+    const dashContent = document.querySelector('.dash-content');
+    if (dashContent) {
+      dashContent.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Format date to US format (MM/DD/YYYY)
+  const formatDateUS = (dateStr) => {
+    if (!dateStr) return '-';
+    try {
+      const date = new Date(dateStr);
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    } catch {
+      return dateStr;
+    }
   };
   const [healthHistory, setHealthHistory] = useState({
     medical_conditions: [],
@@ -408,6 +431,41 @@ export default function DashboardProfile() {
     }));
   };
 
+  // Temperature conversion functions
+  const celsiusToFahrenheit = (celsius) => {
+    return (celsius * 9/5) + 32;
+  };
+
+  const fahrenheitToCelsius = (fahrenheit) => {
+    return (fahrenheit - 32) * 5/9;
+  };
+
+  // Handle temperature unit change
+  const handleTemperatureUnitChange = (newUnit) => {
+    if (newUnit === temperatureUnit) return;
+    
+    const currentValue = parseFloat(healthData.body_temperature);
+    if (!isNaN(currentValue) && currentValue !== '') {
+      let convertedValue;
+      if (temperatureUnit === 'C' && newUnit === 'F') {
+        // Converting from Celsius to Fahrenheit
+        convertedValue = celsiusToFahrenheit(currentValue);
+      } else if (temperatureUnit === 'F' && newUnit === 'C') {
+        // Converting from Fahrenheit to Celsius
+        convertedValue = fahrenheitToCelsius(currentValue);
+      } else {
+        convertedValue = currentValue;
+      }
+      
+      setHealthData(prev => ({
+        ...prev,
+        body_temperature: convertedValue.toFixed(1)
+      }));
+    }
+    
+    setTemperatureUnit(newUnit);
+  };
+
   const handleSaveHealthData = async () => {
     // If editing, use update function
     if (editingRecord) {
@@ -418,35 +476,44 @@ export default function DashboardProfile() {
     try {
       setSaving(true);
       
-      // Validate data before sending
-      const validateHealthData = (data) => {
+      // Validate data before sending (use original healthData values, not converted)
+      const validateHealthData = () => {
         const errors = [];
         
-        if (data.heart_rate && (data.heart_rate < 30 || data.heart_rate > 200)) {
+        if (healthData.heart_rate && (parseInt(healthData.heart_rate) < 30 || parseInt(healthData.heart_rate) > 200)) {
           errors.push('Heart rate should be between 30-200 bpm');
         }
-        if (data.blood_pressure_systolic && (data.blood_pressure_systolic < 70 || data.blood_pressure_systolic > 250)) {
+        if (healthData.blood_pressure_systolic && (parseInt(healthData.blood_pressure_systolic) < 70 || parseInt(healthData.blood_pressure_systolic) > 250)) {
           errors.push('Systolic blood pressure should be between 70-250 mmHg');
         }
-        if (data.blood_pressure_diastolic && (data.blood_pressure_diastolic < 40 || data.blood_pressure_diastolic > 150)) {
+        if (healthData.blood_pressure_diastolic && (parseInt(healthData.blood_pressure_diastolic) < 40 || parseInt(healthData.blood_pressure_diastolic) > 150)) {
           errors.push('Diastolic blood pressure should be between 40-150 mmHg');
         }
-        if (data.pulse_oximetry && (data.pulse_oximetry < 70 || data.pulse_oximetry > 100)) {
+        if (healthData.pulse_oximetry && (parseInt(healthData.pulse_oximetry) < 70 || parseInt(healthData.pulse_oximetry) > 100)) {
           errors.push('Pulse oximetry should be between 70-100%');
         }
-        if (data.respiratory_rate && (data.respiratory_rate < 8 || data.respiratory_rate > 40)) {
+        if (healthData.respiratory_rate && (parseInt(healthData.respiratory_rate) < 8 || parseInt(healthData.respiratory_rate) > 40)) {
           errors.push('Respiratory rate should be between 8-40 breaths/min');
         }
-        if (data.body_mass_index && (data.body_mass_index < 10 || data.body_mass_index > 60)) {
+        if (healthData.body_mass_index && (parseFloat(healthData.body_mass_index) < 10 || parseFloat(healthData.body_mass_index) > 60)) {
           errors.push('BMI should be between 10-60');
         }
-        if (data.fasting_glucose && (data.fasting_glucose < 50 || data.fasting_glucose > 500)) {
+        if (healthData.fasting_glucose && (parseFloat(healthData.fasting_glucose) < 50 || parseFloat(healthData.fasting_glucose) > 500)) {
           errors.push('Fasting glucose should be between 50-500 mg/dL');
         }
-        if (data.body_temperature && (data.body_temperature < 30 || data.body_temperature > 45)) {
-          errors.push('Body temperature should be between 30-45°C');
+        // Validate temperature based on current unit (before conversion)
+        if (healthData.body_temperature && healthData.body_temperature.trim() !== '') {
+          const tempValue = parseFloat(healthData.body_temperature);
+          if (!isNaN(tempValue)) {
+            const tempC = temperatureUnit === 'F' 
+              ? fahrenheitToCelsius(tempValue)
+              : tempValue;
+            if (tempC < 30 || tempC > 45) {
+              errors.push(`Body temperature should be between ${temperatureUnit === 'F' ? '86-113°F' : '30-45°C'}`);
+            }
+          }
         }
-        if (data.activity_level && (data.activity_level < 1 || data.activity_level > 5)) {
+        if (healthData.activity_level && (parseInt(healthData.activity_level) < 1 || parseInt(healthData.activity_level) > 5)) {
           errors.push('Activity level should be between 1-5');
         }
         
@@ -468,11 +535,16 @@ export default function DashboardProfile() {
         respiratory_rate: healthData.respiratory_rate ? parseInt(healthData.respiratory_rate) : null,
         body_mass_index: healthData.body_mass_index ? parseFloat(healthData.body_mass_index) : null,
         fasting_glucose: healthData.fasting_glucose ? parseFloat(healthData.fasting_glucose) : null,
-        body_temperature: healthData.body_temperature ? parseFloat(healthData.body_temperature) : null,
+        // Do NOT convert temperature - send it as-is in the unit specified by body_temperature_unit
+        body_temperature: healthData.body_temperature && healthData.body_temperature.trim() !== ''
+          ? parseFloat(healthData.body_temperature)
+          : null,
+        // Send temperature unit to API
+        body_temperature_unit: temperatureUnit,
       };
       
-      // Validate data
-      const validationErrors = validateHealthData(healthDataPayload);
+      // Validate data (before conversion)
+      const validationErrors = validateHealthData();
       if (validationErrors.length > 0) {
         showError(`Please check your data: ${validationErrors.join(', ')}`);
         return;
@@ -485,15 +557,6 @@ export default function DashboardProfile() {
 
       console.log('Health data API response:', response);
 
-      // Add to local state for immediate UI update
-      const newRecord = {
-        id: response.id || Date.now(),
-        ...healthDataPayload,
-        created_at: response.created_at || new Date().toISOString()
-      };
-
-      setHealthDataRecords(prev => [newRecord, ...prev]);
-      
       // Reset form
       setHealthData({
         date: new Date().toISOString().split('T')[0],
@@ -511,9 +574,14 @@ export default function DashboardProfile() {
         fasting_glucose: '',
         body_temperature: ''
       });
+      // Reset temperature unit to default
+      setTemperatureUnit('C');
 
       showSuccess('Health data saved successfully!');
       setIsHealthDataModalOpen(false); // Close modal after successful save
+      
+      // Reload data to update the list with latest records from server
+      await loadHealthData();
     } catch (error) {
       console.error('Error saving health data:', error);
       showError('Failed to save health data. Please try again.');
@@ -648,6 +716,8 @@ export default function DashboardProfile() {
       fasting_glucose: record.fasting_glucose?.toString() || '',
       body_temperature: record.body_temperature?.toString() || ''
     });
+    // Set temperature unit from record (or default to Celsius if not specified)
+    setTemperatureUnit(record.body_temperature_unit || 'C');
     setIsHealthDataModalOpen(true);
   };
 
@@ -657,6 +727,58 @@ export default function DashboardProfile() {
 
     try {
       setSaving(true);
+      
+      // Validate data before sending (use original healthData values, not converted)
+      const validateHealthData = () => {
+        const errors = [];
+        
+        if (healthData.heart_rate && (parseInt(healthData.heart_rate) < 30 || parseInt(healthData.heart_rate) > 200)) {
+          errors.push('Heart rate should be between 30-200 bpm');
+        }
+        if (healthData.blood_pressure_systolic && (parseInt(healthData.blood_pressure_systolic) < 70 || parseInt(healthData.blood_pressure_systolic) > 250)) {
+          errors.push('Systolic blood pressure should be between 70-250 mmHg');
+        }
+        if (healthData.blood_pressure_diastolic && (parseInt(healthData.blood_pressure_diastolic) < 40 || parseInt(healthData.blood_pressure_diastolic) > 150)) {
+          errors.push('Diastolic blood pressure should be between 40-150 mmHg');
+        }
+        if (healthData.pulse_oximetry && (parseInt(healthData.pulse_oximetry) < 70 || parseInt(healthData.pulse_oximetry) > 100)) {
+          errors.push('Pulse oximetry should be between 70-100%');
+        }
+        if (healthData.respiratory_rate && (parseInt(healthData.respiratory_rate) < 8 || parseInt(healthData.respiratory_rate) > 40)) {
+          errors.push('Respiratory rate should be between 8-40 breaths/min');
+        }
+        if (healthData.body_mass_index && (parseFloat(healthData.body_mass_index) < 10 || parseFloat(healthData.body_mass_index) > 60)) {
+          errors.push('BMI should be between 10-60');
+        }
+        if (healthData.fasting_glucose && (parseFloat(healthData.fasting_glucose) < 50 || parseFloat(healthData.fasting_glucose) > 500)) {
+          errors.push('Fasting glucose should be between 50-500 mg/dL');
+        }
+        // Validate temperature based on current unit (before conversion)
+        if (healthData.body_temperature && healthData.body_temperature.trim() !== '') {
+          const tempValue = parseFloat(healthData.body_temperature);
+          if (!isNaN(tempValue)) {
+            const tempC = temperatureUnit === 'F' 
+              ? fahrenheitToCelsius(tempValue)
+              : tempValue;
+            if (tempC < 30 || tempC > 45) {
+              errors.push(`Body temperature should be between ${temperatureUnit === 'F' ? '86-113°F' : '30-45°C'}`);
+            }
+          }
+        }
+        if (healthData.activity_level && (parseInt(healthData.activity_level) < 1 || parseInt(healthData.activity_level) > 5)) {
+          errors.push('Activity level should be between 1-5');
+        }
+        
+        return errors;
+      };
+      
+      // Validate data (before conversion)
+      const validationErrors = validateHealthData();
+      if (validationErrors.length > 0) {
+        showError(`Please check your data: ${validationErrors.join(', ')}`);
+        setSaving(false);
+        return;
+      }
       
       // Prepare data for API
       const healthDataPayload = {
@@ -673,7 +795,12 @@ export default function DashboardProfile() {
         respiratory_rate: healthData.respiratory_rate ? parseInt(healthData.respiratory_rate) : null,
         body_mass_index: healthData.body_mass_index ? parseFloat(healthData.body_mass_index) : null,
         fasting_glucose: healthData.fasting_glucose ? parseFloat(healthData.fasting_glucose) : null,
-        body_temperature: healthData.body_temperature ? parseFloat(healthData.body_temperature) : null
+        // Do NOT convert temperature - send it as-is in the unit specified by body_temperature_unit
+        body_temperature: healthData.body_temperature && healthData.body_temperature.trim() !== ''
+          ? parseFloat(healthData.body_temperature)
+          : null,
+        // Send temperature unit to API
+        body_temperature_unit: temperatureUnit,
       };
 
       await HealthApi.updateRecord(user.id, editingRecord.id, healthDataPayload);
@@ -697,6 +824,8 @@ export default function DashboardProfile() {
         fasting_glucose: '',
         body_temperature: ''
       });
+      // Reset temperature unit to default
+      setTemperatureUnit('C');
       // Reload data
       await loadHealthData();
     } catch (error) {
@@ -917,24 +1046,72 @@ const calculateAgeFromDOB = (dob) => {
         console.log('📊 Profile data:', profileData);
         console.log('📊 User data:', user);
         
-        // Get unit types from API
-        const apiHeightType = (dataToUse?.height_type || 'cm').toString().toLowerCase();
-        const apiWeightType = (dataToUse?.weight_type || 'kg').toString().toLowerCase();
+        // Try to get unit types from profile data first
+        let apiHeightType = dataToUse?.height_type 
+          ? dataToUse.height_type.toString().toLowerCase().trim() 
+          : null;
+        let apiWeightType = dataToUse?.weight_type 
+          ? dataToUse.weight_type.toString().toLowerCase().trim() 
+          : null;
         
-        // Convert values for display based on unit types
-        let heightForDisplay = (dataToUse?.height_cm ?? "") === 0 ? "" : (dataToUse?.height_cm ?? "");
-        let weightForDisplay = (dataToUse?.weight_kg ?? "") === 0 ? "" : (dataToUse?.weight_kg ?? "");
-        
-        // If stored values are in cm/kg but user prefers other units, convert for display
-        if (apiHeightType === 'in' && heightForDisplay && !isNaN(heightForDisplay)) {
-          // Convert cm to inches for display
-          heightForDisplay = parseFloat((heightForDisplay / 2.54).toFixed(1));
+        // If units not found in profile, try to get from onboarding data
+        if ((!apiHeightType || !apiWeightType) && user?.id) {
+          // First check if onboarding data is already in user context
+          let personalData = user?.save_onboarding?.steps?.personal?.data;
+          
+          // If not in context, try to load from onboarding API
+          if (!personalData) {
+            try {
+              console.log('📊 Units not found in profile, checking onboarding API...');
+              const onboardingProgress = await OnboardingApi.getProgress(user.id);
+              personalData = onboardingProgress?.save_onboarding?.steps?.personal?.data;
+            } catch (onboardingError) {
+              console.warn('⚠️ Failed to load units from onboarding API:', onboardingError.message);
+            }
+          } else {
+            console.log('📊 Using onboarding data from user context');
+          }
+          
+          if (personalData) {
+            if (!apiHeightType && personalData.height_type) {
+              apiHeightType = personalData.height_type.toString().toLowerCase().trim();
+              console.log('📏 Height unit from onboarding data:', apiHeightType);
+            }
+            if (!apiWeightType && personalData.weight_type) {
+              apiWeightType = personalData.weight_type.toString().toLowerCase().trim();
+              console.log('⚖️ Weight unit from onboarding data:', apiWeightType);
+            }
+          }
         }
         
-        if (apiWeightType === 'lb' && weightForDisplay && !isNaN(weightForDisplay)) {
-          // Convert kg to pounds for display
-          weightForDisplay = parseFloat((weightForDisplay * 2.20462).toFixed(1));
-        }
+        // Set defaults if still not found
+        apiHeightType = apiHeightType || 'cm';
+        apiWeightType = apiWeightType || 'kg';
+        
+        // Set unit types in UI first (before conversion)
+        const validHeightUnit = (apiHeightType === 'in' || apiHeightType === 'cm') ? apiHeightType : 'cm';
+        const validWeightUnit = (apiWeightType === 'lb' || apiWeightType === 'kg') ? apiWeightType : 'kg';
+        
+        setHeightUnit(validHeightUnit);
+        setWeightUnit(validWeightUnit);
+        
+        console.log('📏 Height unit from API:', apiHeightType, '→ using:', validHeightUnit);
+        console.log('⚖️ Weight unit from API:', apiWeightType, '→ using:', validWeightUnit);
+        
+        // Get stored values
+        // NOTE: height_cm and weight_kg are just field names - the actual unit is determined by height_type/weight_type
+        // If height_type is "in", then height_cm contains inches (not cm)
+        // If weight_type is "lb", then weight_kg contains pounds (not kg)
+        let heightStored = (dataToUse?.height_cm ?? "") === 0 ? "" : (dataToUse?.height_cm ?? "");
+        let weightStored = (dataToUse?.weight_kg ?? "") === 0 ? "" : (dataToUse?.weight_kg ?? "");
+        
+        // Values are already in the correct units as specified by height_type/weight_type
+        // No conversion needed - just use the values as-is
+        let heightForDisplay = heightStored;
+        let weightForDisplay = weightStored;
+        
+        console.log(`📏 Height: ${heightStored} (unit: ${validHeightUnit})`);
+        console.log(`⚖️ Weight: ${weightStored} (unit: ${validWeightUnit})`);
         
         const formData = {
           first_name: dataToUse?.first_name || dataToUse?.firstName || "",
@@ -943,25 +1120,22 @@ const calculateAgeFromDOB = (dob) => {
           dob: dataToUse?.dob || dataToUse?.date_of_birth || "",
           gender: dataToUse?.gender || "",
           sex_of_birth: dataToUse?.sex_of_birth || "",
-          height_cm: heightForDisplay,
-          weight_kg: weightForDisplay,
+          height_cm: heightForDisplay === "" ? "" : heightForDisplay.toString(),
+          weight_kg: weightForDisplay === "" ? "" : weightForDisplay.toString(),
           zip_code: dataToUse?.zip_code ?? "",
           user_id: dataToUse?.user_id || user?.id || "",
         };
         
         console.log('📊 Form data to set:', formData);
+        console.log('📊 Conversion details:', {
+          heightStored,
+          heightForDisplay,
+          heightUnit: validHeightUnit,
+          weightStored,
+          weightForDisplay,
+          weightUnit: validWeightUnit
+        });
         setFormValues(formData);
-        // Set unit types in UI
-        try {
-          if (apiHeightType === 'in' || apiHeightType === 'cm') {
-            setHeightUnit(apiHeightType);
-          }
-          if (apiWeightType === 'lb' || apiWeightType === 'kg') {
-            setWeightUnit(apiWeightType);
-          }
-          if (apiHeightType) console.log('📏 Height unit from API:', apiHeightType);
-          if (apiWeightType) console.log('⚖️ Weight unit from API:', apiWeightType);
-        } catch {}
         setError(null);
         
         if (!profileData) {
@@ -980,14 +1154,70 @@ const calculateAgeFromDOB = (dob) => {
           ""
         );
         if (preview) setPhotoPreview(preview);
+        
+        // Get unit types from fallback data
+        let fallbackHeightType = profileData?.height_type 
+          ? profileData.height_type.toString().toLowerCase().trim() 
+          : null;
+        let fallbackWeightType = profileData?.weight_type 
+          ? profileData.weight_type.toString().toLowerCase().trim() 
+          : null;
+        
+        // If units not found, try to get from onboarding data
+        if ((!fallbackHeightType || !fallbackWeightType) && user?.id) {
+          // First check if onboarding data is already in user context
+          let personalData = user?.save_onboarding?.steps?.personal?.data;
+          
+          // If not in context, try to load from onboarding API
+          if (!personalData) {
+            try {
+              console.log('📊 Units not found in fallback, checking onboarding API...');
+              const onboardingProgress = await OnboardingApi.getProgress(user.id);
+              personalData = onboardingProgress?.save_onboarding?.steps?.personal?.data;
+            } catch (onboardingError) {
+              console.warn('⚠️ Failed to load units from onboarding API in fallback:', onboardingError.message);
+            }
+          }
+          
+          if (personalData) {
+            if (!fallbackHeightType && personalData.height_type) {
+              fallbackHeightType = personalData.height_type.toString().toLowerCase().trim();
+            }
+            if (!fallbackWeightType && personalData.weight_type) {
+              fallbackWeightType = personalData.weight_type.toString().toLowerCase().trim();
+            }
+          }
+        }
+        
+        // Set defaults if still not found
+        fallbackHeightType = fallbackHeightType || 'cm';
+        fallbackWeightType = fallbackWeightType || 'kg';
+        
+        const fallbackHeightUnit = (fallbackHeightType === 'in' || fallbackHeightType === 'cm') ? fallbackHeightType : 'cm';
+        const fallbackWeightUnit = (fallbackWeightType === 'lb' || fallbackWeightType === 'kg') ? fallbackWeightType : 'kg';
+        
+        setHeightUnit(fallbackHeightUnit);
+        setWeightUnit(fallbackWeightUnit);
+        
+        // Get stored values
+        // NOTE: height_cm and weight_kg are just field names - the actual unit is determined by height_type/weight_type
+        let fallbackHeight = (profileData?.height_cm ?? "") === 0 ? "" : (profileData?.height_cm ?? "");
+        let fallbackWeight = (profileData?.weight_kg ?? "") === 0 ? "" : (profileData?.weight_kg ?? "");
+        
+        // Values are already in the correct units as specified by height_type/weight_type
+        // No conversion needed - just use the values as-is
+        console.log(`📏 Fallback Height: ${fallbackHeight} (unit: ${fallbackHeightUnit})`);
+        console.log(`⚖️ Fallback Weight: ${fallbackWeight} (unit: ${fallbackWeightUnit})`);
+        
         setFormValues({
           first_name: profileData?.first_name || profileData?.firstName || "",
           last_name: profileData?.last_name || profileData?.lastName || "",
           phone_number: profileData?.phone_number || profileData?.phone || "",
           dob: profileData?.dob || profileData?.date_of_birth || "",
           gender: profileData?.gender || "",
-          height_cm: (profileData?.height_cm ?? "") === 0 ? "" : (profileData?.height_cm ?? ""),
-          weight_kg: (profileData?.weight_kg ?? "") === 0 ? "" : (profileData?.weight_kg ?? ""),
+          sex_of_birth: profileData?.sex_of_birth || "",
+          height_cm: fallbackHeight === "" ? "" : fallbackHeight.toString(),
+          weight_kg: fallbackWeight === "" ? "" : fallbackWeight.toString(),
           zip_code: profileData?.zip_code ?? "",
           user_id: profileData?.user_id || user?.id || "",
         });
@@ -1124,19 +1354,11 @@ const calculateAgeFromDOB = (dob) => {
         }
       }
 
-      // Convert values to cm/kg for storage if they were entered in other units
-      let heightToSave = formValues.height_cm === "" ? 0 : Number(formValues.height_cm);
-      let weightToSave = formValues.weight_kg === "" ? 0 : Number(formValues.weight_kg);
-      
-      if (heightUnit === 'in' && heightToSave > 0) {
-        // Convert inches to cm for storage
-        heightToSave = parseFloat((heightToSave * 2.54).toFixed(1));
-      }
-      
-      if (weightUnit === 'lb' && weightToSave > 0) {
-        // Convert pounds to kg for storage
-        weightToSave = parseFloat((weightToSave / 2.20462).toFixed(1));
-      }
+      // Do NOT convert values - send them as-is in the units specified by height_type/weight_type
+      // If height_type is "in", then height_cm contains inches (not cm)
+      // If weight_type is "lb", then weight_kg contains pounds (not kg)
+      const heightToSave = formValues.height_cm === "" ? 0 : Number(formValues.height_cm);
+      const weightToSave = formValues.weight_kg === "" ? 0 : Number(formValues.weight_kg);
       
       // Prepare profile data payload (excluding photo - photo is handled separately)
       const basePayload = {
@@ -1236,31 +1458,210 @@ const calculateAgeFromDOB = (dob) => {
       </div>
       
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, paddingBottom:8, borderBottom: "1px solid var(--border)" }}>
-        <button 
-          onClick={() => changeTab('personal')} 
-          className={`btn ${activeTab === 'personal' ? 'primary' : 'outline'}`}
-          style={{ width:'auto', padding:'8px 16px', height:38 }}
-        >
-          Personal Info
-        </button>
-        <button 
-          onClick={() => changeTab('health_history')} 
-          className={`btn ${activeTab === 'health_history' ? 'primary' : 'outline'}`}
-          style={{ width:'auto', padding:'8px 16px', height:38 }}
-        >
-          Health History
-        </button>
-        <button 
-          onClick={() => changeTab('health_data')} 
-          className={`btn ${activeTab === 'health_data' ? 'primary' : 'outline'}`}
-          style={{ width:'auto', padding:'8px 16px', height:38 }}
-        >
-          Health Data
-        </button>
-        {/* Medical Records tab hidden per request */}
-        <span style={{ marginLeft:'auto' }} />
-        <button className="btn outline" style={{ width:'auto', padding:'8px 16px', height:38 }} onClick={() => navigate('/onboarding?force=true')}>Go to Onboarding</button>
+      <style>{`
+        .profile-tabs-container {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 16px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid var(--border);
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .profile-tabs-container::-webkit-scrollbar {
+          display: none;
+        }
+        .profile-tabs-wrapper {
+          display: flex;
+          gap: 8px;
+          min-width: max-content;
+          flex: 1;
+        }
+        .profile-tab-button {
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .profile-tabs-actions {
+          display: flex;
+          gap: 8px;
+          margin-left: auto;
+          flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+          .profile-tabs-container {
+            gap: 6px;
+          }
+          .profile-tab-button {
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+            height: 36px !important;
+          }
+          .profile-tabs-actions {
+            margin-left: 8px;
+          }
+          .profile-tabs-actions .btn {
+            padding: 6px 12px !important;
+            font-size: 12px !important;
+            height: 36px !important;
+            white-space: nowrap;
+          }
+        }
+        @media (max-width: 480px) {
+          .profile-tab-button {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+          }
+          .profile-tabs-actions .btn {
+            padding: 6px 10px !important;
+            font-size: 11px !important;
+          }
+        }
+        
+        /* Profile card responsive styles */
+        @media (max-width: 768px) {
+          .dashboard-profile .card {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 16px !important;
+          }
+          .dashboard-profile .card > div:first-child {
+           
+          }
+          .dashboard-profile .card .form {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            gap: 12px !important;
+          }
+          .dashboard-profile .card .form .form-field {
+            width: 100% !important;
+            flex: 1 1 auto !important;
+          }
+          .dashboard-profile .card > div[style*="flex:1"],
+          .dashboard-profile .card > div[style*="flex: 1"] {
+            flex: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .dashboard-profile .card {
+            padding: 16px !important;
+            gap: 12px !important;
+          }
+        
+        }
+        
+        /* Health History and Health Data card styles */
+        .health-history-container,
+        .health-data-container {
+          max-width: 920px;
+          width: 100%;
+        }
+        .health-data-container {
+          max-width: 1200px;
+        }
+        .health-history-card,
+        .health-data-card {
+          padding: 0;
+        }
+        .health-card-header {
+          padding: 16px;
+          border-bottom: 1px solid var(--border);
+        }
+        .health-card-content {
+          padding: 16px;
+        }
+        .health-data-management-card {
+          margin-bottom: 24px;
+        }
+        .health-data-management-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+        
+        /* Health History and Health Data card responsive styles */
+        @media (max-width: 768px) {
+          .health-history-container,
+          .health-data-container {
+            max-width: 100% !important;
+            width: 100% !important;
+          }
+          .health-history-card,
+          .health-data-card {
+            border-radius: 8px !important;
+          }
+          .health-card-header,
+          .health-card-content {
+            padding: 12px !important;
+          }
+          .health-data-management-card {
+            margin-bottom: 16px !important;
+            padding: 12px !important;
+          }
+          .health-data-management-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 12px !important;
+          }
+          .health-data-management-card button.btn {
+            width: 100% !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .health-card-header,
+          .health-card-content {
+            padding: 10px !important;
+          }
+          .health-data-management-card {
+            padding: 10px !important;
+            margin-bottom: 12px !important;
+          }
+          .health-history-card h2,
+          .health-data-card h2 {
+            font-size: 18px !important;
+          }
+          .health-history-card h3,
+          .health-data-card h3,
+          .health-data-management-card h3 {
+            font-size: 16px !important;
+          }
+        }
+      `}</style>
+      <div className="profile-tabs-container">
+        <div className="profile-tabs-wrapper">
+          <button 
+            onClick={() => changeTab('personal')} 
+            className={`btn ${activeTab === 'personal' ? 'primary' : 'outline'} profile-tab-button`}
+            style={{ width:'auto', padding:'8px 16px', height:38 }}
+          >
+            Personal Info
+          </button>
+          <button 
+            onClick={() => changeTab('health_history')} 
+            className={`btn ${activeTab === 'health_history' ? 'primary' : 'outline'} profile-tab-button`}
+            style={{ width:'auto', padding:'8px 16px', height:38 }}
+          >
+            Health History
+          </button>
+          <button 
+            onClick={() => changeTab('health_data')} 
+            className={`btn ${activeTab === 'health_data' ? 'primary' : 'outline'} profile-tab-button`}
+            style={{ width:'auto', padding:'8px 16px', height:38 }}
+          >
+            Health Data
+          </button>
+        </div>
+        <div className="profile-tabs-actions">
+          <button className="btn outline" style={{ width:'auto', padding:'8px 16px', height:38 }} onClick={() => navigate('/onboarding?force=true')}>Go to Onboarding</button>
+        </div>
       </div>
 
       {activeTab === 'personal' && (
@@ -1668,9 +2069,9 @@ const calculateAgeFromDOB = (dob) => {
       )}
 
       {activeTab === 'health_history' && (
-        <div style={{ maxWidth: 920 }}>
-          <div className="card" style={{ padding: 0 }}>
-            <div style={{ padding:16, borderBottom:'1px solid var(--border)' }}>
+        <div className="health-history-container">
+          <div className="card health-history-card">
+            <div className="health-card-header">
               <h2 style={{ margin: 0 }}>Health History</h2>
               <p style={{ color:'var(--muted)', margin: '8px 0 0 0', fontSize: '14px' }}>
                 Comprehensive health intake form. Each section can be collapsed/expanded for easy navigation.
@@ -2335,18 +2736,18 @@ const calculateAgeFromDOB = (dob) => {
       />
 
       {activeTab === 'health_data' && (
-        <div style={{ maxWidth: 1200 }}>
-          <div className="card" style={{ padding: 0 }}>
-            <div style={{ padding:16, borderBottom:'1px solid var(--border)' }}>
+        <div className="health-data-container">
+          <div className="card health-data-card">
+            <div className="health-card-header">
               <h2 style={{ margin: 0 }}>Health Data</h2>
               <p style={{ color:'var(--muted)', margin: '8px 0 0 0', fontSize: '14px' }}>
                 Track your health metrics, vitals, and wellness data over time.
               </p>
             </div>
-            <div style={{ padding:16 }}>
+            <div className="health-card-content">
               {/* Add New Health Data Button */}
-              <div className="card" style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div className="card health-data-management-card">
+                <div className="health-data-management-header">
                   <h3 style={{ marginTop: 0, marginBottom: 0 }}>Health Data Management</h3>
                   <button 
                     className="btn primary" 
@@ -2444,6 +2845,7 @@ const calculateAgeFromDOB = (dob) => {
                       <DatePicker 
                         value={healthData.date || ''} 
                         onChange={(val) => handleHealthDataChange('date', val)}
+                        maxDate={new Date().toISOString().split('T')[0]}
                       />
                     </label>
 
@@ -2512,15 +2914,90 @@ const calculateAgeFromDOB = (dob) => {
 
   {/* Body Temperature */}
   <label className="form-field">
-                      <span>Body Temperature (°C)</span>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={healthData.body_temperature} 
-                        onChange={(e) => handleHealthDataChange('body_temperature', e.target.value)}
-                        placeholder="36.6"
-                        min="30" max="45"
-                      />
+                      <span>Body Temperature</span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          type="number" 
+                          step="0.1"
+                          value={healthData.body_temperature} 
+                          onChange={(e) => {
+                            let value = e.target.value;
+                            // Allow only one decimal place
+                            if (value.includes('.')) {
+                              const parts = value.split('.');
+                              if (parts[1] && parts[1].length > 1) {
+                                value = parts[0] + '.' + parts[1].substring(0, 1);
+                              }
+                            }
+                            handleHealthDataChange('body_temperature', value);
+                          }}
+                          placeholder={temperatureUnit === 'C' ? "36.6" : "97.9"}
+                          min={temperatureUnit === 'C' ? "30" : "86"}
+                          max={temperatureUnit === 'C' ? "45" : "113"}
+                          style={{ flex: 1 }}
+                        />
+                        <div style={{ 
+                          display: 'flex', 
+                          border: '1px solid var(--border)', 
+                          borderRadius: '6px',
+                          overflow: 'hidden',
+                          backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => handleTemperatureUnitChange('C')}
+                            style={{
+                              padding: '8px 12px',
+                              border: 'none',
+                              backgroundColor: temperatureUnit === 'C' ? 'var(--primary)' : 'transparent',
+                              color: temperatureUnit === 'C' ? '#fff' : 'var(--text)',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: temperatureUnit === 'C' ? 600 : 400,
+                              transition: 'all 0.2s ease',
+                              borderRight: '1px solid var(--border)'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (temperatureUnit !== 'C') {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (temperatureUnit !== 'C') {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            °C
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTemperatureUnitChange('F')}
+                            style={{
+                              padding: '8px 12px',
+                              border: 'none',
+                              backgroundColor: temperatureUnit === 'F' ? 'var(--primary)' : 'transparent',
+                              color: temperatureUnit === 'F' ? '#fff' : 'var(--text)',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: temperatureUnit === 'F' ? 600 : 400,
+                              transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (temperatureUnit !== 'F') {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (temperatureUnit !== 'F') {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            °F
+                          </button>
+                        </div>
+                      </div>
                     </label>
                           </div>
                           
@@ -2664,60 +3141,116 @@ const calculateAgeFromDOB = (dob) => {
                   </div>
                 ) : healthDataRecords.length > 0 ? (
                   <div style={{ 
-                    overflowX: 'auto', 
                     overflowY: 'auto', 
                     height: 'calc(100vh - 520px)',
                     minHeight: '300px',
                     border: '1px solid var(--border)',
-                    borderRadius: '6px'
+                    borderRadius: '6px',
+                    width: '100%'
                   }}>
-                    <table style={{ 
-                      width: '100%', 
-                      borderCollapse: 'collapse',
-                      minWidth: '800px'
-                    }}>
-                      <thead style={{ 
-                        position: 'sticky', 
-                        top: 0, 
-                        backgroundColor: 'var(--card)', 
-                        zIndex: 10
-                      }}>
-                        <tr style={{ borderBottom: '1px solid var(--border)' , backgroundColor: 'var(--border)' }}>
-                          <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Date</th>
-                          <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Heart Rate</th>
-                          <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Blood Pressure</th>
-                          <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Activity</th>
-                          <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>BMI</th>
-                          <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Temperature</th>
-                          <th style={{ padding: '12px', textAlign: 'left', fontSize: '14px', fontWeight: '600' }}>Glucose</th>
-                          <th style={{ padding: '12px', textAlign: 'center', fontSize: '14px', fontWeight: '600', width: '120px' }}>Actions</th>
+                    <style>{`
+                      .health-data-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                      }
+                      .health-data-table th,
+                      .health-data-table td {
+                        padding: 12px;
+                        text-align: left;
+                        font-size: 14px;
+                        border-bottom: 1px solid var(--border);
+                      }
+                      .health-data-table th {
+                        font-weight: 600;
+                        position: sticky;
+                        top: 0;
+                        background-color: var(--card);
+                        z-index: 10;
+                        border-bottom: 2px solid var(--border);
+                      }
+                      .health-data-table .col-date,
+                      .health-data-table .col-actions {
+                        display: table-cell !important;
+                      }
+                      .health-data-table .col-heart-rate,
+                      .health-data-table .col-blood-pressure,
+                      .health-data-table .col-activity,
+                      .health-data-table .col-bmi,
+                      .health-data-table .col-temperature,
+                      .health-data-table .col-glucose {
+                        display: table-cell;
+                      }
+                      @media (max-width: 1200px) {
+                        .health-data-table .col-glucose {
+                          display: none;
+                        }
+                      }
+                      @media (max-width: 1000px) {
+                        .health-data-table .col-temperature {
+                          display: none;
+                        }
+                      }
+                      @media (max-width: 900px) {
+                        .health-data-table .col-bmi {
+                          display: none;
+                        }
+                      }
+                      @media (max-width: 800px) {
+                        .health-data-table .col-activity {
+                          display: none;
+                        }
+                      }
+                      @media (max-width: 700px) {
+                        .health-data-table .col-blood-pressure {
+                          display: none;
+                        }
+                      }
+                      @media (max-width: 600px) {
+                        .health-data-table .col-heart-rate {
+                          display: none;
+                        }
+                      }
+                    `}</style>
+                    <table className="health-data-table">
+                      <thead>
+                        <tr style={{ backgroundColor: 'var(--border)' }}>
+                          <th className="col-date">Date</th>
+                          <th className="col-heart-rate">Heart Rate</th>
+                          <th className="col-blood-pressure">Blood Pressure</th>
+                          <th className="col-activity">Activity</th>
+                          <th className="col-bmi">BMI</th>
+                          <th className="col-temperature">Temperature</th>
+                          <th className="col-glucose">Glucose</th>
+                          <th className="col-actions" style={{ textAlign: 'center', width: '120px' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {healthDataRecords.map((record) => (
-                          <tr key={record.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '12px', fontSize: '14px' }}>{record.date}</td>
-                            <td style={{ padding: '12px', fontSize: '14px' }}>
+                          <tr key={record.id}>
+                            <td className="col-date" style={{ fontWeight: '500' }}>{formatDateUS(record.date)}</td>
+                            <td className="col-heart-rate">
                               {record.heart_rate ? `${record.heart_rate} bpm` : '-'}
                             </td>
-                            <td style={{ padding: '12px', fontSize: '14px' }}>
+                            <td className="col-blood-pressure">
                               {record.blood_pressure_systolic && record.blood_pressure_diastolic 
                                 ? `${record.blood_pressure_systolic}/${record.blood_pressure_diastolic}` 
                                 : '-'}
                             </td>
-                            <td style={{ padding: '12px', fontSize: '14px' }}>
+                            <td className="col-activity">
                               {record.weekly_activity_minutes ? `${record.weekly_activity_minutes} min` : '-'}
                             </td>
-                            <td style={{ padding: '12px', fontSize: '14px' }}>
-                              {record.body_mass_index || '-'}
+                            <td className="col-bmi">
+                              {record.body_mass_index ? parseFloat(record.body_mass_index).toFixed(1) : '-'}
                             </td>
-                            <td style={{ padding: '12px', fontSize: '14px' }}>
-                              {record.body_temperature ? `${record.body_temperature}°C` : '-'}
+                            <td className="col-temperature">
+                              {record.body_temperature 
+                                ? `${parseFloat(record.body_temperature).toFixed(1)}°${record.body_temperature_unit || 'C'}` 
+                                : '-'}
                             </td>
-                            <td style={{ padding: '12px', fontSize: '14px' }}>
+                            <td className="col-glucose">
                               {record.fasting_glucose ? `${record.fasting_glucose} mg/dL` : '-'}
                             </td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <td className="col-actions" style={{ textAlign: 'center' }}>
                               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                                 <button
                                   className="btn outline"
@@ -3056,7 +3589,12 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
   const formatLastUpdated = (timestamp) => {
     if (!timestamp) return null;
     const date = new Date(timestamp);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    const dateStr = `${month}/${day}/${year}`;
+    const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    return dateStr + ' ' + timeStr;
   };
 
   return (

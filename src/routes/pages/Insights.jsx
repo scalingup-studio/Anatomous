@@ -722,6 +722,13 @@ export default function DashboardInsights() {
       sp.set('tab', next);
       return sp;
     }, { replace: true });
+    // Scroll to top when tab changes
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Also try to scroll dash-content if available
+    const dashContent = document.querySelector('.dash-content');
+    if (dashContent) {
+      dashContent.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
   const { user } = useAuth();
   const { showNotification } = useNotifications();
@@ -736,13 +743,43 @@ export default function DashboardInsights() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Sub-tabs navigation */}
-      <div style={{ 
-        display: "flex", 
-        gap: 8, 
-        borderBottom: isLight ? "1px solid #ffffff" : "1px solid var(--border)", 
-        paddingBottom: 8, 
-        marginBottom: 16 
-      }}>
+      <style>{`
+        .insights-tabs {
+          display: flex;
+          gap: 8px;
+          border-bottom: ${isLight ? "1px solid #ffffff" : "1px solid var(--border)"};
+          padding-bottom: 8px;
+          margin-bottom: 16px;
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .insights-tabs::-webkit-scrollbar {
+          display: none;
+        }
+        .insights-tabs button {
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        @media (max-width: 768px) {
+          .insights-tabs {
+            gap: 6px;
+          }
+          .insights-tabs button {
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .insights-tabs button {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+          }
+        }
+      `}</style>
+      <div className="insights-tabs">
         {tabs.map((tab) => (
           <button
             key={tab.id}

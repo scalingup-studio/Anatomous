@@ -1062,8 +1062,56 @@ img.brand-logo { display:block; height:28px; }
 .dash-sidebar::-webkit-scrollbar { width:8px; }
 .dash-sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 8px; }
 :root.light-theme .dash-sidebar::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); }
+
+/* Global scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Light theme scrollbar */
+:root.light-theme * {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+:root.light-theme *::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  background-clip: padding-box;
+}
+
+:root.light-theme *::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+  background-clip: padding-box;
+}
 .dash-content { 
-  padding:24px; 
+  padding:16px; 
   overflow-y: auto; 
   height: calc(100vh - 0px);
   max-height: 100vh;
@@ -1088,8 +1136,8 @@ img.brand-logo { display:block; height:28px; }
   .dash-content { 
     padding-top:64px; 
     overflow-y: auto; 
-    height: calc(100vh - 64px);
-    max-height: calc(100vh - 64px);
+    height: calc(100vh );
+    max-height: calc(100vh );
   }
   .dash-header { position:fixed; top:0; left:0; right:0; height:56px; background:rgba(17,17,17,.95); backdrop-filter:blur(8px); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:center; z-index:45; }
   .dash-header h1 { margin:0; font-size:20px; font-weight:800; color:var(--text); }

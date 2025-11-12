@@ -13,6 +13,7 @@ export default function DashboardLayout() {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const { logout } = useAuth();
   const { notifications, removeNotification } = useNotifications();
+  const dashContentRef = React.useRef(null);
 
   const handleLogOut = async () => {
 
@@ -25,7 +26,20 @@ export default function DashboardLayout() {
     navigate("/login");
   }
 
-  React.useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+  const scrollToTop = () => {
+    if (dashContentRef.current) {
+      dashContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // Fallback: scroll window if ref not available
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  React.useEffect(() => { 
+    setMenuOpen(false);
+    // Scroll to top when route changes
+    scrollToTop();
+  }, [location.pathname]);
   return (
     <div className={`dash-layout ${menuOpen ? "menu-open" : ""}`}>
       <header className="dash-header">
@@ -42,26 +56,26 @@ export default function DashboardLayout() {
         </div>
         {/* Top group */}
         <div className="dash-nav" style={{ flex: 1 }}>
-          <NavLink end className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard">Overview</NavLink>
-          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/profile">Profile</NavLink>
-          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/insights">Insights</NavLink>
-          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/goals">Goals</NavLink>
+          <NavLink end className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard" onClick={scrollToTop}>Overview</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/profile" onClick={scrollToTop}>Profile</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/insights" onClick={scrollToTop}>Insights</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/goals" onClick={scrollToTop}>Goals</NavLink>
           {/* Hidden per request: Workouts & Nutrition */}
-          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/reports">Reports</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/reports" onClick={scrollToTop}>Reports</NavLink>
         </div>
 
         {/* Bottom group (above user info) */}
 
         <div className="dash-nav" style={{ borderTop:'1px solid var(--border, #ececec)', paddingTop:8 }}>
-          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/subscriptions">Subscriptions</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/subscriptions" onClick={scrollToTop}>Subscriptions</NavLink>
 
-          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/settings">Settings</NavLink>
-          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/help">Help Center</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/settings" onClick={scrollToTop}>Settings</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/help" onClick={scrollToTop}>Help Center</NavLink>
         </div>
         <UserSummaryAndLogout onLogout={handleLogOut} />
       </aside>
       {menuOpen && <div className="dash-backdrop" onClick={() => setMenuOpen(false)} />}
-      <section className="dash-content">
+      <section className="dash-content" ref={dashContentRef}>
         <div className="dash-toolbar" />
         <Outlet />
       </section>
