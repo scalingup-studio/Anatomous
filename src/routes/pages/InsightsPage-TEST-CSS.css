@@ -112,7 +112,8 @@
 .input-container {
   display: flex;
   padding: 15px;
-  gap: 10px;
+  gap: 12px;
+  align-items: flex-end;
 }
 
 .message-input {
@@ -139,30 +140,100 @@
 }
 
 .send-button {
-  padding: 12px 20px;
-  height: 44px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-600) 100%);
+  padding: 2px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  background: transparent;
   color: white;
   border: none;
-  border-radius: 10px;
+  outline: none;
+  border-radius: 50%;
   cursor: pointer;
   font-size: 16px;
-  transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(0,76,215,.3);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.send-button svg {
+  width: 100%;
+  height: 100%;
+  max-width: 44px;
+  max-height: 44px;
+  outline: none;
+}
+
+.send-button svg circle {
+  stroke: none;
+  outline: none;
 }
 
 .send-button:disabled {
-  background: rgba(11,11,11,0.5);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: none;
   cursor: not-allowed;
   box-shadow: none;
-  opacity: 0.5;
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.send-button:disabled[data-loading="true"] {
+  opacity: 1 !important;
+  transform: none !important;
+  cursor: wait;
+}
+
+.send-button:disabled[data-loading="true"] svg {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .send-button:hover:not(:disabled) {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0,76,215,.4);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 0 12px rgba(0, 186, 206, 0.6);
+  opacity: 0.9;
+}
+
+.send-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  transition: all 0.1s;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.send-button .loading-spinner {
+  animation: spin 1s linear infinite !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform-origin: center center;
+}
+
+.send-button:disabled[data-loading="true"] .loading-spinner {
+  animation: spin 1s linear infinite !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.send-button .loading-spinner circle {
+  stroke: var(--primary) !important;
+  stroke-width: 2.5 !important;
+  opacity: 1 !important;
+  animation: none;
 }
 
 .error-message {

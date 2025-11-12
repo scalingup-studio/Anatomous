@@ -358,7 +358,7 @@ const ChatComponent = ({ sharedHook }) => {
       </div>
 
       <form onSubmit={handleSubmit} className="input-form">
-        <div className="input-container">
+        <div className="input-container" style={{ display: 'flex', alignItems: 'start', justifyContent: 'center' }}>
           <textarea
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
@@ -372,8 +372,52 @@ const ChatComponent = ({ sharedHook }) => {
             type="submit" 
             disabled={loading || !inputMessage.trim()}
             className="send-button"
+            data-loading={loading}
+            title={loading ? "Sending..." : inputMessage.trim() ? "Send message" : "Type a message to send"}
+            aria-label={loading ? "Sending message" : "Send message"}
           >
-            {loading ? '⏳' : '📤'}
+            {loading ? (
+              <svg 
+                width="44" 
+                height="44" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ display: 'block', width: '100%', height: '100%', opacity: 1 }}
+                className="loading-spinner"
+              >
+                <circle 
+                  cx="12" 
+                  cy="12" 
+                  r="10" 
+                  stroke="var(--primary)" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeDasharray="32" 
+                  strokeDashoffset="24" 
+                  fill="none"
+                  style={{ opacity: 1 }}
+                />
+              </svg>
+            ) : (
+              <svg 
+                width="44" 
+                height="44" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ display: 'block', width: '100%', height: '100%' }}
+              >
+                <circle cx="12" cy="12" r="11" fill="var(--primary)"/>
+                <path 
+                  d="M12 7L12 15M12 7L8 11M12 7L16 11" 
+                  stroke="white" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
           </button>
         </div>
       </form>
