@@ -40,6 +40,20 @@ export default function DashboardLayout() {
     // Scroll to top when route changes
     scrollToTop();
   }, [location.pathname]);
+
+  // Lock body scroll when sidebar is open
+  React.useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [menuOpen]);
   return (
     <div className={`dash-layout ${menuOpen ? "menu-open" : ""}`}>
       <header className="dash-header">

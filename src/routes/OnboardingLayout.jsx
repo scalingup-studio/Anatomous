@@ -21,6 +21,21 @@ const OnboardingLayout = () => {
   const initializedRef = useRef(false);
   const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
   const [bmiTooltipPosition, setBmiTooltipPosition] = useState({ x: 0, y: 0 });
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Lock body scroll when sidebar is open
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [menuOpen]);
 
   const [formData, setFormData] = useState({
     // User ID for API calls
@@ -679,7 +694,10 @@ const OnboardingLayout = () => {
       : false;
     
     if (stepIndex <= currentStep || completedSteps.has(stepIndex) || allPreviousCompleted) {
+      setMenuOpen(false);
       setCurrentStep(stepIndex);
+      // Scroll to top of page
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -907,35 +925,99 @@ const OnboardingLayout = () => {
               
               <div className="form-field">
                 <label>Height</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
                     type="number"
                     value={formData.height}
                     onChange={(e) => updateFormData('height', e.target.value)}
                     placeholder={formData.heightUnit === 'cm' ? 'e.g., 175' : 'e.g., 69'}
-                    style={{ }}
+                    style={{ flex: 1 }}
                   />
-                  <select
-                    value={formData.heightUnit}
-                    onChange={(e) => {
-                      const newUnit = e.target.value;
-                      // convert existing value
-                      const h = parseFloat(formData.height);
-                      if (!isNaN(h)) {
-                        if (formData.heightUnit === 'cm' && newUnit === 'in') {
-                          const inches = (h / 2.54).toFixed(1);
-                          updateFormData('height', inches);
-                        } else if (formData.heightUnit === 'in' && newUnit === 'cm') {
-                          const cm = (h * 2.54).toFixed(0);
-                          updateFormData('height', cm);
+                  <div style={{ 
+                    display: 'flex', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newUnit = 'cm';
+                        const h = parseFloat(formData.height);
+                        if (!isNaN(h)) {
+                          if (formData.heightUnit === 'in' && newUnit === 'cm') {
+                            const cm = (h * 2.54).toFixed(0);
+                            updateFormData('height', cm);
+                          }
                         }
-                      }
-                      updateFormData('heightUnit', newUnit);
-                    }}
-                  >
-                    <option value="cm">cm</option>
-                    <option value="in">in</option>
-                  </select>
+                        updateFormData('heightUnit', newUnit);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        border: 'none',
+                        backgroundColor: formData.heightUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                        color: formData.heightUnit === 'cm' ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                        borderRight: '1px solid var(--border)',
+                        minWidth: '44px',
+                        textAlign: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.heightUnit !== 'cm') {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.heightUnit !== 'cm') {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      cm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newUnit = 'in';
+                        const h = parseFloat(formData.height);
+                        if (!isNaN(h)) {
+                          if (formData.heightUnit === 'cm' && newUnit === 'in') {
+                            const inches = (h / 2.54).toFixed(1);
+                            updateFormData('height', inches);
+                          }
+                        }
+                        updateFormData('heightUnit', newUnit);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        border: 'none',
+                        backgroundColor: formData.heightUnit === 'in' ? 'var(--primary)' : 'transparent',
+                        color: formData.heightUnit === 'in' ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                        minWidth: '44px',
+                        textAlign: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.heightUnit !== 'in') {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.heightUnit !== 'in') {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      in
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -943,39 +1025,104 @@ const OnboardingLayout = () => {
               
               <div className="form-field">
                 <label>Weight</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
                     type="number"
                     value={formData.weight}
                     onChange={(e) => updateFormData('weight', e.target.value)}
                     placeholder={formData.weightUnit === 'kg' ? 'e.g., 70' : 'e.g., 154'}
-                    style={{  }}
+                    style={{ flex: 1 }}
                   />
-                  <select
-                    value={formData.weightUnit}
-                    onChange={(e) => {
-                      const newUnit = e.target.value;
-                      const w = parseFloat(formData.weight);
-                      if (!isNaN(w)) {
-                        if (formData.weightUnit === 'kg' && newUnit === 'lb') {
-                          const lb = (w * 2.20462).toFixed(1);
-                          updateFormData('weight', lb);
-                        } else if (formData.weightUnit === 'lb' && newUnit === 'kg') {
-                          const kg = (w / 2.20462).toFixed(1);
-                          updateFormData('weight', kg);
+                  <div style={{ 
+                    display: 'flex', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newUnit = 'kg';
+                        const w = parseFloat(formData.weight);
+                        if (!isNaN(w)) {
+                          if (formData.weightUnit === 'lb' && newUnit === 'kg') {
+                            const kg = (w / 2.20462).toFixed(1);
+                            updateFormData('weight', kg);
+                          }
                         }
-                      }
-                      updateFormData('weightUnit', newUnit);
-                    }}
-                  >
-                    <option value="kg">kg</option>
-                    <option value="lb">lb</option>
-                  </select>
+                        updateFormData('weightUnit', newUnit);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        border: 'none',
+                        backgroundColor: formData.weightUnit === 'kg' ? 'var(--primary)' : 'transparent',
+                        color: formData.weightUnit === 'kg' ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                        borderRight: '1px solid var(--border)',
+                        minWidth: '44px',
+                        textAlign: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.weightUnit !== 'kg') {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.weightUnit !== 'kg') {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      kg
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newUnit = 'lb';
+                        const w = parseFloat(formData.weight);
+                        if (!isNaN(w)) {
+                          if (formData.weightUnit === 'kg' && newUnit === 'lb') {
+                            const lb = (w * 2.20462).toFixed(1);
+                            updateFormData('weight', lb);
+                          }
+                        }
+                        updateFormData('weightUnit', newUnit);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        border: 'none',
+                        backgroundColor: formData.weightUnit === 'lb' ? 'var(--primary)' : 'transparent',
+                        color: formData.weightUnit === 'lb' ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                        minWidth: '44px',
+                        textAlign: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.weightUnit !== 'lb') {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.weightUnit !== 'lb') {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      lb
+                    </button>
+                  </div>
                 </div>
               </div>
                  {/* BMI auto-calculation */}
                  <div className="form-field">
-                <label>BMI</label>
+                <label>Body Mass Index (BMI)</label>
                 {(() => {
                   const h = parseFloat(formData.height);
                   const w = parseFloat(formData.weight);
@@ -1391,7 +1538,7 @@ const OnboardingLayout = () => {
           };
           
           return (
-            <div className="form-field" style={{ margin: 0 }}>
+            <div className="form-field multiselect-field" style={{ margin: 0 }}>
               <label style={{ 
                 display: 'block', 
                 marginBottom: '12px', 
@@ -1404,7 +1551,7 @@ const OnboardingLayout = () => {
               
               {/* Selected items as tags */}
               {selectedItems.length > 0 && (
-                <div style={{ 
+                <div className="multiselect-tags-container" style={{ 
                   display: 'flex', 
                   flexWrap: 'wrap', 
                   gap: '10px', 
@@ -1419,6 +1566,7 @@ const OnboardingLayout = () => {
                   {selectedItems.map((item, index) => (
                     <span
                       key={index}
+                      className="multiselect-tag"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -1480,20 +1628,21 @@ const OnboardingLayout = () => {
               )}
               
               {/* Input with dropdown */}
-              <div style={{ 
+              <div className="multiselect-input-container" style={{ 
                 display: 'flex', 
                 gap: '10px', 
                 alignItems: 'flex-start',
                 position: 'relative',
                 zIndex: showDropdown ? 99999 : 1
               }}>
-                <div style={{ 
+                <div className="multiselect-input-wrapper" style={{ 
                   position: 'relative', 
                   flex: 1,
                   zIndex: showDropdown ? 99999 : 1
                 }}>
                   <input
                     ref={inputRef}
+                    className="multiselect-input"
                     placeholder={placeholder}
                     value={inputValue}
                     onChange={handleInputChange}
@@ -1566,6 +1715,7 @@ const OnboardingLayout = () => {
                       {filteredOptions.map((option, idx) => (
                         <div
                           key={idx}
+                          className="multiselect-dropdown-item"
                           onClick={() => handleOptionClick(option)}
                           onMouseEnter={() => setHighlightedIndex(idx)}
                           onMouseLeave={() => setHighlightedIndex(-1)}
@@ -1573,10 +1723,10 @@ const OnboardingLayout = () => {
                             padding: '12px 16px',
                             cursor: 'pointer',
                             backgroundColor: highlightedIndex === idx 
-                              ? 'var(--primary)' 
+                              ? 'rgba(0, 186, 206, 0.1)' 
                               : 'transparent',
                             color: highlightedIndex === idx 
-                              ? '#fff' 
+                              ? 'var(--primary)' 
                               : 'var(--text)',
                             transition: 'all 0.15s ease',
                             borderBottom: idx < filteredOptions.length - 1 
@@ -1622,7 +1772,7 @@ const OnboardingLayout = () => {
                 {inputValue.trim() && !selectedItems.includes(inputValue.trim()) && (
                   <button
                     type="button"
-                    className="btn primary"
+                    className="btn primary multiselect-add-btn"
                     onClick={handleAddClick}
                     style={{
                       padding: '12px 24px',
@@ -1648,7 +1798,7 @@ const OnboardingLayout = () => {
               </div>
               
               {/* Helper text */}
-              <div style={{ 
+              <div className="multiselect-helper-text" style={{ 
                 marginTop: '8px', 
                 fontSize: '13px', 
                 color: 'var(--muted)',
@@ -1747,14 +1897,13 @@ const OnboardingLayout = () => {
           <div className="onboarding-step-content">
             <div style={{ marginBottom: '32px' }}>
               <h2 style={{ marginBottom: '8px', fontSize: '28px', fontWeight: 600 }}>Health Snapshot</h2>
-              <p className="step-description" style={{ fontSize: '15px', color: 'var(--muted)', lineHeight: '1.6' }}>
+              <p className="step-description health-snapshot-description" style={{ fontSize: '15px', color: 'var(--muted)', lineHeight: '1.6', whiteSpace: 'normal', wordWrap: 'break-word' }}>
                 Help us understand your current health status. You can add multiple items to each category.
               </p>
             </div>
             
             <div className="form-fields" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              <div style={{ 
-                padding: '24px', 
+              <div className="health-snapshot-card" style={{ 
                 backgroundColor: 'var(--card-bg, var(--background))',
                 border: '1px solid var(--border)',
                 borderRadius: '12px',
@@ -1769,8 +1918,7 @@ const OnboardingLayout = () => {
                 />
               </div>
               
-              <div style={{ 
-                padding: '24px', 
+              <div className="health-snapshot-card" style={{ 
                 backgroundColor: 'var(--card-bg, var(--background))',
                 border: '1px solid var(--border)',
                 borderRadius: '12px',
@@ -1785,8 +1933,7 @@ const OnboardingLayout = () => {
                 />
               </div>
               
-              <div style={{ 
-                padding: '24px', 
+              <div className="health-snapshot-card" style={{ 
                 backgroundColor: 'var(--card-bg, var(--background))',
                 border: '1px solid var(--border)',
                 borderRadius: '12px',
@@ -2076,7 +2223,7 @@ const OnboardingLayout = () => {
   };
 
   return (
-    <div className="onboarding-layout">
+    <div className={`onboarding-layout ${menuOpen ? "menu-open" : ""}`}>
       {/* Header */}
       <header className="onboarding-header">
         <div className="header-left">
@@ -2096,17 +2243,63 @@ const OnboardingLayout = () => {
         </div>
         
         <div className="header-right">
-          <button className="btn ghost small" onClick={finishLater}>
-            Finish Later
-          </button>
-          <button className="btn ghost small" onClick={() => window.open('https://crisp.chat', '_blank')}>
-            Help
-          </button>
-          <button className="btn ghost small" onClick={() => navigate('/logout')}>
-            Log Out
+          <div className="header-right-buttons">
+            <button className="btn ghost small" onClick={finishLater}>
+              Finish Later
+            </button>
+            <button className="btn ghost small" onClick={() => window.open('https://crisp.chat', '_blank')}>
+              Help
+            </button>
+            <button className="btn ghost small" onClick={() => navigate('/logout')}>
+              Log Out
+            </button>
+          </div>
+          <button 
+            className={`onboarding-hamburger ${menuOpen ? 'open' : ''}`} 
+            aria-label="Open menu" 
+            aria-expanded={menuOpen} 
+            onClick={() => setMenuOpen(v => !v)}
+          >
+            <span />
+            <span />
+            <span />
           </button>
         </div>
       </header>
+
+      {/* Mobile Sidebar */}
+      <aside className={`onboarding-mobile-sidebar ${menuOpen ? 'open' : ''}`}>
+        <div className="mobile-sidebar-content">
+          <button 
+            className="mobile-sidebar-item" 
+            onClick={() => {
+              finishLater();
+              setMenuOpen(false);
+            }}
+          >
+            Finish Later
+          </button>
+          <button 
+            className="mobile-sidebar-item" 
+            onClick={() => {
+              window.open('https://crisp.chat', '_blank');
+              setMenuOpen(false);
+            }}
+          >
+            Help
+          </button>
+          <button 
+            className="mobile-sidebar-item" 
+            onClick={() => {
+              navigate('/logout');
+              setMenuOpen(false);
+            }}
+          >
+            Log Out
+          </button>
+        </div>
+      </aside>
+      {menuOpen && <div className="onboarding-backdrop" onClick={() => setMenuOpen(false)} />}
 
       {/* Main Content */}
       <div className="onboarding-content">

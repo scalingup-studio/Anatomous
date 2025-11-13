@@ -1887,7 +1887,8 @@ const calculateAgeFromDOB = (dob) => {
           .dashboard-profile .card {
             flex-direction: column !important;
             align-items: flex-start !important;
-            gap: 16px !important;
+            gap: 12px !important;
+            padding: 12px !important;
           }
           .dashboard-profile .card > div:first-child {
            
@@ -1897,7 +1898,7 @@ const calculateAgeFromDOB = (dob) => {
             flex-direction: column !important;
             width: 100% !important;
             max-width: 100% !important;
-            gap: 12px !important;
+            gap: 10px !important;
           }
           .dashboard-profile .card .form .form-field {
             width: 100% !important;
@@ -1913,8 +1914,8 @@ const calculateAgeFromDOB = (dob) => {
         }
         @media (max-width: 480px) {
           .dashboard-profile .card {
-            padding: 16px !important;
-            gap: 12px !important;
+            padding: 10px !important;
+            gap: 10px !important;
           }
         
         }
@@ -1962,38 +1963,124 @@ const calculateAgeFromDOB = (dob) => {
           }
           .health-card-header,
           .health-card-content {
-            padding: 12px !important;
+            padding: 10px !important;
+          }
+          .health-card-header h2 {
+            font-size: 18px !important;
+          }
+          .health-card-header p {
+            font-size: 13px !important;
           }
           .health-data-management-card {
             margin-bottom: 16px !important;
-            padding: 12px !important;
+            padding: 10px !important;
           }
           .health-data-management-header {
             flex-direction: column !important;
             align-items: flex-start !important;
-            gap: 12px !important;
+            gap: 10px !important;
           }
           .health-data-management-card button.btn {
             width: 100% !important;
+          }
+          .health-data-management-card h3 {
+            font-size: 15px !important;
+          }
+          .health-data-management-card p {
+            font-size: 13px !important;
+          }
+          .health-section-title {
+            font-size: 15px !important;
+          }
+          .health-section-description {
+            font-size: 12px !important;
+          }
+          .health-item-text {
+            font-size: 13px !important;
+          }
+          .health-item-date {
+            font-size: 11px !important;
+          }
+          .health-section-button {
+            padding: 12px !important;
+          }
+          .health-section-content {
+            padding: 12px 0 !important;
+            margin-left: 12px !important;
+          }
+          .health-item-card {
+            padding: 10px 12px !important;
+          }
+          .health-history-card > div[style*="padding:16"] {
+            padding: 10px !important;
+          }
+          .add-history-modal-header {
+            padding: 12px 16px !important;
+          }
+          .add-history-modal-body {
+            padding: 16px !important;
+          }
+          .add-history-modal-overlay {
+            padding: 10px !important;
           }
         }
         @media (max-width: 480px) {
           .health-card-header,
           .health-card-content {
-            padding: 10px !important;
+            padding: 8px !important;
+          }
+          .health-history-card > div[style*="padding:16"] {
+            padding: 8px !important;
+          }
+          .add-history-modal-header {
+            padding: 10px 12px !important;
+          }
+          .add-history-modal-body {
+            padding: 12px !important;
+          }
+          .add-history-modal-overlay {
+            padding: 5px !important;
           }
           .health-data-management-card {
-            padding: 10px !important;
+            padding: 8px !important;
             margin-bottom: 12px !important;
           }
           .health-history-card h2,
           .health-data-card h2 {
-            font-size: 18px !important;
+            font-size: 16px !important;
+          }
+          .health-card-header p {
+            font-size: 12px !important;
           }
           .health-history-card h3,
           .health-data-card h3,
           .health-data-management-card h3 {
-            font-size: 16px !important;
+            font-size: 14px !important;
+          }
+          .health-data-management-card p {
+            font-size: 12px !important;
+          }
+          .health-section-title {
+            font-size: 14px !important;
+          }
+          .health-section-description {
+            font-size: 11px !important;
+          }
+          .health-item-text {
+            font-size: 12px !important;
+          }
+          .health-item-date {
+            font-size: 10px !important;
+          }
+          .health-section-button {
+            padding: 10px !important;
+          }
+          .health-section-content {
+            padding: 10px 0 !important;
+            margin-left: 8px !important;
+          }
+          .health-item-card {
+            padding: 8px 10px !important;
           }
         }
       `}</style>
@@ -2124,52 +2211,188 @@ const calculateAgeFromDOB = (dob) => {
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6  }}>
                   <span>Height</span>
-                  <div style={{ display:'flex', gap:8 }}>
-                    <input type="number" inputMode="numeric" name="height_cm" value={formValues.height_cm} onChange={handleChange} placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 69'} style={{ }} />
-                    <select value={heightUnit} onChange={(e)=>{
-                      const newUnit = e.target.value;
+                  <div style={{ display:'flex', gap:8, alignItems: 'center' }}>
+                    <input type="number" inputMode="numeric" name="height_cm" value={formValues.height_cm} onChange={handleChange} placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 69'} style={{ flex: 1 }} />
+                    <div style={{ 
+                      display: 'flex', 
+                      border: '1px solid var(--border)', 
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newUnit = 'cm';
+                          const h = parseFloat(formValues.height_cm);
+                          if (!isNaN(h) && h > 0) {
+                            let newValue = h;
+                            if (heightUnit === 'in' && newUnit === 'cm') {
+                              newValue = parseFloat((h * 2.54).toFixed(1));
+                            }
+                            setFormValues(prev => ({ ...prev, height_cm: newValue.toString() }));
+                          }
+                          setHeightUnit(newUnit);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          border: 'none',
+                          backgroundColor: heightUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                          color: heightUnit === 'cm' ? '#fff' : 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s ease',
+                          borderRight: '1px solid var(--border)',
+                          minWidth: '44px',
+                          textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (heightUnit !== 'cm') {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (heightUnit !== 'cm') {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        cm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newUnit = 'in';
                       const h = parseFloat(formValues.height_cm);
                       if (!isNaN(h) && h > 0) {
                         let newValue = h;
                         if (heightUnit === 'cm' && newUnit === 'in') {
-                          // convert cm -> inches
                           newValue = parseFloat((h / 2.54).toFixed(1));
-                        } else if (heightUnit === 'in' && newUnit === 'cm') {
-                          // convert inches -> cm
-                          newValue = parseFloat((h * 2.54).toFixed(1));
                         }
                         setFormValues(prev => ({ ...prev, height_cm: newValue.toString() }));
                       }
                       setHeightUnit(newUnit);
-                    }}>
-                      <option value="cm">cm</option>
-                      <option value="in">in</option>
-                    </select>
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          border: 'none',
+                          backgroundColor: heightUnit === 'in' ? 'var(--primary)' : 'transparent',
+                          color: heightUnit === 'in' ? '#fff' : 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s ease',
+                          minWidth: '44px',
+                          textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (heightUnit !== 'in') {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (heightUnit !== 'in') {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        in
+                      </button>
+                    </div>
                   </div>
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Weight</span>
-                  <div style={{ display:'flex', gap:8 }}>
-                    <input type="number" inputMode="numeric" name="weight_kg" value={formValues.weight_kg} onChange={handleChange} placeholder={weightUnit === 'kg' ? 'e.g. 70' : 'e.g. 154'} style={{ }} />
-                    <select value={weightUnit} onChange={(e)=>{
-                      const newUnit = e.target.value;
+                  <div style={{ display:'flex', gap:8, alignItems: 'center' }}>
+                    <input type="number" inputMode="numeric" name="weight_kg" value={formValues.weight_kg} onChange={handleChange} placeholder={weightUnit === 'kg' ? 'e.g. 70' : 'e.g. 154'} style={{ flex: 1 }} />
+                    <div style={{ 
+                      display: 'flex', 
+                      border: '1px solid var(--border)', 
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newUnit = 'kg';
+                          const w = parseFloat(formValues.weight_kg);
+                          if (!isNaN(w) && w > 0) {
+                            let newValue = w;
+                            if (weightUnit === 'lb' && newUnit === 'kg') {
+                              newValue = parseFloat((w / 2.20462).toFixed(1));
+                            }
+                            setFormValues(prev => ({ ...prev, weight_kg: newValue.toString() }));
+                          }
+                          setWeightUnit(newUnit);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          border: 'none',
+                          backgroundColor: weightUnit === 'kg' ? 'var(--primary)' : 'transparent',
+                          color: weightUnit === 'kg' ? '#fff' : 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s ease',
+                          borderRight: '1px solid var(--border)',
+                          minWidth: '44px',
+                          textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (weightUnit !== 'kg') {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (weightUnit !== 'kg') {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        kg
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newUnit = 'lb';
                       const w = parseFloat(formValues.weight_kg);
                       if (!isNaN(w) && w > 0) {
                         let newValue = w;
                         if (weightUnit === 'kg' && newUnit === 'lb') {
-                          // convert kg -> pounds
                           newValue = parseFloat((w * 2.20462).toFixed(1));
-                        } else if (weightUnit === 'lb' && newUnit === 'kg') {
-                          // convert pounds -> kg
-                          newValue = parseFloat((w / 2.20462).toFixed(1));
                         }
                         setFormValues(prev => ({ ...prev, weight_kg: newValue.toString() }));
                       }
                       setWeightUnit(newUnit);
-                    }}>
-                      <option value="kg">kg</option>
-                      <option value="lb">lb</option>
-                    </select>
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          border: 'none',
+                          backgroundColor: weightUnit === 'lb' ? 'var(--primary)' : 'transparent',
+                          color: weightUnit === 'lb' ? '#fff' : 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s ease',
+                          minWidth: '44px',
+                          textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (weightUnit !== 'lb') {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (weightUnit !== 'lb') {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        lb
+                      </button>
+                    </div>
                   </div>
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
@@ -2568,6 +2791,7 @@ const calculateAgeFromDOB = (dob) => {
       {/* Add Health History Modal */}
       {isAddHistoryModalOpen && (
         <div 
+          className="add-history-modal-overlay"
           style={{
             position: 'fixed',
             top: 0,
@@ -2596,7 +2820,7 @@ const calculateAgeFromDOB = (dob) => {
             display: 'flex',
             flexDirection: 'column'
           }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <div className="add-history-modal-header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
                 {editingHistoryItem ? (
                   addHistorySectionKey === 'medical_conditions' ? 'Edit Medical Condition' : `Edit ${addHistorySectionKey?.replace('_',' ').replace(/\b\w/g, l => l.toUpperCase())}`
@@ -2606,7 +2830,7 @@ const calculateAgeFromDOB = (dob) => {
               </h3>
               <button className="btn outline" onClick={() => setIsAddHistoryModalOpen(false)} style={{ padding: '6px 10px', fontSize: '16px' }}>✕</button>
             </div>
-            <div style={{ padding: 20, overflowY: 'auto' }}>
+            <div className="add-history-modal-body" style={{ padding: 20, overflowY: 'auto' }}>
               <form 
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -3126,6 +3350,42 @@ const calculateAgeFromDOB = (dob) => {
 
               {/* Health Data Modal */}
               {isHealthDataModalOpen && (
+                <>
+                  <style>{`
+                    /* Mobile responsive styles for Health Data Modal */
+                    @media (max-width: 768px) {
+                      .health-data-form-grid {
+                        grid-template-columns: 1fr !important;
+                        gap: 12px !important;
+                      }
+                      .health-data-modal-content {
+                        max-width: 100% !important;
+                        margin: 10px !important;
+                        max-height: 95vh !important;
+                      }
+                      .health-data-modal-header {
+                        padding: 12px !important;
+                      }
+                      .health-data-modal-body {
+                        padding: 12px !important;
+                      }
+                    }
+                    @media (max-width: 480px) {
+                      .health-data-form-grid {
+                        gap: 10px !important;
+                      }
+                      .health-data-modal-content {
+                        margin: 5px !important;
+                        border-radius: 8px !important;
+                      }
+                      .health-data-modal-header {
+                        padding: 10px !important;
+                      }
+                      .health-data-modal-body {
+                        padding: 10px !important;
+                      }
+                    }
+                  `}</style>
                 <div 
                   style={{
                     position: 'fixed',
@@ -3150,7 +3410,7 @@ const calculateAgeFromDOB = (dob) => {
                     }
                   }}
                 >
-                  <div style={{
+                  <div className="health-data-modal-content" style={{
                     backgroundColor: 'var(--bg)',
                     border: '1px solid var(--border)',
                     borderRadius: '12px',
@@ -3161,7 +3421,7 @@ const calculateAgeFromDOB = (dob) => {
                     flexDirection: 'column'
                   }}>
                     {/* Fixed Header */}
-                    <div style={{ 
+                    <div className="health-data-modal-header" style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between', 
                       alignItems: 'center', 
@@ -3189,7 +3449,7 @@ const calculateAgeFromDOB = (dob) => {
                     </div>
                     
                     {/* Scrollable Content */}
-                    <div style={{ 
+                    <div className="health-data-modal-body" style={{ 
                       padding: '24px',
                       overflowY: 'auto',
                       flex: 1
@@ -3197,7 +3457,7 @@ const calculateAgeFromDOB = (dob) => {
                       <form onSubmit={(e) => { e.preventDefault(); handleSaveHealthData(); }} className="form" style={{ maxWidth: '100%' }}>
   
                         {/* Two Column Layout */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start' }}>
+                        <div className="health-data-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start' }}>
                           
                           {/* Left Column - Grouped by Related Fields */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -3288,9 +3548,11 @@ const calculateAgeFromDOB = (dob) => {
                               color: temperatureUnit === 'C' ? '#fff' : 'var(--text)',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              fontWeight: temperatureUnit === 'C' ? 600 : 400,
+                              fontWeight: 500,
                               transition: 'all 0.2s ease',
-                              borderRight: '1px solid var(--border)'
+                              borderRight: '1px solid var(--border)',
+                              minWidth: '44px',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               if (temperatureUnit !== 'C') {
@@ -3315,8 +3577,10 @@ const calculateAgeFromDOB = (dob) => {
                               color: temperatureUnit === 'F' ? '#fff' : 'var(--text)',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              fontWeight: temperatureUnit === 'F' ? 600 : 400,
-                              transition: 'all 0.2s ease'
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              minWidth: '44px',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               if (temperatureUnit !== 'F') {
@@ -3403,9 +3667,11 @@ const calculateAgeFromDOB = (dob) => {
                               color: healthDataWeightUnit === 'kg' ? '#fff' : 'var(--text)',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              fontWeight: healthDataWeightUnit === 'kg' ? 600 : 400,
+                              fontWeight: 500,
                               transition: 'all 0.2s ease',
-                              borderRight: '1px solid var(--border)'
+                              borderRight: '1px solid var(--border)',
+                              minWidth: '44px',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               if (healthDataWeightUnit !== 'kg') {
@@ -3430,8 +3696,10 @@ const calculateAgeFromDOB = (dob) => {
                               color: healthDataWeightUnit === 'lb' ? '#fff' : 'var(--text)',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              fontWeight: healthDataWeightUnit === 'lb' ? 600 : 400,
-                              transition: 'all 0.2s ease'
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              minWidth: '44px',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               if (healthDataWeightUnit !== 'lb') {
@@ -3501,9 +3769,11 @@ const calculateAgeFromDOB = (dob) => {
                               color: waistUnit === 'cm' ? '#fff' : 'var(--text)',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              fontWeight: waistUnit === 'cm' ? 600 : 400,
+                              fontWeight: 500,
                               transition: 'all 0.2s ease',
-                              borderRight: '1px solid var(--border)'
+                              borderRight: '1px solid var(--border)',
+                              minWidth: '44px',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               if (waistUnit !== 'cm') {
@@ -3528,8 +3798,10 @@ const calculateAgeFromDOB = (dob) => {
                               color: waistUnit === 'in' ? '#fff' : 'var(--text)',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              fontWeight: waistUnit === 'in' ? 600 : 400,
-                              transition: 'all 0.2s ease'
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              minWidth: '44px',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               if (waistUnit !== 'in') {
@@ -3721,6 +3993,7 @@ const calculateAgeFromDOB = (dob) => {
                     </div>
                   </div>
                 </div>
+                </>
               )}
 
               {/* Health Data Records */}
@@ -4211,7 +4484,7 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
     }}>
       <button 
         onClick={() => setOpen(v => !v)} 
-        className="btn ghost"
+        className="btn ghost health-section-button"
         style={{ 
           width: '100%', 
           height: '100%', 
@@ -4223,11 +4496,11 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
       >
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <span style={{ fontWeight: 600, fontSize: '16px', color: 'var(--text)' }}>{title}</span>
+            <span className="health-section-title" style={{ fontWeight: 600, fontSize: '16px', color: 'var(--text)' }}>{title}</span>
     
           </div>
           {description && (
-            <p style={{ 
+            <p className="health-section-description" style={{ 
               color: 'var(--muted)', 
               fontSize: '13px', 
               margin: '0 0 0 0',
@@ -4250,7 +4523,7 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
       </button>
       
       {open && (
-        <div style={{ 
+        <div className="health-section-content" style={{ 
           padding: '16px 0 16px 0',
         
           marginLeft: '20px',
@@ -4266,7 +4539,7 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
             alignItems: 'center'
           }}>
             {values.length === 0 ? (
-              <p style={{ 
+              <p className="health-section-description" style={{ 
                 color: 'var(--muted)', 
                 fontSize: '14px', 
                 fontStyle: 'italic',
@@ -4305,7 +4578,7 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
                   const isLightTheme = document.documentElement.classList.contains('light-theme');
 
                   return (
-                    <div key={uniqueKey} style={{
+                    <div key={uniqueKey} className="health-item-card" style={{
                       backgroundColor: isLightTheme ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17, 17, 17, 0.6)',
                       border: '1px solid var(--border)',
                       borderLeft: '2px solid var(--primary)',
@@ -4329,13 +4602,13 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontWeight: 600, color: 'var(--text)' }}>{displayName}</span>
+                          <span className="health-item-text" style={{ fontWeight: 600, color: 'var(--text)' }}>{displayName}</span>
                           {severity && (
-                            <span style={{ fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px' }}>{severity}</span>
+                            <span className="health-item-date" style={{ fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 6px' }}>{severity}</span>
                           )}
                         </div>
                         {infoParts.length > 0 && (
-                          <div style={{ 
+                          <div className="health-item-date" style={{ 
                             fontSize: 13, 
                             color: isLightTheme ? '#4b5563' : 'var(--muted)',
                             lineHeight: 1.5

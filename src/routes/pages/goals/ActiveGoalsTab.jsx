@@ -99,6 +99,7 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [targetDate, setTargetDate] = React.useState("");
+  const [noTargetDate, setNoTargetDate] = React.useState(false);
   const [status, setStatus] = React.useState("on track");
   const [type, setType] = React.useState("");
   const [visibility, setVisibility] = React.useState("private");
@@ -108,7 +109,10 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
     if (!goal) return;
     setTitle(goal.title || "");
     setDescription(goal.description || "");
-    setTargetDate(goal.target_date || "");
+    // Check if no_target_date is true, or if target_date is missing/empty
+    const noTargetDateValue = goal.no_target_date === true || (!goal.target_date || goal.target_date.trim() === "");
+    setNoTargetDate(noTargetDateValue);
+    setTargetDate(noTargetDateValue ? "" : (goal.target_date || ""));
     setStatus(goal.status || "on track");
     setType(goal.type || "");
     setVisibility(goal.visibility_scope || "private");
@@ -155,7 +159,27 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
         <div className="form-row" style={{ width: "100%" }}>
           <div className="form-field" style={{ flex: 1 }}>
             <label>Target date</label>
-            <DatePicker value={targetDate} onChange={(val) => setTargetDate(val)} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <DatePicker 
+                value={targetDate} 
+                onChange={(val) => setTargetDate(val)} 
+                disabled={noTargetDate}
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={noTargetDate}
+                  onChange={(e) => {
+                    setNoTargetDate(e.target.checked);
+                    if (e.target.checked) {
+                      setTargetDate("");
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                <span style={{ color: 'var(--muted)' }}>No target date (ongoing goal)</span>
+              </label>
+            </div>
           </div>
           <div className="form-field" style={{ width: 180 }}>
             <label>Status</label>
@@ -170,7 +194,13 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
         <div className="form-row" style={{ width: "100%" }}>
           <div className="form-field" style={{ flex: 1 }}>
             <label>Type</label>
-            <input value={type} onChange={(e) => setType(e.target.value)} placeholder="fitness / diet / habit" />
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="">Select Type</option>
+              <option value="Fitness">Fitness</option>
+              <option value="Nutrition">Nutrition</option>
+              <option value="Habit / Routine">Habit / Routine</option>
+              <option value="Wellness / General Health">Wellness / General Health</option>
+            </select>
           </div>
           <div className="form-field" style={{ width: 180 }}>
             <label>Visibility</label>
@@ -195,14 +225,17 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
                 showNotification("Description cannot exceed 500 characters", "error");
                 return;
               }
-              onSave({
+              const payload = {
                 title,
                 description,
                 status,
-                target_date: targetDate || undefined,
+                target_date: noTargetDate ? undefined : (targetDate || undefined),
+                no_target_date: noTargetDate,
                 type,
                 visibility_scope: visibility,
-              });
+              };
+              console.log('Update Goal - Request payload:', payload);
+              onSave(payload);
             }}
             style={{ flex: 1, minWidth: '120px' }}
           >
@@ -218,6 +251,7 @@ function AddGoalForm({ onCreate, loading }) {
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [targetDate, setTargetDate] = React.useState("");
+  const [noTargetDate, setNoTargetDate] = React.useState(false);
   const [type, setType] = React.useState("");
   const [visibility, setVisibility] = React.useState("private");
   const { showNotification } = useNotifications();
@@ -237,7 +271,7 @@ function AddGoalForm({ onCreate, loading }) {
             }
           }}
           maxLength={200}
-          placeholder="e.g. Run 5km (max 200 characters)"
+          placeholder="e.g. Run 5km"
         />
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
           {title.length}/200
@@ -254,21 +288,47 @@ function AddGoalForm({ onCreate, loading }) {
             }
           }}
           maxLength={500}
-          placeholder="Details (max 500 characters)"
+          placeholder="Walk 8,000 steps daily or Strength train 3x/week."
           rows={4}
         />
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
           {description.length}/500
         </div>
       </div>
-      <div className="form-row">
+      <div className="form-row" style={{ alignItems: 'flex-start' }}>
         <div className="form-field" style={{ flex: 1 }}>
           <label>Target date</label>
-          <DatePicker value={targetDate} onChange={(val) => setTargetDate(val)} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <DatePicker 
+              value={targetDate} 
+              onChange={(val) => setTargetDate(val)} 
+              disabled={noTargetDate}
+            />
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={noTargetDate}
+                onChange={(e) => {
+                  setNoTargetDate(e.target.checked);
+                  if (e.target.checked) {
+                    setTargetDate("");
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+              />
+              <span style={{ color: 'var(--muted)' }}>No target date (ongoing goal)</span>
+            </label>
+          </div>
         </div>
         <div className="form-field" style={{ flex: 1 }}>
           <label>Type</label>
-          <input value={type} onChange={(e) => setType(e.target.value)} placeholder="fitness / diet / habit" />
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="">Select Type</option>
+            <option value="Fitness">Fitness</option>
+            <option value="Nutrition">Nutrition</option>
+            <option value="Habit / Routine">Habit / Routine</option>
+            <option value="Wellness / General Health">Wellness / General Health</option>
+          </select>
         </div>
         <div className="form-field" style={{ width: 160 }}>
           <label>Visibility</label>
@@ -290,18 +350,22 @@ function AddGoalForm({ onCreate, loading }) {
             showNotification("Description cannot exceed 500 characters", "error");
             return;
           }
-          const ok = await onCreate({
+          const payload = {
             title,
             description,
             status: "on track",
-            target_date: targetDate || undefined,
+            target_date: noTargetDate ? undefined : (targetDate || undefined),
+            no_target_date: noTargetDate,
             type,
             visibility_scope: visibility,
-          });
+          };
+          console.log('Create Goal - Request payload:', payload);
+          const ok = await onCreate(payload);
           if (ok) {
             setTitle("");
             setDescription("");
             setTargetDate("");
+            setNoTargetDate(false);
             setType("");
             setVisibility("private");
           }

@@ -36,7 +36,10 @@ export function useGoals() {
     try {
       setLoading(true);
       const id = goal.id || goal.goals_id || goal.goal_id;
-      await GoalsApi.updateGoal(id, { ...patch, goals_id: id });
+      const payload = { ...patch, goals_id: id };
+      console.log('Update Goal Status - Request payload:', payload);
+      console.log('Update Goal Status - Endpoint: PATCH /goals/' + id);
+      await GoalsApi.updateGoal(id, payload);
       addNotification("Goal updated", "success");
       load();
     } catch (e) { addNotification(e.message, "error"); } finally { setLoading(false); }
@@ -63,7 +66,10 @@ export function useGoals() {
     try {
       setLoading(true);
       const id = goal.id || goal.goals_id || goal.goal_id;
-      await GoalsApi.updateGoal(id, { ...payload, goals_id: id });
+      const fullPayload = { ...payload, goals_id: id };
+      console.log('Update Goal Edit - Request payload:', fullPayload);
+      console.log('Update Goal Edit - Endpoint: PATCH /goals/' + id);
+      await GoalsApi.updateGoal(id, fullPayload);
       addNotification("Goal updated", "success");
       closeEdit();
       load();
