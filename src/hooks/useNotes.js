@@ -13,6 +13,7 @@ export function useNotes() {
   const [mood, setMood] = React.useState("");
   const [selectedNote, setSelectedNote] = React.useState(null);
   const [confirmNoteDelete, setConfirmNoteDelete] = React.useState(false);
+  const [noteToDelete, setNoteToDelete] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
 
   const load = React.useCallback(async () => {
@@ -43,11 +44,9 @@ export function useNotes() {
     } catch (e) { addNotification(e.message, "error"); } finally { setLoading(false); }
   };
 
-  const openNote = async (n) => {
-    try {
-      const res = await NotesApi.getById(n.id);
-      setSelectedNote(res?.result || res || n);
-    } catch (e) { addNotification(e.message, "error"); }
+  const openNote = (n) => {
+    // Simply set the selected note with existing data - no API call needed
+    setSelectedNote(n);
   };
 
   const saveNote = async () => {
@@ -62,12 +61,14 @@ export function useNotes() {
   };
 
   const deleteNote = async () => {
-    if (!selectedNote) return;
+    const note = noteToDelete || selectedNote;
+    if (!note) return;
     try {
       setLoading(true);
-      await NotesApi.delete(selectedNote.id, { user_id: user?.id });
+      await NotesApi.delete(note.id, { user_id: user?.id });
       addNotification("Note deleted", "success");
       setSelectedNote(null);
+      setNoteToDelete(null);
       setConfirmNoteDelete(false);
       load();
     } catch (e) { addNotification(e.message, "error"); } finally { setLoading(false); }
@@ -92,6 +93,7 @@ export function useNotes() {
     mood, setMood,
     selectedNote, setSelectedNote,
     confirmNoteDelete, setConfirmNoteDelete,
+    noteToDelete, setNoteToDelete,
     loading,
     // actions
     load,

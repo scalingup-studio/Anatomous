@@ -13,6 +13,7 @@ export default function NotesPage() {
     mood, setMood,
     selectedNote, setSelectedNote,
     confirmNoteDelete, setConfirmNoteDelete,
+    noteToDelete, setNoteToDelete,
     loading,
     add, openNote, saveNote, deleteNote,
     formatDisplayDate,
@@ -156,7 +157,7 @@ export default function NotesPage() {
                       className="icon-button error"
                       title="Delete note"
                       aria-label="Delete note"
-                      onClick={(e) => { e.stopPropagation(); setSelectedNote(n); setConfirmNoteDelete(true); }}
+                      onClick={(e) => { e.stopPropagation(); setNoteToDelete(n); setConfirmNoteDelete(true); }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: .9 }}>
                         <polyline points="3 6 5 6 21 6"></polyline>
@@ -241,7 +242,10 @@ export default function NotesPage() {
 
         <ConfirmDeleteModal
           isOpen={confirmNoteDelete}
-          onClose={() => setConfirmNoteDelete(false)}
+          onClose={() => {
+            setConfirmNoteDelete(false);
+            setNoteToDelete(null);
+          }}
           onConfirm={deleteNote}
           title="Delete note"
           message="This action cannot be undone. Are you sure?"
