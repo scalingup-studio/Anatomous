@@ -60,6 +60,7 @@ export default function DashboardLayout() {
           <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/profile" onClick={scrollToTop}>Profile</NavLink>
           <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/insights" onClick={scrollToTop}>Insights</NavLink>
           <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/goals" onClick={scrollToTop}>Goals</NavLink>
+          <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/notes" onClick={scrollToTop}>Notes</NavLink>
           {/* Hidden per request: Workouts & Nutrition */}
           <NavLink className={({ isActive }) => `dash-link ${isActive ? "active" : ""}`} to="/dashboard/reports" onClick={scrollToTop}>Reports</NavLink>
         </div>

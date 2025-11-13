@@ -113,6 +113,7 @@ function PrivacyTab({ onSaved, onAction }){
   const [aiHealthData, setAiHealthData] = React.useState(true);
   const [aiMedicalRecords, setAiMedicalRecords] = React.useState(true);
   const [aiNotes, setAiNotes] = React.useState(true);
+  const [aiGoals, setAiGoals] = React.useState(true);
 
   return (
     <div style={{ display:'grid', gap:16 }}>
@@ -162,7 +163,7 @@ function PrivacyTab({ onSaved, onAction }){
       <div className="card" style={{ maxWidth: 720 }}>
         <h3 style={{ marginTop:0 }}>AI Processing Preferences</h3>
         <p style={{ marginTop:4, marginBottom:16, color:'var(--muted)', fontSize:12, lineHeight:1.5 }}>
-          Data processing preferences determine which types of information may be used by the AI engine to generate insights.
+        Data processing preferences determine which types of information may be used by the AI engine to generate insights. Your preferences control what the AI can analyze. Disabling an item may limit the depth or personalization of insights.
         </p>
         <div style={{ display:'grid', gap:12 }}>
           <label className="checkbox">
@@ -171,7 +172,7 @@ function PrivacyTab({ onSaved, onAction }){
               checked={aiHealthHistory} 
               onChange={(e)=>setAiHealthHistory(e.target.checked)} 
             /> 
-            <span>Health history information</span>
+            <span>Health history (conditions, medications, allergies)</span>
           </label>
           <label className="checkbox">
             <input 
@@ -179,7 +180,7 @@ function PrivacyTab({ onSaved, onAction }){
               checked={aiHealthData} 
               onChange={(e)=>setAiHealthData(e.target.checked)} 
             /> 
-            <span>Health data (metrics, e.g., last 7 days)</span>
+            <span>Health data & vital metrics (e.g., heart rate, sleep, activity)</span>
           </label>
           <label className="checkbox">
             <input 
@@ -187,7 +188,7 @@ function PrivacyTab({ onSaved, onAction }){
               checked={aiMedicalRecords} 
               onChange={(e)=>setAiMedicalRecords(e.target.checked)} 
             /> 
-            <span>Medical record uploads (de-identified)</span>
+            <span>Medical record uploads (de-identified before processing)</span>
           </label>
           <label className="checkbox">
             <input 
@@ -195,7 +196,15 @@ function PrivacyTab({ onSaved, onAction }){
               checked={aiNotes} 
               onChange={(e)=>setAiNotes(e.target.checked)} 
             /> 
-            <span>Notes/journal entries</span>
+            <span>Notes & journal entries</span>
+          </label>
+          <label className="checkbox">
+            <input 
+              type="checkbox" 
+              checked={aiGoals} 
+              onChange={(e)=>setAiGoals(e.target.checked)} 
+            /> 
+            <span>Goals & progress entries</span>
           </label>
         </div>
         <button className="btn primary" style={{ width:180 , marginTop:16 }} onClick={()=>onSaved && onSaved()}>Save preferences</button>

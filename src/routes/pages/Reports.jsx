@@ -449,7 +449,7 @@ function ShareWithProviderTab() {
             value={title}
             onChange={(e)=>setTitle(e.target.value)}
             placeholder="Full Health Summary"
-            style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+            style={{ width: "100%", padding: "8px 12px", background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
           />
         </div>
         
@@ -535,7 +535,7 @@ function ShareWithProviderTab() {
                 value={recipientEmail}
                 onChange={(e)=>setRecipientEmail(e.target.value)}
                 placeholder="recipient@example.com"
-                style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+                style={{ width: "100%", padding: "8px 12px", background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
               />
             </div>
             <div>
@@ -545,7 +545,7 @@ function ShareWithProviderTab() {
                 value={subject}
                 onChange={(e)=>setSubject(e.target.value)}
                 placeholder="Subject (optional)"
-                style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+                style={{ width: "100%", padding: "8px 12px", background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
               />
             </div>
             <div>
@@ -555,7 +555,7 @@ function ShareWithProviderTab() {
                 onChange={(e)=>setCustomMessage(e.target.value)}
                 placeholder="Custom message (optional)"
                 rows={3}
-                style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, resize: "vertical" }}
+                style={{ width: "100%", padding: "8px 12px", background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, resize: "vertical" }}
               />
             </div>
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: 'var(--muted)' }}>
@@ -605,6 +605,7 @@ function ShareWithProviderTab() {
 
 function ExportSettingsTab() {
   const { user } = useAuth();
+  const { isLight } = useTheme();
   const [layout, setLayout] = React.useState("detailed");
   const [dateRange, setDateRange] = React.useState("all"); // 'all' | '30'
   const [sections, setSections] = React.useState({ insights: false, vitals: true, labs: true, goals: true });
@@ -667,7 +668,7 @@ function ExportSettingsTab() {
             value={title}
             onChange={(e)=>setTitle(e.target.value)}
             placeholder="Full Health Summary"
-            style={{ width: "100%", padding: "8px 12px", background: "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
+            style={{ width: "100%", padding: "8px 12px", background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13 }}
           />
         </div>
 

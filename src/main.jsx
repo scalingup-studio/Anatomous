@@ -14,6 +14,7 @@ import DashboardInsights from "./routes/pages/Insights.jsx";
 import DashboardWorkouts from "./routes/pages/Workouts.jsx";
 import DashboardNutrition from "./routes/pages/Nutrition.jsx";
 import DashboardGoals from "./routes/pages/Goals.jsx";
+import DashboardNotes from "./routes/pages/Notes.jsx";
 import DashboardProfile from "./routes/pages/Profile.jsx";
 import DashboardSettings from "./routes/pages/Settings.jsx";
 import DashboardReports from "./routes/pages/Reports.jsx";
@@ -138,6 +139,7 @@ function AppRouter() {
           {/* Analytics route removed */}
           <Route path="insights" element={<DashboardInsights />} />
           <Route path="goals" element={<DashboardGoals />} />
+          <Route path="notes" element={<DashboardNotes />} />
           <Route path="workouts" element={<DashboardWorkouts />} />
           <Route path="nutrition" element={<DashboardNutrition />} />
           <Route path="reports" element={<DashboardReports />} />
