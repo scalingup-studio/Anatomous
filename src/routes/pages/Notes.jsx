@@ -1,9 +1,11 @@
 import React from "react";
+import ReactDOM from "react-dom";
 import DatePicker from "../../components/DatePicker.jsx";
 import { Modal } from "../../components/Modal.jsx";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal.jsx";
 import { useNotes } from "../../hooks/useNotes.js";
 import { useNotifications } from "../../api/NotificationContext.jsx";
+import { NotesApi } from "../../api/notesApi.js";
 
 export default function NotesPage() {
   const {
@@ -20,6 +22,47 @@ export default function NotesPage() {
     load,
   } = useNotes();
   const { showNotification } = useNotifications();
+  
+  // Mood dropdown options
+  const moodOptions = [
+    'Calm',
+    'Energetic',
+    'Tired',
+    'Stressed',
+    'Relaxed',
+    'Focused',
+    'Anxious',
+    'Low Mood',
+    'Neutral',
+    'In Pain',
+    'Grateful',
+    'Motivated'
+  ];
+  
+  // State for mood selection
+  const [moodInput, setMoodInput] = React.useState('');
+  const [showMoodDropdown, setShowMoodDropdown] = React.useState(false);
+  const moodInputRef = React.useRef(null);
+  
+  // Separate state for edit modal dropdown
+  const [showEditMoodDropdown, setShowEditMoodDropdown] = React.useState(false);
+  const [editDropdownPosition, setEditDropdownPosition] = React.useState(null);
+
+  // Function to add note with mood
+  const addNoteWithMood = React.useCallback(async (moodValue) => {
+    if (!note.trim()) return;
+    try {
+      await NotesApi.create({ text: note, mood_tag: moodValue || undefined, date: undefined });
+      setNote("");
+      setMood("");
+      showNotification("Note added", "success");
+      load();
+      // Clear mood field
+      setMoodInput('');
+    } catch (e) {
+      showNotification(e.message || "Failed to add note", "error");
+    }
+  }, [note, setNote, setMood, showNotification, load]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -87,50 +130,119 @@ export default function NotesPage() {
                 }
               }}
               maxLength={500}
-              placeholder="How are you feeling today? (max 500 characters)"
+              placeholder="Write any thoughts, symptoms, or observations…"
               rows={4}
             />
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
               {note.length}/500
             </div>
           </div>
-          <div className="form-row">
-            <div className="form-field" style={{ width: 220 }}>
-              <label>Mood tag</label>
-              <input 
-                value={mood} 
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value.length <= 200) {
-                    setMood(value);
-                  }
+          <div className="form-field" style={{ width: '100%', position: 'relative' }}>
+            <label>Mood tag</label>
+            <input
+              ref={moodInputRef}
+              type="text"
+              value={moodInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= 200) {
+                  setMoodInput(value);
+                  setShowMoodDropdown(true);
+                }
+              }}
+              onFocus={() => setShowMoodDropdown(true)}
+              onBlur={(e) => {
+                // Delay to allow click on dropdown item
+                setTimeout(() => {
+                  setShowMoodDropdown(false);
+                }, 200);
+              }}
+              placeholder="Select or type a mood"
+              maxLength={200}
+              style={{ 
+                width: '100%',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'textfield',
+                backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 8px center',
+                backgroundSize: '16px',
+                paddingRight: '32px'
+              }}
+            />
+            {showMoodDropdown && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  backgroundColor: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  marginTop: '4px',
+                  maxHeight: '200px',
+                  overflowY: 'auto',
+                  zIndex: 100,
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                 }}
-                maxLength={200}
-                placeholder="calm / energetic / tired (max 200)"
-              />
-            
-            </div>
-            <div style={{ alignSelf: "end" }}>
-              <button 
-                className="btn primary" 
-                onClick={() => {
-                  // Validate note length (max 500 characters)
-                  if (note.length > 500) {
-                    showNotification("Note cannot exceed 500 characters", "error");
-                    return;
-                  }
-                  // Validate mood tag length (max 200 characters)
-                  if (mood.length > 200) {
-                    showNotification("Mood tag cannot exceed 200 characters", "error");
-                    return;
-                  }
-                  add();
-                }} 
-                disabled={loading}
               >
-                Save
-              </button>
-            </div>
+                {moodOptions
+                  .filter(option => 
+                    !moodInput || option.toLowerCase().includes(moodInput.toLowerCase())
+                  )
+                  .map(option => (
+                    <div
+                      key={option}
+                      onClick={() => {
+                        setMoodInput(option);
+                        setShowMoodDropdown(false);
+                        moodInputRef.current?.blur();
+                      }}
+                      onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
+                      style={{
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid var(--border)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {option}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button 
+              className="btn primary" 
+              onClick={() => {
+                // Validate note length (max 500 characters)
+                if (note.length > 500) {
+                  showNotification("Note cannot exceed 500 characters", "error");
+                  return;
+                }
+                  // Use mood input value
+                  const moodToSave = moodInput.trim();
+                // Validate mood tag length (max 200 characters)
+                if (moodToSave.length > 200) {
+                  showNotification("Mood tag cannot exceed 200 characters", "error");
+                  return;
+                }
+                // Call addNoteWithMood directly with mood value
+                addNoteWithMood(moodToSave);
+              }} 
+              disabled={loading}
+            >
+              Save
+            </button>
           </div>
         </div>
 
@@ -177,7 +289,10 @@ export default function NotesPage() {
         )}
 
         {selectedNote && (
-          <Modal open={!!selectedNote} title="Edit Note" onClose={() => setSelectedNote(null)}>
+          <Modal open={!!selectedNote} title="Edit Note" onClose={() => {
+            setSelectedNote(null);
+            setShowEditMoodDropdown(false);
+          }}>
             <div className="form-field" style={{ width: "100%" }}>
               <label>Text</label>
               <textarea 
@@ -195,27 +310,115 @@ export default function NotesPage() {
                 {selectedNote.text?.length || 0}/500
               </div>
             </div>
-            <div className="form-row" style={{ width: "100%" }}>
-              <div className="form-field" style={{ width: "100%"}}>
-                <label>Mood tag</label>
-                <input 
-                  value={selectedNote.mood_tag || ""} 
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value.length <= 200) {
-                      setSelectedNote({ ...selectedNote, mood_tag: value });
-                    }
+            <div className="form-field" style={{ width: "100%", position: 'relative' }}>
+              <label>Mood tag</label>
+              <input
+                type="text"
+                value={selectedNote.mood_tag || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= 200) {
+                    setSelectedNote({ ...selectedNote, mood_tag: value });
+                  }
+                }}
+                onFocus={(e) => {
+                  const rect = e.target.getBoundingClientRect();
+                  setEditDropdownPosition({
+                    top: rect.bottom + window.scrollY + 4,
+                    left: rect.left + window.scrollX,
+                    width: rect.width
+                  });
+                  setShowEditMoodDropdown(true);
+                }}
+                onBlur={(e) => {
+                  setTimeout(() => {
+                    setShowEditMoodDropdown(false);
+                  }, 200);
+                }}
+                placeholder="Select or type a mood"
+                maxLength={200}
+                style={{ 
+                  width: '100%',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'textfield',
+                  backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 8px center',
+                  backgroundSize: '16px',
+                  paddingRight: '32px'
+                }}
+              />
+              {showEditMoodDropdown && editDropdownPosition && ReactDOM.createPortal(
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: `${editDropdownPosition.top}px`,
+                    left: `${editDropdownPosition.left}px`,
+                    width: `${editDropdownPosition.width}px`,
+                    backgroundColor: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    marginTop: '4px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    zIndex: 10000,
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                   }}
-                  maxLength={200}
-                />
-                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
-                  {(selectedNote.mood_tag || "").length}/200
-                </div>
-              </div>
+                >
+                  {moodOptions
+                    .filter(option => {
+                      const currentValue = (selectedNote.mood_tag || '').toLowerCase();
+                      // Show all options if field is empty or matches an option exactly, otherwise filter by input
+                      if (!currentValue) return true;
+                      if (moodOptions.includes(selectedNote.mood_tag || '')) {
+                        // If current value is an exact match, show all options
+                        return true;
+                      }
+                      // Otherwise filter by what user is typing
+                      return option.toLowerCase().includes(currentValue);
+                    })
+                    .map(option => (
+                      <div
+                        key={option}
+                        onClick={() => {
+                          setSelectedNote({ ...selectedNote, mood_tag: option });
+                          setShowEditMoodDropdown(false);
+                        }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        style={{
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid var(--border)',
+                          transition: 'background-color 0.2s',
+                          backgroundColor: (selectedNote.mood_tag || '').toLowerCase() === option.toLowerCase() 
+                            ? 'var(--background-secondary, rgba(0, 0, 0, 0.05))' 
+                            : 'transparent'
+                        }}
+                        onMouseEnter={(e) => {
+                          if ((selectedNote.mood_tag || '').toLowerCase() !== option.toLowerCase()) {
+                            e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if ((selectedNote.mood_tag || '').toLowerCase() !== option.toLowerCase()) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        {option}
+                      </div>
+                    ))}
+                </div>,
+                document.body
+              )}
             </div>
             <div style={{ display: "flex",  width: "100%" }}>
               <div style={{ display: "flex", justifyContent: "space-between", width: "100%"}}>
-                <button className="btn secondary" onClick={() => setSelectedNote(null)}>Cancel</button>
+                <button className="btn secondary" onClick={() => {
+                  setSelectedNote(null);
+                  setShowEditMoodDropdown(false);
+                }}>Cancel</button>
                 <button 
                   className="btn primary" 
                   onClick={() => {

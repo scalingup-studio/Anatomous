@@ -271,7 +271,7 @@ function AddGoalForm({ onCreate, loading }) {
             }
           }}
           maxLength={200}
-          placeholder="e.g. Run 5km"
+          placeholder="e.g., Daily Step Goal"
         />
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>
           {title.length}/200
@@ -288,7 +288,7 @@ function AddGoalForm({ onCreate, loading }) {
             }
           }}
           maxLength={500}
-          placeholder="Walk 8,000 steps daily or Strength train 3x/week."
+          placeholder="Example: Walk 8,000 steps daily or Strength train 3x/week."
           rows={4}
         />
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, textAlign: "right" }}>

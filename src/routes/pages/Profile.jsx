@@ -48,11 +48,12 @@ export default function DashboardProfile() {
     return allowed.includes(t) ? t : 'personal';
   })();
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [heightUnit, setHeightUnit] = useState('cm');
-  const [weightUnit, setWeightUnit] = useState('kg');
-  const [temperatureUnit, setTemperatureUnit] = useState('C'); // 'C' for Celsius, 'F' for Fahrenheit
-  const [healthDataWeightUnit, setHealthDataWeightUnit] = useState('kg'); // For health data weight field
-  const [waistUnit, setWaistUnit] = useState('cm'); // For waist circumference
+  const [heightUnit, setHeightUnit] = useState('in');
+  const [weightUnit, setWeightUnit] = useState('lb');
+  const [temperatureUnit, setTemperatureUnit] = useState('F'); // 'F' for Fahrenheit (default), 'C' for Celsius
+  const [healthDataWeightUnit, setHealthDataWeightUnit] = useState('lb'); // For health data weight field (default: lb, toggle to kg)
+  const [waistUnit, setWaistUnit] = useState('in'); // For waist circumference (default: inches, toggle to cm)
+  const [waterUnit, setWaterUnit] = useState('oz'); // For water intake: 'oz' (ounces) or 'L' (liters), default: oz
   const [glucoseType, setGlucoseType] = useState('fasting'); // 'fasting', 'random', 'post-meal'
   const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
   const [bmiTooltipPosition, setBmiTooltipPosition] = useState({ x: 0, y: 0 });
@@ -553,6 +554,15 @@ export default function DashboardProfile() {
     return lb / 2.20462;
   };
 
+  // Water conversion functions
+  const ozToLiters = (oz) => {
+    return oz * 0.0295735; // 1 fluid ounce = 0.0295735 liters
+  };
+
+  const litersToOz = (liters) => {
+    return liters / 0.0295735; // 1 liter = 33.814 fluid ounces
+  };
+
   // Handle weight unit change
   const handleWeightUnitChange = (newUnit) => {
     if (newUnit === healthDataWeightUnit) return;
@@ -620,6 +630,17 @@ export default function DashboardProfile() {
     }
     
     setWaistUnit(newUnit);
+  };
+
+  // Handle water unit change
+  // Note: hydration_liters always stores in liters
+  // When displaying, if waterUnit is 'oz', we show litersToOz(hydration_liters)
+  // When user inputs, if waterUnit is 'oz', we convert ozToLiters(input) before storing
+  const handleWaterUnitChange = (newUnit) => {
+    if (newUnit === waterUnit) return;
+    // No need to convert hydration_liters - it always stores in liters
+    // We just change the display unit
+    setWaterUnit(newUnit);
   };
 
   const handleSaveHealthData = async () => {
@@ -796,9 +817,10 @@ export default function DashboardProfile() {
         daily_step_count: ''
       });
       // Reset units to defaults
-      setTemperatureUnit('C');
-      setHealthDataWeightUnit('kg');
-      setWaistUnit('cm');
+      setTemperatureUnit('F');
+      setHealthDataWeightUnit('lb');
+      setWaistUnit('in');
+      setWaterUnit('oz');
       setGlucoseType('fasting');
 
       showSuccess('Health data saved successfully!');
@@ -924,8 +946,8 @@ export default function DashboardProfile() {
   const handleEditHealthData = (record) => {
     setEditingRecord(record);
     // Get units from record (or defaults)
-    const recordWeightUnit = record.body_weight_unit || 'kg';
-    const recordWaistUnit = record.waist_circumference_unit || 'cm';
+    const recordWeightUnit = record.body_weight_unit || 'lb';
+    const recordWaistUnit = record.waist_circumference_unit || 'in';
     
     // Set units first
     setHealthDataWeightUnit(recordWeightUnit);
@@ -1005,7 +1027,7 @@ export default function DashboardProfile() {
       daily_step_count: toFormValue(record.daily_step_count)
     });
     // Set units from record (or defaults)
-    setTemperatureUnit(record.body_temperature_unit || 'C');
+    setTemperatureUnit(record.body_temperature_unit || 'F');
     setHealthDataWeightUnit(recordWeightUnit);
     setWaistUnit(recordWaistUnit);
     // Handle glucose_type: API may return blood_glucose_unit instead of glucose_type
@@ -1184,9 +1206,10 @@ export default function DashboardProfile() {
         daily_step_count: ''
       });
       // Reset units to defaults
-      setTemperatureUnit('C');
-      setHealthDataWeightUnit('kg');
-      setWaistUnit('cm');
+      setTemperatureUnit('F');
+      setHealthDataWeightUnit('lb');
+      setWaistUnit('in');
+      setWaterUnit('oz');
       setGlucoseType('fasting');
       // Reload data
       await loadHealthData();
@@ -1447,12 +1470,12 @@ const calculateAgeFromDOB = (dob) => {
         }
         
         // Set defaults if still not found
-        apiHeightType = apiHeightType || 'cm';
-        apiWeightType = apiWeightType || 'kg';
+        apiHeightType = apiHeightType || 'in';
+        apiWeightType = apiWeightType || 'lb';
         
         // Set unit types in UI first (before conversion)
-        const validHeightUnit = (apiHeightType === 'in' || apiHeightType === 'cm') ? apiHeightType : 'cm';
-        const validWeightUnit = (apiWeightType === 'lb' || apiWeightType === 'kg') ? apiWeightType : 'kg';
+        const validHeightUnit = (apiHeightType === 'in' || apiHeightType === 'cm') ? apiHeightType : 'in';
+        const validWeightUnit = (apiWeightType === 'lb' || apiWeightType === 'kg') ? apiWeightType : 'lb';
         
         setHeightUnit(validHeightUnit);
         setWeightUnit(validWeightUnit);
@@ -1552,11 +1575,11 @@ const calculateAgeFromDOB = (dob) => {
         }
         
         // Set defaults if still not found
-        fallbackHeightType = fallbackHeightType || 'cm';
-        fallbackWeightType = fallbackWeightType || 'kg';
+        fallbackHeightType = fallbackHeightType || 'in';
+        fallbackWeightType = fallbackWeightType || 'lb';
         
-        const fallbackHeightUnit = (fallbackHeightType === 'in' || fallbackHeightType === 'cm') ? fallbackHeightType : 'cm';
-        const fallbackWeightUnit = (fallbackWeightType === 'lb' || fallbackWeightType === 'kg') ? fallbackWeightType : 'kg';
+        const fallbackHeightUnit = (fallbackHeightType === 'in' || fallbackHeightType === 'cm') ? fallbackHeightType : 'in';
+        const fallbackWeightUnit = (fallbackWeightType === 'lb' || fallbackWeightType === 'kg') ? fallbackWeightType : 'lb';
         
         setHeightUnit(fallbackHeightUnit);
         setWeightUnit(fallbackWeightUnit);
@@ -2194,7 +2217,24 @@ const calculateAgeFromDOB = (dob) => {
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Date of birth</span>
-                  <DatePicker value={formValues.dob || ""} onChange={(val)=>handleChange({ target: { name: 'dob', value: val }})} />
+                  <div style={{ position: 'relative' }}>
+                    <DatePicker value={formValues.dob || ""} onChange={(val)=>handleChange({ target: { name: 'dob', value: val }})} />
+                    {formValues.dob && calculateAgeFromDOB(formValues.dob) !== null && (
+                      <span style={{ 
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.9em',
+                        fontWeight: 'normal',
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }}>
+                        {calculateAgeFromDOB(formValues.dob)} years old
+                      </span>
+                    )}
+                  </div>
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Sex</span>
@@ -3833,7 +3873,7 @@ const calculateAgeFromDOB = (dob) => {
                         step="0.1"
                         value={healthData.weekly_activity_minutes || ''} 
                         onChange={(e) => handleHealthDataChange('weekly_activity_minutes', e.target.value)}
-                        placeholder="150"
+                        placeholder="60"
                         min="0" max="10080"
                       />
                     </label>
@@ -3897,15 +3937,102 @@ const calculateAgeFromDOB = (dob) => {
 
                     {/* Hydration */}
                     <label className="form-field">
-                      <span>Hydration (liters)</span>
+                      <span>Daily Water Intake</span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
                       <input 
                         type="number" 
                         step="0.1"
-                        value={healthData.hydration_liters || ''} 
-                        onChange={(e) => handleHealthDataChange('hydration_liters', e.target.value)}
-                        placeholder="2.5"
-                        min="0" max="10"
-                      />
+                          value={
+                            healthData.hydration_liters 
+                              ? (waterUnit === 'oz' 
+                                  ? litersToOz(parseFloat(healthData.hydration_liters)).toFixed(1)
+                                  : parseFloat(healthData.hydration_liters).toFixed(1))
+                              : ''
+                          } 
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            if (inputValue === '') {
+                              handleHealthDataChange('hydration_liters', '');
+                            } else {
+                              const numValue = parseFloat(inputValue);
+                              if (!isNaN(numValue)) {
+                                // Convert to liters if input is in ounces
+                                const litersValue = waterUnit === 'oz' ? ozToLiters(numValue) : numValue;
+                                handleHealthDataChange('hydration_liters', litersValue.toString());
+                              }
+                            }
+                          }}
+                          placeholder={waterUnit === 'oz' ? "64" : "2.0"}
+                          min="0"
+                          max={waterUnit === 'oz' ? "200" : "10"}
+                          style={{ flex: 1 }}
+                        />
+                        <div style={{ 
+                          display: 'flex', 
+                          border: '1px solid var(--border)', 
+                          borderRadius: '6px',
+                          overflow: 'hidden',
+                          backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => handleWaterUnitChange('oz')}
+                            style={{
+                              padding: '8px 12px',
+                              border: 'none',
+                              backgroundColor: waterUnit === 'oz' ? 'var(--primary)' : 'transparent',
+                              color: waterUnit === 'oz' ? '#fff' : 'var(--text)',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              borderRight: '1px solid var(--border)',
+                              minWidth: '50px',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (waterUnit !== 'oz') {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (waterUnit !== 'oz') {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            oz
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleWaterUnitChange('L')}
+                            style={{
+                              padding: '8px 12px',
+                              border: 'none',
+                              backgroundColor: waterUnit === 'L' ? 'var(--primary)' : 'transparent',
+                              color: waterUnit === 'L' ? '#fff' : 'var(--text)',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              minWidth: '50px',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (waterUnit !== 'L') {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (waterUnit !== 'L') {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            L
+                          </button>
+                        </div>
+                      </div>
                     </label>
 
                     {/* Mood */}
@@ -3939,19 +4066,6 @@ const calculateAgeFromDOB = (dob) => {
                         <option value="5">5 - Very High</option>
                       </select>
                     </label>
-
-                    {/* Visibility Scope */}
-                    <label className="form-field">
-                      <span>Visibility Scope</span>
-                      <select 
-                        value={healthData.visibility_scope} 
-                        onChange={(e) => handleHealthDataChange('visibility_scope', e.target.value)}
-                      >
-                        <option value="private">Private</option>
-                        <option value="public">Public</option>
-                      </select>
-                    </label>
-
     {/* Blood Glucose */}
                     <label className="form-field">
                       <span>Blood Glucose (mg/dL)</span>
@@ -3975,6 +4089,19 @@ const calculateAgeFromDOB = (dob) => {
                         </select>
                       </div>
                     </label>
+                    {/* Visibility Scope */}
+                    <label className="form-field">
+                      <span>Visibility Scope</span>
+                      <select 
+                        value={healthData.visibility_scope} 
+                        onChange={(e) => handleHealthDataChange('visibility_scope', e.target.value)}
+                      >
+                        <option value="private">Private</option>
+                        <option value="public">Public</option>
+                      </select>
+                    </label>
+
+    
                           </div>
                         </div>
 

@@ -52,7 +52,7 @@ const OnboardingLayout = () => {
     weight: '',
     zipCode: '',
     heightUnit: 'cm',
-    weightUnit: 'kg',
+    weightUnit: 'lb',
 
     // Health Snapshot
     healthConditions: [],
@@ -238,7 +238,7 @@ const OnboardingLayout = () => {
     
     // Validate and set default units
     const validHeightUnit = (apiHeightType === 'in' || apiHeightType === 'cm') ? apiHeightType : 'cm';
-    const validWeightUnit = (apiWeightType === 'lb' || apiWeightType === 'kg') ? apiWeightType : 'kg';
+    const validWeightUnit = (apiWeightType === 'lb' || apiWeightType === 'kg') ? apiWeightType : 'lb';
     
     // Get stored values
     // NOTE: height_cm and weight_kg are just field names - the actual unit is determined by height_type/weight_type
@@ -497,7 +497,7 @@ const OnboardingLayout = () => {
         ...populatedFormData,
         // Ensure measurement units are always defined
         heightUnit: prev.heightUnit || 'cm',
-        weightUnit: prev.weightUnit || 'kg',
+        weightUnit: prev.weightUnit || 'lb',
       }));
       
     } catch (error) {
@@ -1135,7 +1135,7 @@ const OnboardingLayout = () => {
                   }
                   // Normalize units with sensible defaults
                   const normalizedHeightUnit = formData.heightUnit || 'cm';
-                  const normalizedWeightUnit = formData.weightUnit || 'kg';
+                  const normalizedWeightUnit = formData.weightUnit || 'lb';
 
                   // Convert height to meters
                   let heightMeters;
@@ -2147,7 +2147,7 @@ const OnboardingLayout = () => {
                   <p><strong>Date of Birth:</strong> {formData.dateOfBirth}</p>
                   <p><strong>Sex:</strong> {formData.sexAtBirth}</p>
                   {formData.height && <p><strong>Height:</strong> {formData.height} {formData.heightUnit || 'cm'}</p>}
-                  {formData.weight && <p><strong>Weight:</strong> {formData.weight} {formData.weightUnit || 'kg'}</p>}
+                  {formData.weight && <p><strong>Weight:</strong> {formData.weight} {formData.weightUnit || 'lb'}</p>}
                   {formData.zipCode && <p><strong>ZIP Code:</strong> {formData.zipCode}</p>}
                 </div>
                 <button className="btn ghost small" onClick={() => goToStep(1)}>Edit</button>
