@@ -11,6 +11,7 @@ import { useSearchParams } from "react-router-dom";
 import { CUSTOM_ENDPOINTS } from "../../api/apiConfig";
 import useOpenAI from "../../hooks/useOpenAI";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
+import DatePicker from "../../components/DatePicker.jsx";
 
 // Normalize metric title: remove underscores and capitalize first letter
 function formatMetricTitle(input) {
@@ -1034,13 +1035,13 @@ function PreviousQueriesList({ hook }) {
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <h3 style={{ marginTop: 0, marginBottom: 12 }}>Previous Queries</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 12 }}>Recent Questions</h3>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input
             type="text"
             value={chatIdInput}
             onChange={(e) => setChatIdInput(e.target.value)}
-            placeholder="Enter chat ID to load queries"
+            placeholder="Revisit what you've asked before and continue where you left off."
             style={{
               flex: 1,
               padding: "8px 12px",
@@ -1920,6 +1921,10 @@ function UploadsTab() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [fileToDelete, setFileToDelete] = useState(null);
+  // Filters
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterFileName, setFilterFileName] = useState('');
 
   useEffect(() => {
     if (user?.id) {
@@ -1938,6 +1943,43 @@ function UploadsTab() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Filter files based on filters
+  const getFilteredFiles = () => {
+    let filtered = [...files];
+
+    // Filter by file name
+    if (filterFileName) {
+      const searchTerm = filterFileName.toLowerCase();
+      filtered = filtered.filter(file => {
+        const fileName = (file.filename || file.file_name || '').toLowerCase();
+        return fileName.includes(searchTerm);
+      });
+    }
+
+    // Filter by date range
+    if (filterDateFrom) {
+      const fromDate = new Date(filterDateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(file => {
+        const fileDate = new Date(file.created_at || file.uploaded_at || 0);
+        fileDate.setHours(0, 0, 0, 0);
+        return fileDate >= fromDate;
+      });
+    }
+
+    if (filterDateTo) {
+      const toDate = new Date(filterDateTo);
+      toDate.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(file => {
+        const fileDate = new Date(file.created_at || file.uploaded_at || 0);
+        fileDate.setHours(0, 0, 0, 0);
+        return fileDate <= toDate;
+      });
+    }
+
+    return filtered;
   };
 
   const handleFileChange = async (e) => {
@@ -2214,39 +2256,126 @@ function UploadsTab() {
 
       {/* Results table */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Lab Results</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <h3 style={{ marginTop: 0, marginBottom: 4 }}>Your Uploaded Files</h3>
+            {files.length > 0 && (
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 'normal', 
+                color: 'var(--muted)', 
+              }}>
+                {(() => {
+                  const filteredCount = getFilteredFiles().length;
+                  return filteredCount === files.length 
+                    ? `(${files.length} files)`
+                    : `(${filteredCount} of ${files.length} files)`;
+                })()}
+              </span>
+            )}
+          </div>
+          {(filterDateFrom || filterDateTo || filterFileName) && (
+            <button
+              type="button"
+              className="btn outline"
+              onClick={() => {
+                setFilterDateFrom('');
+                setFilterDateTo('');
+                setFilterFileName('');
+              }}
+              style={{ 
+                padding: '6px 12px', 
+                fontSize: '14px'
+              }}
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+        
+        {/* Filters */}
+        <div style={{ 
+          marginBottom: 16, 
+          padding: 16, 
+          border: '1px solid var(--border)', 
+          borderRadius: '6px',
+          backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+        }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: 12
+          }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                File Name
+              </label>
+              <input
+                type="text"
+                value={filterFileName}
+                onChange={(e) => setFilterFileName(e.target.value)}
+                placeholder="Search by file name..."
+                style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                Upload Date From
+              </label>
+              <DatePicker
+                value={filterDateFrom}
+                onChange={(val) => setFilterDateFrom(val)}
+                maxDate={filterDateTo || new Date().toISOString().split('T')[0]}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                Upload Date To
+              </label>
+              <DatePicker
+                value={filterDateTo}
+                onChange={(val) => setFilterDateTo(val)}
+                minDate={filterDateFrom || undefined}
+                maxDate={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+          </div>
+        </div>
+
         {loading ? (
           <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>
             Loading files...
           </div>
-        ) : files.length === 0 ? (
-          <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>
-            No files uploaded yet
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
-                    Test/File
-                  </th>
-                  <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
-                    Date
-                  </th>
-                  <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
-                    Category
-                  </th>
-                  <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
-                    Status
-                  </th>
-                  <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.map((file, idx) => (
+        ) : (() => {
+          const filteredFiles = getFilteredFiles();
+          return filteredFiles.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>
+              {files.length === 0 ? "No files uploaded yet" : "No files match your filters"}
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
+                      File
+                    </th>
+                    <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
+                      Date
+                    </th>
+                    <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
+                      Category
+                    </th>
+                    <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
+                      Status
+                    </th>
+                    <th style={{ padding: "12px 8px", textAlign: "left", color: "var(--muted)", fontWeight: 600 }}>
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredFiles.map((file, idx) => (
                   <tr 
                     key={idx} 
                     style={{ 
@@ -2336,11 +2465,12 @@ function UploadsTab() {
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Delete Confirmation Modal */}

@@ -47,6 +47,9 @@ export default function NotesPage() {
   // Separate state for edit modal dropdown
   const [showEditMoodDropdown, setShowEditMoodDropdown] = React.useState(false);
   const [editDropdownPosition, setEditDropdownPosition] = React.useState(null);
+  
+  // Keyword search state
+  const [keywordSearch, setKeywordSearch] = React.useState('');
 
   // Function to add note with mood
   const addNoteWithMood = React.useCallback(async (moodValue) => {
@@ -73,6 +76,42 @@ export default function NotesPage() {
       <div style={{ display: "grid", gap: 16 }}>
         <div className="card" style={{ display: "grid", gap: 12 }}>
           <div className="form-row">
+            <div className="form-field" style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+              <label>Search</label>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input 
+                  type="text"
+                  value={keywordSearch} 
+                  onChange={(e) => setKeywordSearch(e.target.value)}
+                  placeholder="Search notes by text, mood, or keywords..."
+                  style={{ width: '100%', paddingRight: keywordSearch ? '32px' : '8px' }}
+                />
+                {keywordSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setKeywordSearch('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--muted)',
+                      fontSize: '16px'
+                    }}
+                    title="Clear search"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="form-field" style={{ width: 180 }}>
               <label>Start date</label>
               <DatePicker 
@@ -98,20 +137,7 @@ export default function NotesPage() {
                 minDate={filters.start_date || undefined}
               />
             </div>
-            <div className="form-field" style={{ width: 180 }}>
-              <label>Mood</label>
-              <input 
-                value={filters.mood_tag} 
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value.length <= 200) {
-                    setFilters(v => ({ ...v, mood_tag: value }));
-                  }
-                }}
-                maxLength={200}
-                placeholder="e.g. energetic (max 200)"
-              />
-            </div>
+           
             <div style={{ alignSelf: "end" }}>
               <button className="btn secondary" onClick={load}>Filter</button>
             </div>
@@ -246,9 +272,20 @@ export default function NotesPage() {
           </div>
         </div>
 
-        {items?.length > 0 ? (
-          <div style={{ display: "grid", gap: 8 }}>
-            {items.map((n) => (
+        {(() => {
+          // Filter items by keyword search (client-side filtering)
+          const filteredItems = keywordSearch.trim() 
+            ? items.filter(n => {
+                const searchTerm = keywordSearch.toLowerCase();
+                const noteText = (n.text || '').toLowerCase();
+                const moodTag = (n.mood_tag || '').toLowerCase();
+                return noteText.includes(searchTerm) || moodTag.includes(searchTerm);
+              })
+            : items;
+          
+          return filteredItems?.length > 0 ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              {filteredItems.map((n) => (
               <div key={n.id} className="card" style={{ cursor: "default"}}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems:'center', gap:8, marginBottom: 8  }}>
                   <div>{n.text}</div>
@@ -280,13 +317,20 @@ export default function NotesPage() {
                 </div>
                 <div style={{ color: "var(--muted)", fontSize: 10 }}>{formatDisplayDate(n)}</div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="card" style={{ textAlign: "center" }}>
-            <p style={{ color: "var(--muted)", marginBottom: 12 }}>No notes yet</p>
-          </div>
-        )}
+              ))}
+            </div>
+          ) : (
+            <div className="card" style={{ textAlign: "center" }}>
+              <p style={{ color: "var(--muted)", marginBottom: 12 }}>
+                {items?.length === 0 
+                  ? "No notes yet" 
+                  : keywordSearch.trim() 
+                    ? "No notes match your search" 
+                    : "No notes yet"}
+              </p>
+            </div>
+          );
+        })()}
 
         {selectedNote && (
           <Modal open={!!selectedNote} title="Edit Note" onClose={() => {

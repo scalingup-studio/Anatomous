@@ -130,7 +130,7 @@ const ChatComponent = ({ sharedHook }) => {
             className="clear-btn"
             style={{ fontSize: 12 }}
           >
-            {showChatSelector ? 'Hide' : 'Load Chat'}
+            {showChatSelector ? 'Hide' : 'Load Previous Chat'}
           </button>
           <button onClick={handleNewChat} className="clear-btn">
             New Chat
@@ -153,7 +153,7 @@ const ChatComponent = ({ sharedHook }) => {
             type="text"
             value={chatIdInput}
             onChange={(e) => setChatIdInput(e.target.value)}
-            placeholder="Enter chat ID to load previous queries"
+            placeholder="Revisit what you've asked before and continue where you left off."
             style={{
               flex: 1,
               padding: "8px 12px",
@@ -200,7 +200,7 @@ const ChatComponent = ({ sharedHook }) => {
             alignItems: 'center',
             marginBottom: 12
           }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Previous Queries</h3>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Recent Questions</h3>
             <button
               onClick={() => setShowPreviousQueries(false)}
               className="btn ghost small"
@@ -301,8 +301,7 @@ const ChatComponent = ({ sharedHook }) => {
           fontSize: 12,
           color: "var(--muted)"
         }}>
-          <strong>Important:</strong> This AI assistant provides general health information and educational content only. 
-          It is not a substitute for professional medical advice. For specific health concerns, please consult with a healthcare professional.
+          <strong>Important:</strong> This AI assistant provides general health information and educational content only. It is not a substitute for professional medical advice, diagnosis, or treatment. For personal medical concerns, always consult a qualified healthcare professional.
         </div>
       )}
 
@@ -315,7 +314,7 @@ const ChatComponent = ({ sharedHook }) => {
       <div className="messages-container" ref={messagesContainerRef}>
         {conversation.length === 0 ? (
           <div className="empty-state">
-            <p>Ask a question to start the conversation!</p>
+            <p>Ask anything to get started.</p>
           </div>
         ) : (
           conversation.map((msg, index) => (

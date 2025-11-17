@@ -40,6 +40,10 @@ export default function DashboardProfile() {
     weight_kg: "",
     zip_code: "",
     user_id: "",
+    body_fat_percentage: "",
+    body_fat_method: "",
+    waist_circumference: "",
+    hip_circumference: "",
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (() => {
@@ -52,7 +56,9 @@ export default function DashboardProfile() {
   const [weightUnit, setWeightUnit] = useState('lb');
   const [temperatureUnit, setTemperatureUnit] = useState('F'); // 'F' for Fahrenheit (default), 'C' for Celsius
   const [healthDataWeightUnit, setHealthDataWeightUnit] = useState('lb'); // For health data weight field (default: lb, toggle to kg)
-  const [waistUnit, setWaistUnit] = useState('in'); // For waist circumference (default: inches, toggle to cm)
+  const [waistUnit, setWaistUnit] = useState('in'); // For waist circumference in health data (default: inches, toggle to cm)
+  const [personalWaistUnit, setPersonalWaistUnit] = useState('in'); // For waist circumference in personal info (default: inches, toggle to cm)
+  const [hipUnit, setHipUnit] = useState('in'); // For hip circumference in personal info (default: inches, toggle to cm)
   const [waterUnit, setWaterUnit] = useState('oz'); // For water intake: 'oz' (ounces) or 'L' (liters), default: oz
   const [glucoseType, setGlucoseType] = useState('fasting'); // 'fasting', 'random', 'post-meal'
   const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
@@ -115,7 +121,11 @@ export default function DashboardProfile() {
     vaccinations: null,
     sensitivities: null,
     family_history: null,
+    dental_history: null,
   });
+
+  // Dental History state (as array like other sections)
+  const [dentalHistory, setDentalHistory] = useState([]);
 
   // Health Data state
   const [healthData, setHealthData] = useState({
@@ -149,6 +159,29 @@ export default function DashboardProfile() {
   const [deletingRecordId, setDeletingRecordId] = useState(null);
   const [recordToDelete, setRecordToDelete] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
+  // Health Data Records filtering and sorting
+  const [sortColumn, setSortColumn] = useState(null); // 'date' | 'heart_rate' | 'blood_pressure' | 'activity' | 'bmi' | 'temperature' | 'glucose'
+  const [sortDirection, setSortDirection] = useState('desc'); // 'asc' | 'desc'
+  const [filters, setFilters] = useState({
+    dateFrom: '',
+    dateTo: '',
+    heartRateMin: '',
+    heartRateMax: '',
+    bloodPressureSystolicMin: '',
+    bloodPressureSystolicMax: '',
+    bloodPressureDiastolicMin: '',
+    bloodPressureDiastolicMax: '',
+    activityMin: '',
+    activityMax: '',
+    bmiMin: '',
+    bmiMax: '',
+    temperatureMin: '',
+    temperatureMax: '',
+    glucoseMin: '',
+    glucoseMax: ''
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   // Health history add modal state
   const [isAddHistoryModalOpen, setIsAddHistoryModalOpen] = useState(false);
@@ -165,6 +198,7 @@ export default function DashboardProfile() {
     vaccinations: false,
     sensitivities: false,
     family_history: false,
+    dental_history: false,
   });
   // Dedicated saving state for Add modal
   const [savingAddHistory, setSavingAddHistory] = useState(false);
@@ -173,6 +207,9 @@ export default function DashboardProfile() {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [sectionKeyToDelete, setSectionKeyToDelete] = useState(null);
   const [isDeletingHistory, setIsDeletingHistory] = useState(false);
+  // Autocomplete state for modal name fields
+  const [showModalAutocomplete, setShowModalAutocomplete] = useState(false);
+  const modalNameInputRef = useRef(null);
 
   // Delete modal management
   useEffect(() => {
@@ -608,7 +645,7 @@ export default function DashboardProfile() {
     return inches * 2.54;
   };
 
-  // Handle waist unit change
+  // Handle waist unit change (for health data)
   const handleWaistUnitChange = (newUnit) => {
     if (newUnit === waistUnit) return;
     
@@ -630,6 +667,54 @@ export default function DashboardProfile() {
     }
     
     setWaistUnit(newUnit);
+  };
+
+  // Handle personal waist unit change (for personal info)
+  const handlePersonalWaistUnitChange = (newUnit) => {
+    if (newUnit === personalWaistUnit) return;
+    
+    const currentValue = parseFloat(formValues.waist_circumference);
+    if (!isNaN(currentValue) && currentValue !== '') {
+      let convertedValue;
+      if (personalWaistUnit === 'cm' && newUnit === 'in') {
+        convertedValue = cmToIn(currentValue);
+      } else if (personalWaistUnit === 'in' && newUnit === 'cm') {
+        convertedValue = inToCm(currentValue);
+      } else {
+        convertedValue = currentValue;
+      }
+      
+      setFormValues(prev => ({
+        ...prev,
+        waist_circumference: convertedValue.toFixed(1)
+      }));
+    }
+    
+    setPersonalWaistUnit(newUnit);
+  };
+
+  // Handle hip unit change (for personal info)
+  const handleHipUnitChange = (newUnit) => {
+    if (newUnit === hipUnit) return;
+    
+    const currentValue = parseFloat(formValues.hip_circumference);
+    if (!isNaN(currentValue) && currentValue !== '') {
+      let convertedValue;
+      if (hipUnit === 'cm' && newUnit === 'in') {
+        convertedValue = cmToIn(currentValue);
+      } else if (hipUnit === 'in' && newUnit === 'cm') {
+        convertedValue = inToCm(currentValue);
+      } else {
+        convertedValue = currentValue;
+      }
+      
+      setFormValues(prev => ({
+        ...prev,
+        hip_circumference: convertedValue.toFixed(1)
+      }));
+    }
+    
+    setHipUnit(newUnit);
   };
 
   // Handle water unit change
@@ -877,39 +962,57 @@ export default function DashboardProfile() {
         || itemToDelete?.surgical_history_id || itemToDelete?.surgical_id || itemToDelete?.surgery_id
         || itemToDelete?.vaccinations_id || itemToDelete?.vaccination_id
         || itemToDelete?.sensitivities_id || itemToDelete?.sensitivity_id
-        || itemToDelete?.family_history_id || itemToDelete?.family_id;
+        || itemToDelete?.family_history_id || itemToDelete?.family_id
+        || itemToDelete?.dental_history_id;
       
       if (!id) {
         throw new Error('Cannot delete: record ID not found');
       }
 
-      const numericId = Number(id);
-      if (!Number.isFinite(numericId)) {
-        throw new Error('Invalid record ID: must be a number');
+      // For dental_history, ID can be UUID (string), for others it's numeric
+      let recordId;
+      if (sectionKeyToDelete === 'dental_history') {
+        // Dental history uses UUID, keep as string
+        recordId = id;
+      } else {
+        // Other sections use numeric IDs
+        const numericId = Number(id);
+        if (!Number.isFinite(numericId)) {
+          throw new Error('Invalid record ID: must be a number');
+        }
+        recordId = numericId;
       }
 
       // Delete based on section type
       switch (sectionKeyToDelete) {
         case 'medical_conditions':
-          await HealthHistoryApi.deleteMedicalCondition(numericId);
+          await HealthHistoryApi.deleteMedicalCondition(recordId);
           break;
         case 'allergies':
-          await HealthHistoryApi.deleteAllergy(numericId);
+          await HealthHistoryApi.deleteAllergy(recordId);
           break;
         case 'medications':
-          await HealthHistoryApi.deleteMedication(numericId);
+          await HealthHistoryApi.deleteMedication(recordId);
           break;
         case 'sensitivities':
-          await HealthHistoryApi.deleteSensitivity(numericId);
+          await HealthHistoryApi.deleteSensitivity(recordId);
           break;
         case 'family_history':
-          await HealthHistoryApi.deleteFamilyHistory(numericId);
+          await HealthHistoryApi.deleteFamilyHistory(recordId);
           break;
         case 'vaccinations':
-          await HealthHistoryApi.deleteVaccination(numericId);
+          await HealthHistoryApi.deleteVaccination(recordId);
           break;
         case 'surgical_history':
-          await HealthHistoryApi.deleteSurgicalHistory(numericId);
+          await HealthHistoryApi.deleteSurgicalHistory(recordId);
+          break;
+        case 'dental_history':
+          // Delete from API - ID is in the URL path (can be UUID)
+          await authRequest(ENDPOINTS.dentalHistory.remove(recordId), {
+            method: 'DELETE',
+          });
+          // Reload dental history from API
+          await loadDentalHistory();
           break;
         // TODO: Add delete methods for other sections when endpoints are available
         default:
@@ -917,8 +1020,10 @@ export default function DashboardProfile() {
           throw new Error(`Delete operation not available for ${sectionKeyToDelete}`);
       }
 
-      // Reload health history summary
+      // Reload health history summary (skip for dental_history as it's handled above)
+      if (sectionKeyToDelete !== 'dental_history') {
       await loadHealthHistorySummary();
+      }
       showSuccess('Record deleted successfully');
     } catch (err) {
       // Handle ACCESS_DENIED error specifically
@@ -1321,46 +1426,213 @@ export default function DashboardProfile() {
       setLoadingHealthData(false);
     }
   };
+
+  // Handle sorting for health data records
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to descending
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Apply filters and sorting to health data records
+  const getFilteredAndSortedRecords = () => {
+    let filtered = [...healthDataRecords];
+
+    // Apply filters
+    if (filters.dateFrom) {
+      filtered = filtered.filter(record => {
+        const recordDate = new Date(record.date);
+        const fromDate = new Date(filters.dateFrom);
+        return recordDate >= fromDate;
+      });
+    }
+    if (filters.dateTo) {
+      filtered = filtered.filter(record => {
+        const recordDate = new Date(record.date);
+        const toDate = new Date(filters.dateTo);
+        toDate.setHours(23, 59, 59, 999); // Include entire day
+        return recordDate <= toDate;
+      });
+    }
+    if (filters.heartRateMin) {
+      const min = parseFloat(filters.heartRateMin);
+      filtered = filtered.filter(record => record.heart_rate && parseFloat(record.heart_rate) >= min);
+    }
+    if (filters.heartRateMax) {
+      const max = parseFloat(filters.heartRateMax);
+      filtered = filtered.filter(record => record.heart_rate && parseFloat(record.heart_rate) <= max);
+    }
+    if (filters.bloodPressureSystolicMin) {
+      const min = parseFloat(filters.bloodPressureSystolicMin);
+      filtered = filtered.filter(record => record.blood_pressure_systolic && parseFloat(record.blood_pressure_systolic) >= min);
+    }
+    if (filters.bloodPressureSystolicMax) {
+      const max = parseFloat(filters.bloodPressureSystolicMax);
+      filtered = filtered.filter(record => record.blood_pressure_systolic && parseFloat(record.blood_pressure_systolic) <= max);
+    }
+    if (filters.bloodPressureDiastolicMin) {
+      const min = parseFloat(filters.bloodPressureDiastolicMin);
+      filtered = filtered.filter(record => record.blood_pressure_diastolic && parseFloat(record.blood_pressure_diastolic) >= min);
+    }
+    if (filters.bloodPressureDiastolicMax) {
+      const max = parseFloat(filters.bloodPressureDiastolicMax);
+      filtered = filtered.filter(record => record.blood_pressure_diastolic && parseFloat(record.blood_pressure_diastolic) <= max);
+    }
+    if (filters.activityMin) {
+      const min = parseFloat(filters.activityMin);
+      filtered = filtered.filter(record => record.weekly_activity_minutes && parseFloat(record.weekly_activity_minutes) >= min);
+    }
+    if (filters.activityMax) {
+      const max = parseFloat(filters.activityMax);
+      filtered = filtered.filter(record => record.weekly_activity_minutes && parseFloat(record.weekly_activity_minutes) <= max);
+    }
+    if (filters.bmiMin) {
+      const min = parseFloat(filters.bmiMin);
+      filtered = filtered.filter(record => record.body_mass_index && parseFloat(record.body_mass_index) >= min);
+    }
+    if (filters.bmiMax) {
+      const max = parseFloat(filters.bmiMax);
+      filtered = filtered.filter(record => record.body_mass_index && parseFloat(record.body_mass_index) <= max);
+    }
+    if (filters.temperatureMin) {
+      const min = parseFloat(filters.temperatureMin);
+      filtered = filtered.filter(record => record.body_temperature && parseFloat(record.body_temperature) >= min);
+    }
+    if (filters.temperatureMax) {
+      const max = parseFloat(filters.temperatureMax);
+      filtered = filtered.filter(record => record.body_temperature && parseFloat(record.body_temperature) <= max);
+    }
+    if (filters.glucoseMin) {
+      const min = parseFloat(filters.glucoseMin);
+      filtered = filtered.filter(record => (record.fasting_glucose || record.blood_glucose) && parseFloat(record.fasting_glucose || record.blood_glucose) >= min);
+    }
+    if (filters.glucoseMax) {
+      const max = parseFloat(filters.glucoseMax);
+      filtered = filtered.filter(record => (record.fasting_glucose || record.blood_glucose) && parseFloat(record.fasting_glucose || record.blood_glucose) <= max);
+    }
+
+    // Apply sorting
+    if (sortColumn) {
+      filtered.sort((a, b) => {
+        let aValue, bValue;
+
+        switch (sortColumn) {
+          case 'date':
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
+            break;
+          case 'heart_rate':
+            aValue = parseFloat(a.heart_rate) || 0;
+            bValue = parseFloat(b.heart_rate) || 0;
+            break;
+          case 'blood_pressure':
+            // Sort by systolic first, then diastolic
+            const aSystolic = parseFloat(a.blood_pressure_systolic) || 0;
+            const bSystolic = parseFloat(b.blood_pressure_systolic) || 0;
+            if (aSystolic !== bSystolic) {
+              return sortDirection === 'asc' ? aSystolic - bSystolic : bSystolic - aSystolic;
+            }
+            // If systolic values are equal, sort by diastolic
+            const aDiastolic = parseFloat(a.blood_pressure_diastolic) || 0;
+            const bDiastolic = parseFloat(b.blood_pressure_diastolic) || 0;
+            return sortDirection === 'asc' ? aDiastolic - bDiastolic : bDiastolic - aDiastolic;
+          case 'activity':
+            aValue = parseFloat(a.weekly_activity_minutes) || 0;
+            bValue = parseFloat(b.weekly_activity_minutes) || 0;
+            break;
+          case 'bmi':
+            aValue = parseFloat(a.body_mass_index) || 0;
+            bValue = parseFloat(b.body_mass_index) || 0;
+            break;
+          case 'temperature':
+            aValue = parseFloat(a.body_temperature) || 0;
+            bValue = parseFloat(b.body_temperature) || 0;
+            break;
+          case 'glucose':
+            aValue = parseFloat(a.fasting_glucose || a.blood_glucose) || 0;
+            bValue = parseFloat(b.fasting_glucose || b.blood_glucose) || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (sortDirection === 'asc') {
+          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        } else {
+          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+        }
+      });
+    } else {
+      // Default: sort by date descending (newest first)
+      filtered.sort((a, b) => {
+        const aDate = new Date(a.date);
+        const bDate = new Date(b.date);
+        return bDate - aDate;
+      });
+    }
+
+    return filtered;
+  };
+
   const healthOptions = {
     medical_conditions: [
-      "Hypertension", "Diabetes Type 1", "Diabetes Type 2", "Asthma", "COPD", 
-      "Cardiovascular Disease", "High Cholesterol", "Arthritis", "Depression", 
-      "Anxiety", "Migraine", "Epilepsy", "Thyroid Disorders", "Autoimmune Diseases"
+      "Anxiety", "Arthritis", "Asthma", "Autoimmune Diseases", "COPD",
+      "Cardiovascular Disease", "Depression", "Diabetes Type 1", "Diabetes Type 2", "Epilepsy",
+      "High Cholesterol", "Hypertension", "Migraine", "Thyroid Disorders"
     ],
     medications: [
-      "Metformin", "Lisinopril", "Atorvastatin", "Ibuprofen", "Aspirin", 
-      "Levothyroxine", "Metoprolol", "Omeprazole", "Sertraline", "Albuterol",
-      "Warfarin", "Furosemide", "Amlodipine", "Simvastatin", "Losartan"
+      "Albuterol", "Amlodipine", "Aspirin", "Atorvastatin", "Furosemide",
+      "Ibuprofen", "Levothyroxine", "Lisinopril", "Losartan", "Metformin",
+      "Metoprolol", "Omeprazole", "Sertraline", "Simvastatin", "Warfarin"
     ],
     allergies: [
-      "Penicillin", "Sulfa drugs", "Peanuts", "Tree nuts", "Shellfish", 
-      "Dust mites", "Pollen", "Pet dander", "Latex", "Mold", "Eggs", "Milk",
-      "Soy", "Wheat", "Insect stings", "Contrast dye"
+      "Contrast dye", "Dust mites", "Eggs", "Insect stings", "Latex",
+      "Milk", "Mold", "Peanuts", "Penicillin", "Pet dander",
+      "Pollen", "Shellfish", "Soy", "Sulfa drugs", "Tree nuts", "Wheat"
     ],
     surgical_history: [
-      "Appendectomy", "C-section", "Knee surgery", "Hip replacement", 
-      "Gallbladder removal", "Hernia repair", "Cataract surgery", 
-      "Tonsillectomy", "Cholecystectomy", "Hysterectomy", "Prostate surgery",
-      "Heart surgery", "Spine surgery", "Shoulder surgery"
+      "Appendectomy", "C-section", "Cataract surgery", "Cholecystectomy", "Gallbladder removal",
+      "Heart surgery", "Hernia repair", "Hip replacement", "Hysterectomy", "Knee surgery",
+      "Prostate surgery", "Shoulder surgery", "Spine surgery", "Tonsillectomy"
     ],
     vaccinations: [
-      "COVID-19", "Influenza (Flu)", "Hepatitis A", "Hepatitis B", "MMR", 
-      "Tdap", "Varicella", "Pneumococcal", "Meningococcal", "HPV", 
-      "Shingles", "Polio", "Tetanus", "Diphtheria", "Pertussis"
+      "COVID-19", "Diphtheria", "Hepatitis A", "Hepatitis B", "HPV",
+      "Influenza (Flu)", "Meningococcal", "MMR", "Pertussis", "Pneumococcal",
+      "Polio", "Shingles", "Tdap", "Tetanus", "Varicella"
     ],
     sensitivities: [
-      "Latex", "Nickel", "Fragrances", "Cleaning products", "Pesticides",
-      "Formaldehyde", "Dyes", "Preservatives", "Sulfites", "MSG",
-      "Artificial sweeteners", "Food additives", "Chemicals", "Smoke"
+      "Artificial sweeteners", "Chemicals", "Cleaning products", "Dyes", "Food additives",
+      "Formaldehyde", "Fragrances", "Latex", "MSG", "Nickel",
+      "Pesticides", "Preservatives", "Smoke", "Sulfites"
     ],
     family_history: [
-      "Heart disease", "Diabetes", "Cancer", "Alzheimer's", "Depression",
-      "High blood pressure", "Stroke", "Kidney disease", "Liver disease",
-      "Mental health disorders", "Autoimmune diseases", "Blood disorders",
-      "Genetic conditions", "Obesity", "Substance abuse"
+      "Alzheimer's", "Autoimmune diseases", "Blood disorders", "Cancer", "Diabetes",
+      "Genetic conditions", "Heart disease", "High blood pressure", "Kidney disease", "Liver disease",
+      "Mental health disorders", "Obesity", "Stroke", "Substance abuse"
     ],
   };
 
+
+const extractHealthItemName = (item) => {
+  if (!item) return '';
+  if (typeof item === 'string') return item;
+  return (
+    item.condition_name ||
+    item.name ||
+    item.allergy_name ||
+    item.procedure_name ||
+    item.vaccine_name ||
+    item.sensitivity_name ||
+    item.family_member ||
+    (item.last_dental_exam_date || item.last_dental_exam ? `Dental History - ${item.last_dental_exam_date || item.last_dental_exam}` : 'Dental History') ||
+    ''
+  );
+};
 
 const calculateAgeFromDOB = (dob) => {
   if (!dob) return null;
@@ -1498,6 +1770,35 @@ const calculateAgeFromDOB = (dob) => {
         console.log(`📏 Height: ${heightStored} (unit: ${validHeightUnit})`);
         console.log(`⚖️ Weight: ${weightStored} (unit: ${validWeightUnit})`);
         
+        // Get waist and hip circumference units from API
+        let apiWaistUnit = dataToUse?.waist_circumference_unit 
+          ? dataToUse.waist_circumference_unit.toString().toLowerCase().trim() 
+          : 'in';
+        let apiHipUnit = dataToUse?.hip_circumference_unit 
+          ? dataToUse.hip_circumference_unit.toString().toLowerCase().trim() 
+          : 'in';
+        
+        const validWaistUnit = (apiWaistUnit === 'in' || apiWaistUnit === 'cm') ? apiWaistUnit : 'in';
+        const validHipUnit = (apiHipUnit === 'in' || apiHipUnit === 'cm') ? apiHipUnit : 'in';
+        
+        setPersonalWaistUnit(validWaistUnit);
+        setHipUnit(validHipUnit);
+        
+        // Get waist and hip values (stored in cm in API, convert back if needed)
+        let waistStored = (dataToUse?.waist_circumference ?? "") === 0 ? "" : (dataToUse?.waist_circumference ?? "");
+        let hipStored = (dataToUse?.hip_circumference ?? "") === 0 ? "" : (dataToUse?.hip_circumference ?? "");
+        
+        // Convert from cm to display unit if needed
+        let waistForDisplay = waistStored;
+        let hipForDisplay = hipStored;
+        
+        if (waistStored && validWaistUnit === 'in') {
+          waistForDisplay = cmToIn(parseFloat(waistStored));
+        }
+        if (hipStored && validHipUnit === 'in') {
+          hipForDisplay = cmToIn(parseFloat(hipStored));
+        }
+        
         const formData = {
           first_name: dataToUse?.first_name || dataToUse?.firstName || "",
           last_name: dataToUse?.last_name || dataToUse?.lastName || "",
@@ -1509,6 +1810,10 @@ const calculateAgeFromDOB = (dob) => {
           weight_kg: weightForDisplay === "" ? "" : weightForDisplay.toString(),
           zip_code: dataToUse?.zip_code ?? "",
           user_id: dataToUse?.user_id || user?.id || "",
+          body_fat_percentage: dataToUse?.body_fat_percentage ?? "",
+          body_fat_method: dataToUse?.body_fat_method || "",
+          waist_circumference: waistForDisplay === "" ? "" : waistForDisplay.toString(),
+          hip_circumference: hipForDisplay === "" ? "" : hipForDisplay.toString(),
         };
         
         console.log('📊 Form data to set:', formData);
@@ -1594,6 +1899,32 @@ const calculateAgeFromDOB = (dob) => {
         console.log(`📏 Fallback Height: ${fallbackHeight} (unit: ${fallbackHeightUnit})`);
         console.log(`⚖️ Fallback Weight: ${fallbackWeight} (unit: ${fallbackWeightUnit})`);
         
+        // Get waist and hip circumference units from fallback data
+        let fallbackWaistUnit = profileData?.waist_circumference_unit 
+          ? profileData.waist_circumference_unit.toString().toLowerCase().trim() 
+          : 'in';
+        let fallbackHipUnit = profileData?.hip_circumference_unit 
+          ? profileData.hip_circumference_unit.toString().toLowerCase().trim() 
+          : 'in';
+        
+        const fallbackValidWaistUnit = (fallbackWaistUnit === 'in' || fallbackWaistUnit === 'cm') ? fallbackWaistUnit : 'in';
+        const fallbackValidHipUnit = (fallbackHipUnit === 'in' || fallbackHipUnit === 'cm') ? fallbackHipUnit : 'in';
+        
+        setPersonalWaistUnit(fallbackValidWaistUnit);
+        setHipUnit(fallbackValidHipUnit);
+        
+        // Get waist and hip values (stored in cm in API, convert back if needed)
+        let fallbackWaist = (profileData?.waist_circumference ?? "") === 0 ? "" : (profileData?.waist_circumference ?? "");
+        let fallbackHip = (profileData?.hip_circumference ?? "") === 0 ? "" : (profileData?.hip_circumference ?? "");
+        
+        // Convert from cm to display unit if needed
+        if (fallbackWaist && fallbackValidWaistUnit === 'in') {
+          fallbackWaist = cmToIn(parseFloat(fallbackWaist));
+        }
+        if (fallbackHip && fallbackValidHipUnit === 'in') {
+          fallbackHip = cmToIn(parseFloat(fallbackHip));
+        }
+        
         setFormValues({
           first_name: profileData?.first_name || profileData?.firstName || "",
           last_name: profileData?.last_name || profileData?.lastName || "",
@@ -1605,6 +1936,10 @@ const calculateAgeFromDOB = (dob) => {
           weight_kg: fallbackWeight === "" ? "" : fallbackWeight.toString(),
           zip_code: profileData?.zip_code ?? "",
           user_id: profileData?.user_id || user?.id || "",
+          body_fat_percentage: profileData?.body_fat_percentage ?? "",
+          body_fat_method: profileData?.body_fat_method || "",
+          waist_circumference: fallbackWaist === "" ? "" : fallbackWaist.toString(),
+          hip_circumference: fallbackHip === "" ? "" : fallbackHip.toString(),
         });
         console.log('📊 Fallback form data set:', {
           first_name: profileData?.first_name || profileData?.firstName || "",
@@ -1631,8 +1966,31 @@ const calculateAgeFromDOB = (dob) => {
     }
     if (activeTab === 'health_history' && user?.id) {
       loadHealthHistorySummary();
+      loadDentalHistory();
     }
   }, [activeTab, user?.id]);
+
+  // Helper: load dental history from API
+  const loadDentalHistory = async () => {
+    if (!user?.id) return;
+    try {
+      // Try with user_id query param first, fallback to base endpoint
+      let response;
+      try {
+        response = await authRequest(`${ENDPOINTS.dentalHistory.getAll}?user_id=${user.id}`);
+      } catch (e) {
+        // If query param fails, try without it (API may filter by auth token)
+        response = await authRequest(ENDPOINTS.dentalHistory.getAll);
+      }
+      const dentalData = response?.result || response || [];
+      const dentalArray = Array.isArray(dentalData) ? dentalData : [];
+      setDentalHistory(dentalArray);
+      setLastUpdated(prev => ({ ...prev, dental_history: new Date().toISOString() }));
+    } catch (e) {
+      console.warn('Failed to load dental history:', e?.message);
+      setDentalHistory([]);
+    }
+  };
 
   // Helper: load health history summary and set state
   const loadHealthHistorySummary = async () => {
@@ -1745,6 +2103,18 @@ const calculateAgeFromDOB = (dob) => {
       const heightToSave = formValues.height_cm === "" ? 0 : Number(formValues.height_cm);
       const weightToSave = formValues.weight_kg === "" ? 0 : Number(formValues.weight_kg);
       
+      // Convert waist and hip circumference to cm for API (similar to height/weight pattern)
+      // Store the unit type so we can convert back when loading
+      let waistToSave = formValues.waist_circumference === "" ? 0 : Number(formValues.waist_circumference);
+      if (waistToSave > 0 && personalWaistUnit === 'in') {
+        waistToSave = inToCm(waistToSave);
+      }
+      
+      let hipToSave = formValues.hip_circumference === "" ? 0 : Number(formValues.hip_circumference);
+      if (hipToSave > 0 && hipUnit === 'in') {
+        hipToSave = inToCm(hipToSave);
+      }
+      
       // Prepare profile data payload (excluding photo - photo is handled separately)
       const basePayload = {
         first_name: formValues.first_name?.trim(),
@@ -1758,6 +2128,12 @@ const calculateAgeFromDOB = (dob) => {
         weight_kg: weightToSave,
         weight_type: weightUnit || "",
         zip_code: formValues.zip_code?.trim() || "",
+        body_fat_percentage: formValues.body_fat_percentage === "" ? null : Number(formValues.body_fat_percentage),
+        body_fat_method: formValues.body_fat_method || "",
+        waist_circumference: waistToSave === 0 ? null : waistToSave,
+        waist_circumference_unit: personalWaistUnit || "",
+        hip_circumference: hipToSave === 0 ? null : hipToSave,
+        hip_circumference_unit: hipUnit || "",
         // Note: profile_photo is handled separately via photo upload API
       };
 
@@ -2137,6 +2513,7 @@ const calculateAgeFromDOB = (dob) => {
       </div>
 
       {activeTab === 'personal' && (
+      <>
       <div className="card" style={{ display: "flex", gap: 16, marginBottom: 24,  alignItems:'flex-start', maxWidth: 900}}>
         <div 
           style={{ width: 120, height: 120, backgroundColor: isLight ? "rgba(241, 243, 245, 0.8)" : "#0b0b0b", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, border:'1px solid var(--border)', overflow:'hidden', cursor:'pointer', position:'relative' }}
@@ -2691,6 +3068,251 @@ const calculateAgeFromDOB = (dob) => {
           )}
         </div>
       </div>
+
+      {/* Core Body Metrics - Separate Card */}
+      <div className="card" style={{ marginBottom: 24, maxWidth: 900, width: '100%' }}>
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ 
+            margin: 0, 
+            marginBottom: 8, 
+            fontSize: '18px', 
+            fontWeight: 600, 
+            color: 'var(--text)'
+          }}>
+            Core Body Metrics
+          </h3>
+          <p style={{ 
+            margin: 0, 
+            fontSize: '14px', 
+            color: 'var(--muted)',
+            lineHeight: 1.5
+          }}>
+            Track your body composition measurements to monitor your health and fitness progress over time.
+          </p>
+        </div>
+        <style>{`
+          .core-body-metrics-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            width: 100%;
+          }
+          .core-body-metrics-input-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            flex-wrap: wrap;
+          }
+          .core-body-metrics-circumference-row {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+          .core-body-metrics-input-row input {
+            flex: 1 1 220px;
+            min-width: 0;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 14px;
+            height: 38px;
+            box-sizing: border-box;
+            background: var(--background);
+          }
+          .core-body-metrics-input-row select {
+            flex: 1 1 180px;
+            min-width: 140px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 14px;
+            height: 38px;
+            background: var(--background);
+            appearance: none;
+            -webkit-appearance: none;
+          }
+          .core-body-metrics-measure-group {
+            display: flex;
+            align-items: stretch;
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--background);
+          }
+          .core-body-metrics-measure-group input {
+            flex: 1 1 auto;
+            border: none;
+            padding: 10px 14px;
+            font-size: 14px;
+            background: transparent;
+          }
+          .core-body-metrics-unit-toggle {
+            display: flex;
+          }
+          .core-body-metrics-unit-toggle button {
+            padding: 10px 16px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 56px;
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+          .core-body-metrics-unit-toggle button.active {
+            background: var(--primary);
+            color: #fff;
+          }
+        `}</style>
+        <form onSubmit={handleSave} className="form core-body-metrics-form">
+          {/* Body Fat % */}
+          <label className="form-field core-body-metrics-field" style={{ display: "flex", flexDirection: "column", gap: 8, width: '100%' }}>
+            <div>
+              <span style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Body Fat Percentage</span>
+              <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Enter your body fat percentage (0-100%)</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+              <div className="core-body-metrics-input-row">
+                <input 
+                  type="number" 
+                  inputMode="numeric"
+                  name="body_fat_percentage" 
+                  value={formValues.body_fat_percentage} 
+                  onChange={handleChange} 
+                  placeholder={formValues.body_fat_percentage ? "" : "e.g. 15.5"}
+                  step="0.1"
+                  min="0"
+                  max="100"
+                />
+                <select 
+                  name="body_fat_method" 
+                  value={formValues.body_fat_method || ""} 
+                  onChange={handleChange}
+                  title="Select the method used to measure body fat"
+                  style={{ height: '38px', padding: '0 12px' }}
+                >
+                  <option value="">Select method</option>
+                  <option value="Smart Scale">Smart Scale</option>
+                  <option value="DXA">DXA</option>
+                  <option value="Calipers">Calipers</option>
+                  <option value="Estimate">Estimate</option>
+                </select>
+              </div>
+              {formValues.body_fat_method && (
+                <span style={{ fontSize: '12px', color: 'var(--muted)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>✓</span>
+                  <span>Method: {formValues.body_fat_method}</span>
+                </span>
+              )}
+            </div>
+          </label>
+
+          {/* Waist Circumference */}
+          <label className="form-field core-body-metrics-field" style={{ display: "flex", flexDirection: "column", gap: 8, width: '100%' }}>
+            <div>
+              <span style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Waist Circumference</span>
+              <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                Measure around your waist at the narrowest point
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+              <div className="core-body-metrics-circumference-row">
+                <input 
+                  type="number" 
+                  inputMode="numeric"
+                  name="waist_circumference" 
+                  value={formValues.waist_circumference} 
+                  onChange={handleChange} 
+                  placeholder={formValues.waist_circumference ? "" : (personalWaistUnit === 'cm' ? "e.g. 80" : "e.g. 31.5")}
+                  step="0.1"
+                  min={personalWaistUnit === 'cm' ? "40" : "15.7"}
+                  max={personalWaistUnit === 'cm' ? "200" : "78.7"}
+                />
+                <div className="core-body-metrics-unit-toggle">
+                  <button
+                    type="button"
+                    onClick={() => handlePersonalWaistUnitChange('cm')}
+                    className={personalWaistUnit === 'cm' ? 'active' : ''}
+                    title="Centimeters"
+                  >
+                    cm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePersonalWaistUnitChange('in')}
+                    className={personalWaistUnit === 'in' ? 'active' : ''}
+                    title="Inches"
+                  >
+                    in
+                  </button>
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                Range: {personalWaistUnit === 'cm' ? '40-200 cm' : '15.7-78.7 in'}
+              </span>
+            </div>
+          </label>
+
+          {/* Hip Circumference */}
+          <label className="form-field core-body-metrics-field" style={{ display: "flex", flexDirection: "column", gap: 8, width: '100%', gridColumn: "1 / -1" }}>
+            <div>
+              <span style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Hip Circumference</span>
+              <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                Measure around your hips at the widest point
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+              <div className="core-body-metrics-circumference-row">
+                <div className="core-body-metrics-measure-group">
+                  <input 
+                    type="number" 
+                    inputMode="numeric"
+                    name="hip_circumference" 
+                    value={formValues.hip_circumference} 
+                    onChange={handleChange} 
+                    placeholder={formValues.hip_circumference ? "" : (hipUnit === 'cm' ? "e.g. 95" : "e.g. 37.4")}
+                    step="0.1"
+                    min={hipUnit === 'cm' ? "40" : "15.7"}
+                    max={hipUnit === 'cm' ? "200" : "78.7"}
+                  />
+                  <div className="core-body-metrics-unit-toggle">
+                    <button
+                      type="button"
+                      onClick={() => handleHipUnitChange('cm')}
+                      className={hipUnit === 'cm' ? 'active' : ''}
+                      title="Centimeters"
+                    >
+                      cm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleHipUnitChange('in')}
+                      className={hipUnit === 'in' ? 'active' : ''}
+                      title="Inches"
+                    >
+                      in
+                    </button>
+                  </div>
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                  Range: {hipUnit === 'cm' ? '40-200 cm' : '15.7-78.7 in'}
+                </span>
+              </div>
+            </div>
+          </label>
+
+          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <button type="submit" className="btn primary full" disabled={saving} style={{ minHeight: '44px' }}>
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+      </>
       )}
 
       {activeTab === 'health_history' && (
@@ -2738,6 +3360,7 @@ const calculateAgeFromDOB = (dob) => {
                     // Prefill modal form with item fields
                     const base = { ...(item || {}), user_id: user?.id };
                     setAddHistoryForm(base);
+                    setShowModalAutocomplete(false);
                     setIsAddHistoryModalOpen(true);
                   }}
                   onDelete={(item) => {
@@ -2818,11 +3441,74 @@ const calculateAgeFromDOB = (dob) => {
                     if (key === 'sensitivities') Object.assign(initial, { sensitivity_name: '', type: 'environmental', symptoms: '', severity: 'mild' });
                     if (key === 'family_history') Object.assign(initial, { family_member: '', condition_name: '', age_at_diagnosis: '', is_genetic: false, notes: '' });
                     setAddHistoryForm(initial);
+                    setShowModalAutocomplete(false);
                     setIsAddHistoryModalOpen(true);
                   }}
                   saving={savingHistory[key]}
                 />
               ))}
+              
+              {/* Dental History Section */}
+              <HealthSection
+                key="dental_history"
+                title="Dental History"
+                description="Track your dental health history and current concerns"
+                options={[]}
+                values={dentalHistory}
+                lastUpdated={lastUpdated.dental_history}
+                onToggle={(item) => {
+                  const itemId = typeof item === 'object' ? (item.id || item.dental_history_id) : item;
+                  setDentalHistory(prev => prev.filter(i => {
+                    const currId = typeof i === 'object' ? (i.id || i.dental_history_id) : i;
+                    return currId !== itemId;
+                  }));
+                }}
+                sectionKey="dental_history"
+                onEdit={(item) => {
+                  setEditingHistoryItem(item);
+                  setEditingHistorySectionKey('dental_history');
+                  setAddHistorySectionKey('dental_history');
+                  // Map API fields to form fields
+                  const base = {
+                    user_id: user?.id,
+                    last_dental_exam: item?.last_dental_exam_date || '',
+                    gum_disease: item?.has_gum_disease ?? null,
+                    frequent_cavities: item?.has_frequent_cavities ?? null,
+                    major_dental_work: item?.major_dental_work_notes || '',
+                    tmj_issues: item?.has_tmj_issues ?? null,
+                    current_concerns: item?.current_dental_concerns || '',
+                  };
+                  setAddHistoryForm(base);
+                  setShowModalAutocomplete(false);
+                  setIsAddHistoryModalOpen(true);
+                }}
+                onDelete={(item) => {
+                  setItemToDelete(item);
+                  setSectionKeyToDelete('dental_history');
+                  setIsDeleteHistoryModalOpen(true);
+                }}
+                onSave={async () => {
+                  // Dental history is saved through the modal, not through bulk save
+                  // This function is kept for consistency but does nothing
+                  showSuccess('Dental History is saved automatically when you add or edit records.');
+                }}
+                onAddNew={() => {
+                  setAddHistorySectionKey('dental_history');
+                  const initial = {
+                    user_id: user?.id,
+                    last_dental_exam: '',
+                    gum_disease: null,
+                    frequent_cavities: null,
+                    major_dental_work: '',
+                    tmj_issues: null,
+                    current_concerns: '',
+                  };
+                  setAddHistoryForm(initial);
+                  setShowModalAutocomplete(false);
+                  setIsAddHistoryModalOpen(true);
+                }}
+                saving={savingHistory.dental_history}
+              />
             </div>
           </div>
         </div>
@@ -2847,7 +3533,12 @@ const calculateAgeFromDOB = (dob) => {
             zIndex: 1000,
             padding: 20,
           }}
-          onClick={(e) => { if (e.target === e.currentTarget) setIsAddHistoryModalOpen(false); }}
+          onClick={(e) => { 
+            if (e.target === e.currentTarget) {
+              setIsAddHistoryModalOpen(false);
+              setShowModalAutocomplete(false);
+            }
+          }}
         >
           <div style={{
             background: 'var(--bg)',
@@ -2868,7 +3559,10 @@ const calculateAgeFromDOB = (dob) => {
                   addHistorySectionKey === 'medical_conditions' ? 'Add New Medical Conditions' : `Add New ${addHistorySectionKey?.replace('_',' ').replace(/\b\w/g, l => l.toUpperCase())}`
                 )}
               </h3>
-              <button className="btn outline" onClick={() => setIsAddHistoryModalOpen(false)} style={{ padding: '6px 10px', fontSize: '16px' }}>✕</button>
+              <button className="btn outline" onClick={() => {
+                setIsAddHistoryModalOpen(false);
+                setShowModalAutocomplete(false);
+              }} style={{ padding: '6px 10px', fontSize: '16px' }}>✕</button>
             </div>
             <div className="add-history-modal-body" style={{ padding: 20, overflowY: 'auto' }}>
               <form 
@@ -3058,17 +3752,64 @@ const calculateAgeFromDOB = (dob) => {
                         response = await HealthHistoryApi.addFamilyHistory(payload);
                       }
                       newItem = response?.result || response || payload;
+                    } else if (addHistorySectionKey === 'dental_history') {
+                      // Map form fields to API structure
+                      const apiPayload = {
+                        last_dental_exam_date: payload.last_dental_exam || null,
+                        has_gum_disease: payload.gum_disease ?? false,
+                        has_frequent_cavities: payload.frequent_cavities ?? false,
+                        major_dental_work_notes: payload.major_dental_work || '',
+                        has_tmj_issues: payload.tmj_issues ?? false,
+                        current_dental_concerns: payload.current_concerns || '',
+                        user_id: user?.id,
+                      };
+                      
+                      let response;
+                      try {
+                        if (editingHistoryItem && (editingHistoryItem.dental_history_id || editingHistoryItem.id)) {
+                          // Update existing record
+                          const dentalHistoryId = editingHistoryItem.dental_history_id || editingHistoryItem.id;
+                          response = await authRequest(ENDPOINTS.dentalHistory.update(dentalHistoryId), {
+                            method: 'PATCH',
+                            body: apiPayload, // authRequest will stringify automatically
+                          });
+                        } else {
+                          // Create new record
+                          response = await authRequest(ENDPOINTS.dentalHistory.create, {
+                            method: 'POST',
+                            body: apiPayload, // authRequest will stringify automatically
+                          });
+                        }
+                        // Ensure newItem is set even if response is empty
+                        newItem = response?.result || response || { ...apiPayload, dental_history_id: response?.dental_history_id || editingHistoryItem?.dental_history_id || editingHistoryItem?.id };
+                        // Reload dental history from API
+                        try {
+                          await loadDentalHistory();
+                        } catch (loadError) {
+                          console.warn('Failed to reload dental history after save:', loadError);
+                          // Don't throw - save was successful, just reload failed
+                        }
+                      } catch (dentalError) {
+                        console.error('Error saving dental history:', dentalError);
+                        throw dentalError; // Re-throw to be caught by outer catch
+                      }
                     }
                     if (newItem) {
-                      await loadHealthHistorySummary();
+                      if (addHistorySectionKey !== 'dental_history') {
+                        await loadHealthHistorySummary();
+                      }
                     }
                     setLastUpdated(prev => ({ ...prev, [addHistorySectionKey]: new Date().toISOString() }));
                     showSuccess('Saved successfully');
                     setIsAddHistoryModalOpen(false);
+                    setShowModalAutocomplete(false);
                     setEditingHistoryItem(null);
                     setEditingHistorySectionKey(null);
+                    setAddHistoryForm({});
                   } catch (err) {
+                    console.error('Error in form submission:', err);
                     showError(err?.message || 'Failed to save');
+                    // Don't close modal on error, let user fix and retry
                   } finally {
                     setSavingAddHistory(false);
                   }
@@ -3080,15 +3821,86 @@ const calculateAgeFromDOB = (dob) => {
                 {addHistorySectionKey === 'medical_conditions' && (
                   <>
                     {/* Condition name */}
-                    <label className="form-field" style={{ display:'flex', flexDirection:'column', gap: 6 }}>
+                    <label className="form-field" style={{ display:'flex', flexDirection:'column', gap: 6, width: '100%', position: 'relative' }}>
                       <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>Condition name</span>
                       <input 
+                        ref={modalNameInputRef}
+                        type="text"
                         value={addHistoryForm.condition_name || ''} 
-                        onChange={(e)=>setAddHistoryForm(v=>({...v, condition_name: e.target.value}))} 
-                        placeholder="Enter medical conditions..."
+                        onChange={(e) => {
+                          setAddHistoryForm(v => ({ ...v, condition_name: e.target.value }));
+                          setShowModalAutocomplete(true);
+                        }}
+                        onFocus={() => setShowModalAutocomplete(true)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            setShowModalAutocomplete(false);
+                          }, 200);
+                        }}
+                        placeholder="Select or type a condition"
                         required 
-                        style={{ padding: '10px 12px', fontSize: '14px' }}
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '16px',
+                          paddingRight: '32px'
+                        }}
                       />
+                      {showModalAutocomplete && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            marginTop: '4px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        >
+                          {healthOptions.medical_conditions
+                            .filter(option => 
+                              !addHistoryForm.condition_name || option.toLowerCase().includes(addHistoryForm.condition_name.toLowerCase())
+                            )
+                            .map(option => (
+                              <div
+                                key={option}
+                                onClick={() => {
+                                  setAddHistoryForm(v => ({ ...v, condition_name: option }));
+                                  setShowModalAutocomplete(false);
+                                  modalNameInputRef.current?.blur();
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                style={{
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </label>
 
                     {/* Diagnosis date with Today checkbox */}
@@ -3165,9 +3977,86 @@ const calculateAgeFromDOB = (dob) => {
 
                 {addHistorySectionKey === 'medications' && (
                   <>
-                    <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
+                    <label className="form-field" style={{ display:'flex', flexDirection:'column', width: '100%', position: 'relative' }}>
                       <span>Name</span>
-                      <input value={addHistoryForm.name || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, name: e.target.value}))} required />
+                      <input 
+                        ref={modalNameInputRef}
+                        type="text"
+                        value={addHistoryForm.name || ''} 
+                        onChange={(e) => {
+                          setAddHistoryForm(v => ({ ...v, name: e.target.value }));
+                          setShowModalAutocomplete(true);
+                        }}
+                        onFocus={() => setShowModalAutocomplete(true)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            setShowModalAutocomplete(false);
+                          }, 200);
+                        }}
+                        placeholder="Select or type a medication"
+                        required 
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '16px',
+                          paddingRight: '32px'
+                        }}
+                      />
+                      {showModalAutocomplete && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            marginTop: '4px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        >
+                          {healthOptions.medications
+                            .filter(option => 
+                              !addHistoryForm.name || option.toLowerCase().includes(addHistoryForm.name.toLowerCase())
+                            )
+                            .map(option => (
+                              <div
+                                key={option}
+                                onClick={() => {
+                                  setAddHistoryForm(v => ({ ...v, name: option }));
+                                  setShowModalAutocomplete(false);
+                                  modalNameInputRef.current?.blur();
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                style={{
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Dosage</span>
@@ -3213,9 +4102,86 @@ const calculateAgeFromDOB = (dob) => {
 
                 {addHistorySectionKey === 'allergies' && (
                   <>
-                    <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
+                    <label className="form-field" style={{ display:'flex', flexDirection:'column', width: '100%', position: 'relative' }}>
                       <span>Allergy name</span>
-                      <input value={addHistoryForm.allergy_name || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, allergy_name: e.target.value}))} required />
+                      <input 
+                        ref={modalNameInputRef}
+                        type="text"
+                        value={addHistoryForm.allergy_name || ''} 
+                        onChange={(e) => {
+                          setAddHistoryForm(v => ({ ...v, allergy_name: e.target.value }));
+                          setShowModalAutocomplete(true);
+                        }}
+                        onFocus={() => setShowModalAutocomplete(true)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            setShowModalAutocomplete(false);
+                          }, 200);
+                        }}
+                        placeholder="Select or type an allergy"
+                        required 
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '16px',
+                          paddingRight: '32px'
+                        }}
+                      />
+                      {showModalAutocomplete && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            marginTop: '4px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        >
+                          {healthOptions.allergies
+                            .filter(option => 
+                              !addHistoryForm.allergy_name || option.toLowerCase().includes(addHistoryForm.allergy_name.toLowerCase())
+                            )
+                            .map(option => (
+                              <div
+                                key={option}
+                                onClick={() => {
+                                  setAddHistoryForm(v => ({ ...v, allergy_name: option }));
+                                  setShowModalAutocomplete(false);
+                                  modalNameInputRef.current?.blur();
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                style={{
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Severity</span>
@@ -3234,9 +4200,86 @@ const calculateAgeFromDOB = (dob) => {
 
                 {addHistorySectionKey === 'surgical_history' && (
                   <>
-                    <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
+                    <label className="form-field" style={{ display:'flex', flexDirection:'column', width: '100%', position: 'relative' }}>
                       <span>Procedure name</span>
-                      <input value={addHistoryForm.procedure_name || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, procedure_name: e.target.value}))} required />
+                      <input 
+                        ref={modalNameInputRef}
+                        type="text"
+                        value={addHistoryForm.procedure_name || ''} 
+                        onChange={(e) => {
+                          setAddHistoryForm(v => ({ ...v, procedure_name: e.target.value }));
+                          setShowModalAutocomplete(true);
+                        }}
+                        onFocus={() => setShowModalAutocomplete(true)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            setShowModalAutocomplete(false);
+                          }, 200);
+                        }}
+                        placeholder="Select or type a procedure"
+                        required 
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '16px',
+                          paddingRight: '32px'
+                        }}
+                      />
+                      {showModalAutocomplete && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            marginTop: '4px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        >
+                          {healthOptions.surgical_history
+                            .filter(option => 
+                              !addHistoryForm.procedure_name || option.toLowerCase().includes(addHistoryForm.procedure_name.toLowerCase())
+                            )
+                            .map(option => (
+                              <div
+                                key={option}
+                                onClick={() => {
+                                  setAddHistoryForm(v => ({ ...v, procedure_name: option }));
+                                  setShowModalAutocomplete(false);
+                                  modalNameInputRef.current?.blur();
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                style={{
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Surgery date</span>
@@ -3259,9 +4302,86 @@ const calculateAgeFromDOB = (dob) => {
 
                 {addHistorySectionKey === 'vaccinations' && (
                   <>
-                    <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
+                    <label className="form-field" style={{ display:'flex', flexDirection:'column', width: '100%', position: 'relative' }}>
                       <span>Vaccine name</span>
-                      <input value={addHistoryForm.vaccine_name || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, vaccine_name: e.target.value}))} required />
+                      <input 
+                        ref={modalNameInputRef}
+                        type="text"
+                        value={addHistoryForm.vaccine_name || ''} 
+                        onChange={(e) => {
+                          setAddHistoryForm(v => ({ ...v, vaccine_name: e.target.value }));
+                          setShowModalAutocomplete(true);
+                        }}
+                        onFocus={() => setShowModalAutocomplete(true)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            setShowModalAutocomplete(false);
+                          }, 200);
+                        }}
+                        placeholder="Select or type a vaccine"
+                        required 
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '16px',
+                          paddingRight: '32px'
+                        }}
+                      />
+                      {showModalAutocomplete && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            marginTop: '4px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        >
+                          {healthOptions.vaccinations
+                            .filter(option => 
+                              !addHistoryForm.vaccine_name || option.toLowerCase().includes(addHistoryForm.vaccine_name.toLowerCase())
+                            )
+                            .map(option => (
+                              <div
+                                key={option}
+                                onClick={() => {
+                                  setAddHistoryForm(v => ({ ...v, vaccine_name: option }));
+                                  setShowModalAutocomplete(false);
+                                  modalNameInputRef.current?.blur();
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                style={{
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Vaccination date</span>
@@ -3280,9 +4400,86 @@ const calculateAgeFromDOB = (dob) => {
 
                 {addHistorySectionKey === 'sensitivities' && (
                   <>
-                    <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
+                    <label className="form-field" style={{ display:'flex', flexDirection:'column', width: '100%', position: 'relative' }}>
                       <span>Sensitivity name</span>
-                      <input value={addHistoryForm.sensitivity_name || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, sensitivity_name: e.target.value}))} required />
+                      <input 
+                        ref={modalNameInputRef}
+                        type="text"
+                        value={addHistoryForm.sensitivity_name || ''} 
+                        onChange={(e) => {
+                          setAddHistoryForm(v => ({ ...v, sensitivity_name: e.target.value }));
+                          setShowModalAutocomplete(true);
+                        }}
+                        onFocus={() => setShowModalAutocomplete(true)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            setShowModalAutocomplete(false);
+                          }, 200);
+                        }}
+                        placeholder="Select or type a sensitivity"
+                        required 
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '16px',
+                          paddingRight: '32px'
+                        }}
+                      />
+                      {showModalAutocomplete && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            marginTop: '4px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        >
+                          {healthOptions.sensitivities
+                            .filter(option => 
+                              !addHistoryForm.sensitivity_name || option.toLowerCase().includes(addHistoryForm.sensitivity_name.toLowerCase())
+                            )
+                            .map(option => (
+                              <div
+                                key={option}
+                                onClick={() => {
+                                  setAddHistoryForm(v => ({ ...v, sensitivity_name: option }));
+                                  setShowModalAutocomplete(false);
+                                  modalNameInputRef.current?.blur();
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                style={{
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Type</span>
@@ -3314,9 +4511,86 @@ const calculateAgeFromDOB = (dob) => {
                       <span>Family member</span>
                       <input value={addHistoryForm.family_member || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, family_member: e.target.value}))} required />
                     </label>
-                    <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
+                    <label className="form-field" style={{ display:'flex', flexDirection:'column', width: '100%', position: 'relative' }}>
                       <span>Condition name</span>
-                      <input value={addHistoryForm.condition_name || ''} onChange={(e)=>setAddHistoryForm(v=>({...v, condition_name: e.target.value}))} required />
+                      <input 
+                        ref={modalNameInputRef}
+                        type="text"
+                        value={addHistoryForm.condition_name || ''} 
+                        onChange={(e) => {
+                          setAddHistoryForm(v => ({ ...v, condition_name: e.target.value }));
+                          setShowModalAutocomplete(true);
+                        }}
+                        onFocus={() => setShowModalAutocomplete(true)}
+                        onBlur={(e) => {
+                          setTimeout(() => {
+                            setShowModalAutocomplete(false);
+                          }, 200);
+                        }}
+                        placeholder="Select or type a condition"
+                        required 
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'textfield',
+                          backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 8px center',
+                          backgroundSize: '16px',
+                          paddingRight: '32px'
+                        }}
+                      />
+                      {showModalAutocomplete && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            right: 0,
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            marginTop: '4px',
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            zIndex: 100,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        >
+                          {healthOptions.family_history
+                            .filter(option => 
+                              !addHistoryForm.condition_name || option.toLowerCase().includes(addHistoryForm.condition_name.toLowerCase())
+                            )
+                            .map(option => (
+                              <div
+                                key={option}
+                                onClick={() => {
+                                  setAddHistoryForm(v => ({ ...v, condition_name: option }));
+                                  setShowModalAutocomplete(false);
+                                  modalNameInputRef.current?.blur();
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                style={{
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'var(--background-secondary, rgba(0, 0, 0, 0.05))';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {option}
+                              </div>
+                            ))}
+                        </div>
+                      )}
                     </label>
                     <label className="form-field" style={{ display:'flex', flexDirection:'column' }}>
                       <span>Age at diagnosis</span>
@@ -3333,8 +4607,124 @@ const calculateAgeFromDOB = (dob) => {
                   </>
                 )}
 
+                {addHistorySectionKey === 'dental_history' && (
+                  <>
+                    {/* Last dental exam */}
+                    <label className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>Last dental exam</span>
+                      <DatePicker
+                        value={addHistoryForm.last_dental_exam || ''}
+                        onChange={(val) => setAddHistoryForm(v => ({ ...v, last_dental_exam: val }))}
+                        maxDate={new Date().toISOString().split('T')[0]}
+                      />
+                    </label>
+
+                    {/* History of gum disease */}
+                    <label className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>History of gum disease / periodontal disease</span>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="gum_disease"
+                            checked={addHistoryForm.gum_disease === true}
+                            onChange={() => setAddHistoryForm(v => ({ ...v, gum_disease: true }))}
+                          />
+                          <span>Yes</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="gum_disease"
+                            checked={addHistoryForm.gum_disease === false}
+                            onChange={() => setAddHistoryForm(v => ({ ...v, gum_disease: false }))}
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+                    </label>
+
+                    {/* Frequent cavities */}
+                    <label className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>Frequent cavities</span>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="frequent_cavities"
+                            checked={addHistoryForm.frequent_cavities === true}
+                            onChange={() => setAddHistoryForm(v => ({ ...v, frequent_cavities: true }))}
+                          />
+                          <span>Yes</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="frequent_cavities"
+                            checked={addHistoryForm.frequent_cavities === false}
+                            onChange={() => setAddHistoryForm(v => ({ ...v, frequent_cavities: false }))}
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+                    </label>
+
+                    {/* Major dental work / missing teeth */}
+                    <label className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>Major dental work / missing teeth</span>
+                      <textarea
+                        value={addHistoryForm.major_dental_work || ''}
+                        onChange={(e) => setAddHistoryForm(v => ({ ...v, major_dental_work: e.target.value }))}
+                        placeholder="Describe any major dental work or missing teeth (optional)"
+                        rows={3}
+                        style={{ padding: '10px 12px', fontSize: '14px', resize: 'vertical', minHeight: '60px', fontFamily: 'inherit' }}
+                      />
+                    </label>
+
+                    {/* TMJ / jaw issues */}
+                    <label className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>TMJ / jaw issues or night guard use</span>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="tmj_issues"
+                            checked={addHistoryForm.tmj_issues === true}
+                            onChange={() => setAddHistoryForm(v => ({ ...v, tmj_issues: true }))}
+                          />
+                          <span>Yes</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="tmj_issues"
+                            checked={addHistoryForm.tmj_issues === false}
+                            onChange={() => setAddHistoryForm(v => ({ ...v, tmj_issues: false }))}
+                          />
+                          <span>No</span>
+                        </label>
+                      </div>
+                    </label>
+
+                    {/* Current dental concerns */}
+                    <label className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>Current dental concerns</span>
+                      <textarea
+                        value={addHistoryForm.current_concerns || ''}
+                        onChange={(e) => setAddHistoryForm(v => ({ ...v, current_concerns: e.target.value }))}
+                        placeholder="Describe any current dental concerns"
+                        rows={4}
+                        style={{ padding: '10px 12px', fontSize: '14px', resize: 'vertical', minHeight: '80px', fontFamily: 'inherit' }}
+                      />
+                    </label>
+                  </>
+                )}
+
                 <div style={{ gridColumn:'1 / -1', display:'flex', gap:8, justifyContent:'flex-end', marginTop: 8 }}>
-                  <button type="button" className="btn outline" onClick={()=>setIsAddHistoryModalOpen(false)}>Cancel</button>
+                  <button type="button" className="btn outline" onClick={() => {
+                    setIsAddHistoryModalOpen(false);
+                    setShowModalAutocomplete(false);
+                  }}>Cancel</button>
                   <button type="submit" className="btn primary" disabled={savingAddHistory}>{savingAddHistory ? 'Saving…' : 'Save'}</button>
                 </div>
               </form>
@@ -3354,7 +4744,7 @@ const calculateAgeFromDOB = (dob) => {
         onConfirm={handleConfirmDeleteHistory}
         title="Delete Record"
         message={itemToDelete 
-          ? `Are you sure you want to delete "${itemToDelete.condition_name || itemToDelete.name || itemToDelete.allergy_name || itemToDelete.procedure_name || itemToDelete.vaccine_name || itemToDelete.sensitivity_name || 'this record'}"? This action cannot be undone.`
+          ? `Are you sure you want to delete "${itemToDelete.condition_name || itemToDelete.name || itemToDelete.allergy_name || itemToDelete.procedure_name || itemToDelete.vaccine_name || itemToDelete.sensitivity_name || ((itemToDelete.last_dental_exam_date || itemToDelete.last_dental_exam) ? `Dental History - ${itemToDelete.last_dental_exam_date || itemToDelete.last_dental_exam}` : 'this record')}"? This action cannot be undone.`
           : "Are you sure you want to delete this record? This action cannot be undone."}
         confirmText="Delete"
         cancelText="Cancel"
@@ -3392,6 +4782,29 @@ const calculateAgeFromDOB = (dob) => {
               {isHealthDataModalOpen && (
                 <>
                   <style>{`
+                    /* Unit toggle styles for Health Data Modal */
+                    .core-body-metrics-unit-toggle {
+                      display: flex;
+                      border: 1px solid var(--border);
+                      border-radius: 12px;
+                      overflow: hidden;
+                      background: var(--background);
+                    }
+                    .core-body-metrics-unit-toggle button {
+                      padding: 10px 16px;
+                      border: none;
+                      font-size: 14px;
+                      font-weight: 600;
+                      min-width: 56px;
+                      background: transparent;
+                      color: var(--text);
+                      cursor: pointer;
+                      transition: all 0.2s ease;
+                    }
+                    .core-body-metrics-unit-toggle button.active {
+                      background: var(--primary);
+                      color: #fff;
+                    }
                     /* Mobile responsive styles for Health Data Modal */
                     @media (max-width: 768px) {
                       .health-data-form-grid {
@@ -3938,7 +5351,8 @@ const calculateAgeFromDOB = (dob) => {
                     {/* Hydration */}
                     <label className="form-field">
                       <span>Daily Water Intake</span>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                      <div style={{ display: 'flex', gap: '8px',      alignItems: 'center',
+                          justifyContent: 'center', }}>
                       <input 
                         type="number" 
                         step="0.1"
@@ -3964,11 +5378,14 @@ const calculateAgeFromDOB = (dob) => {
                           }}
                           placeholder={waterUnit === 'oz' ? "64" : "2.0"}
                           min="0"
-                          max={waterUnit === 'oz' ? "200" : "10"}
+                          max={waterUnit === 'oz' ? "1000" : "30"}
                           style={{ flex: 1 }}
                         />
                         <div style={{ 
                           display: 'flex', 
+                     
+                          minHeight: '34px',
+                          maxHeight: '34px',
                           border: '1px solid var(--border)', 
                           borderRadius: '6px',
                           overflow: 'hidden',
@@ -3987,7 +5404,7 @@ const calculateAgeFromDOB = (dob) => {
                               fontWeight: 500,
                               transition: 'all 0.2s ease',
                               borderRight: '1px solid var(--border)',
-                              minWidth: '50px',
+                              minWidth: '44px',
                               textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
@@ -4000,6 +5417,7 @@ const calculateAgeFromDOB = (dob) => {
                                 e.currentTarget.style.backgroundColor = 'transparent';
                               }
                             }}
+                            title="Ounces"
                           >
                             oz
                           </button>
@@ -4015,7 +5433,7 @@ const calculateAgeFromDOB = (dob) => {
                               fontSize: '14px',
                               fontWeight: 500,
                               transition: 'all 0.2s ease',
-                              minWidth: '50px',
+                              minWidth: '44px',
                               textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
@@ -4028,6 +5446,7 @@ const calculateAgeFromDOB = (dob) => {
                                 e.currentTarget.style.backgroundColor = 'transparent';
                               }
                             }}
+                            title="Liters"
                           >
                             L
                           </button>
@@ -4135,12 +5554,281 @@ const calculateAgeFromDOB = (dob) => {
                         color: 'var(--muted)', 
                         marginLeft: '8px' 
                       }}>
-                        ({healthDataRecords.length} records)
+                        ({getFilteredAndSortedRecords().length} of {healthDataRecords.length} records)
                       </span>
                     )}
                   </h3>
-                
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn outline"
+                      onClick={() => setShowFilters(!showFilters)}
+                      style={{ 
+                        padding: '6px 12px', 
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      {showFilters ? '▼' : '▶'} Filters
+                    </button>
+                    {(Object.values(filters).some(v => v !== '') || sortColumn) && (
+                      <button
+                        type="button"
+                        className="btn outline"
+                        onClick={() => {
+                          setFilters({
+                            dateFrom: '',
+                            dateTo: '',
+                            heartRateMin: '',
+                            heartRateMax: '',
+                            bloodPressureSystolicMin: '',
+                            bloodPressureSystolicMax: '',
+                            bloodPressureDiastolicMin: '',
+                            bloodPressureDiastolicMax: '',
+                            activityMin: '',
+                            activityMax: '',
+                            bmiMin: '',
+                            bmiMax: '',
+                            temperatureMin: '',
+                            temperatureMax: '',
+                            glucoseMin: '',
+                            glucoseMax: ''
+                          });
+                          setSortColumn(null);
+                          setSortDirection('desc');
+                        }}
+                        style={{ 
+                          padding: '6px 12px', 
+                          fontSize: '14px'
+                        }}
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Filters Panel */}
+                {showFilters && (
+                  <div style={{ 
+                    marginBottom: 16, 
+                    padding: 16, 
+                    border: '1px solid var(--border)', 
+                    borderRadius: '6px',
+                    backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                  }}>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                      gap: 12,
+                      marginBottom: 12
+                    }}>
+                      {/* Date Range */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Date From
+                        </label>
+                        <input
+                          type="date"
+                          value={filters.dateFrom}
+                          onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Date To
+                        </label>
+                        <input
+                          type="date"
+                          value={filters.dateTo}
+                          onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      {/* Heart Rate Range */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Heart Rate (bpm) Min
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.heartRateMin}
+                          onChange={(e) => setFilters({ ...filters, heartRateMin: e.target.value })}
+                          placeholder="Min"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Heart Rate (bpm) Max
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.heartRateMax}
+                          onChange={(e) => setFilters({ ...filters, heartRateMax: e.target.value })}
+                          placeholder="Max"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      {/* Blood Pressure Range */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          BP Systolic Min
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.bloodPressureSystolicMin}
+                          onChange={(e) => setFilters({ ...filters, bloodPressureSystolicMin: e.target.value })}
+                          placeholder="Min"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          BP Systolic Max
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.bloodPressureSystolicMax}
+                          onChange={(e) => setFilters({ ...filters, bloodPressureSystolicMax: e.target.value })}
+                          placeholder="Max"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          BP Diastolic Min
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.bloodPressureDiastolicMin}
+                          onChange={(e) => setFilters({ ...filters, bloodPressureDiastolicMin: e.target.value })}
+                          placeholder="Min"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          BP Diastolic Max
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.bloodPressureDiastolicMax}
+                          onChange={(e) => setFilters({ ...filters, bloodPressureDiastolicMax: e.target.value })}
+                          placeholder="Max"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      {/* Activity Range */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Activity (min) Min
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.activityMin}
+                          onChange={(e) => setFilters({ ...filters, activityMin: e.target.value })}
+                          placeholder="Min"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Activity (min) Max
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.activityMax}
+                          onChange={(e) => setFilters({ ...filters, activityMax: e.target.value })}
+                          placeholder="Max"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      {/* BMI Range */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          BMI Min
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={filters.bmiMin}
+                          onChange={(e) => setFilters({ ...filters, bmiMin: e.target.value })}
+                          placeholder="Min"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          BMI Max
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={filters.bmiMax}
+                          onChange={(e) => setFilters({ ...filters, bmiMax: e.target.value })}
+                          placeholder="Max"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      {/* Temperature Range */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Temperature Min
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={filters.temperatureMin}
+                          onChange={(e) => setFilters({ ...filters, temperatureMin: e.target.value })}
+                          placeholder="Min"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Temperature Max
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={filters.temperatureMax}
+                          onChange={(e) => setFilters({ ...filters, temperatureMax: e.target.value })}
+                          placeholder="Max"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      {/* Glucose Range */}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Glucose (mg/dL) Min
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.glucoseMin}
+                          onChange={(e) => setFilters({ ...filters, glucoseMin: e.target.value })}
+                          placeholder="Min"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
+                          Glucose (mg/dL) Max
+                        </label>
+                        <input
+                          type="number"
+                          value={filters.glucoseMax}
+                          onChange={(e) => setFilters({ ...filters, glucoseMax: e.target.value })}
+                          placeholder="Max"
+                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {loadingHealthData ? (
                   <div style={{ textAlign: 'center', padding: '20px 0' }}>
                     <p style={{ color: 'var(--muted)', margin: 0 }}>Loading health data...</p>
@@ -4171,8 +5859,37 @@ const calculateAgeFromDOB = (dob) => {
                         position: sticky;
                         top: 0;
                         background-color: var(--card);
+                        background: var(--card);
                         z-index: 10;
                         border-bottom: 2px solid var(--border);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                      }
+                      .health-data-table thead {
+                        background-color: var(--card);
+                      }
+                      .health-data-table th button {
+                        transition: all 0.2s ease;
+                        position: relative;
+                      }
+                      .health-data-table th button:hover {
+                        color: var(--primary);
+                      }
+                      .health-data-table th button .sort-icon {
+                        font-size: 12px;
+                        color: var(--muted);
+                        opacity: 0.5;
+                        margin-left: 4px;
+                        transition: all 0.2s ease;
+                      }
+                      .health-data-table th button:hover .sort-icon {
+                        opacity: 1;
+                        color: var(--primary);
+                      }
+                      .health-data-table th button .sort-active {
+                        font-size: 14px;
+                        color: var(--primary);
+                        font-weight: 700;
+                        margin-left: 4px;
                       }
                       .health-data-table .col-date,
                       .health-data-table .col-actions {
@@ -4219,19 +5936,194 @@ const calculateAgeFromDOB = (dob) => {
                     `}</style>
                     <table className="health-data-table">
                       <thead>
-                        <tr style={{ backgroundColor: 'var(--border)' }}>
-                          <th className="col-date">Date</th>
-                          <th className="col-heart-rate">Heart Rate</th>
-                          <th className="col-blood-pressure">Blood Pressure</th>
-                          <th className="col-activity">Activity</th>
-                          <th className="col-bmi">BMI</th>
-                          <th className="col-temperature">Temperature</th>
-                          <th className="col-glucose">Glucose</th>
+                        <tr>
+                          <th className="col-date">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('date')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 600,
+                                color: 'var(--text)',
+                                width: '100%',
+                                textAlign: 'left'
+                              }}
+                            >
+                              Date
+                              {sortColumn === 'date' ? (
+                                <span className="sort-active">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                              ) : (
+                                <span className="sort-icon">↕</span>
+                              )}
+                            </button>
+                          </th>
+                          <th className="col-heart-rate">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('heart_rate')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 600,
+                                color: 'var(--text)',
+                                width: '100%',
+                                textAlign: 'left'
+                              }}
+                            >
+                              Heart Rate
+                              {sortColumn === 'heart_rate' ? (
+                                <span className="sort-active">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                              ) : (
+                                <span className="sort-icon">↕</span>
+                              )}
+                            </button>
+                          </th>
+                          <th className="col-blood-pressure">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('blood_pressure')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 600,
+                                color: 'var(--text)',
+                                width: '100%',
+                                textAlign: 'left'
+                              }}
+                            >
+                              Blood Pressure
+                              {sortColumn === 'blood_pressure' ? (
+                                <span className="sort-active">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                              ) : (
+                                <span className="sort-icon">↕</span>
+                              )}
+                            </button>
+                          </th>
+                          <th className="col-activity">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('activity')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 600,
+                                color: 'var(--text)',
+                                width: '100%',
+                                textAlign: 'left'
+                              }}
+                            >
+                              Activity
+                              {sortColumn === 'activity' ? (
+                                <span className="sort-active">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                              ) : (
+                                <span className="sort-icon">↕</span>
+                              )}
+                            </button>
+                          </th>
+                          <th className="col-bmi">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('bmi')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 600,
+                                color: 'var(--text)',
+                                width: '100%',
+                                textAlign: 'left'
+                              }}
+                            >
+                              BMI
+                              {sortColumn === 'bmi' ? (
+                                <span className="sort-active">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                              ) : (
+                                <span className="sort-icon">↕</span>
+                              )}
+                            </button>
+                          </th>
+                          <th className="col-temperature">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('temperature')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 600,
+                                color: 'var(--text)',
+                                width: '100%',
+                                textAlign: 'left'
+                              }}
+                            >
+                              Temperature
+                              {sortColumn === 'temperature' ? (
+                                <span className="sort-active">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                              ) : (
+                                <span className="sort-icon">↕</span>
+                              )}
+                            </button>
+                          </th>
+                          <th className="col-glucose">
+                            <button
+                              type="button"
+                              onClick={() => handleSort('glucose')}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontWeight: 600,
+                                color: 'var(--text)',
+                                width: '100%',
+                                textAlign: 'left'
+                              }}
+                            >
+                              Glucose
+                              {sortColumn === 'glucose' ? (
+                                <span className="sort-active">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                              ) : (
+                                <span className="sort-icon">↕</span>
+                              )}
+                            </button>
+                          </th>
                           <th className="col-actions" style={{ textAlign: 'center', width: '120px' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {healthDataRecords.map((record) => (
+                        {getFilteredAndSortedRecords().map((record) => (
                           <tr key={record.id}>
                             <td className="col-date" style={{ fontWeight: '500' }}>{formatDateUS(record.date)}</td>
                             <td className="col-heart-rate">
@@ -4589,7 +6481,7 @@ const calculateAgeFromDOB = (dob) => {
   );
 }
 
-function HealthSection({ title, description, options, values, lastUpdated, onToggle, onSave, onAddNew, saving, sectionKey, onEdit, onDelete }) {
+function HealthSection({ title, description, options = [], values, lastUpdated, onToggle, onSave, onAddNew, saving, sectionKey, onEdit, onDelete }) {
   const [open, setOpen] = useState(false);
   
   const formatLastUpdated = (timestamp) => {
@@ -4681,25 +6573,53 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
                   const isObject = typeof item === 'object' && item !== null;
                   // Generate unique key combining section, index, and item identifier to avoid duplicates
                   const itemIdentifier = isObject 
-                    ? (item.id || item.medical_conditions_id || item.condition_name || item.name || item.allergy_name || item.procedure_name || item.vaccine_name || item.sensitivity_name || `obj-${idx}`)
+                    ? (item.id || item.medical_conditions_id || item.condition_name || item.name || item.allergy_name || item.procedure_name || item.vaccine_name || item.sensitivity_name || item.dental_history_id || item.last_dental_exam_date || item.last_dental_exam || `obj-${idx}`)
                     : item;
                   const uniqueKey = `${sectionKey}-${idx}-${itemIdentifier}`;
                   
                   // Unified card design for all sections
-                  const displayName = isObject ? (item.condition_name || item.name || item.allergy_name || item.procedure_name || item.vaccine_name || item.sensitivity_name || 'Unknown') : item;
+                  const displayName = isObject ? (
+                    item.condition_name || 
+                    item.name || 
+                    item.allergy_name || 
+                    item.procedure_name || 
+                    item.vaccine_name || 
+                    item.sensitivity_name ||
+                    (item.last_dental_exam_date || item.last_dental_exam ? `Dental History - ${item.last_dental_exam_date || item.last_dental_exam}` : 'Dental History') ||
+                    'Unknown'
+                  ) : item;
                   const infoParts = [];
-                  const diagnosis = item?.diagnosis_date || item?.entry_date || item?.date || item?.start_date;
-                  const endDate = item?.end_date;
+                  // Define severity outside the if-else block so it's available for rendering
                   const severity = item?.severity;
-                  const dosage = item?.dosage;
-                  const frequency = item?.frequency;
-                  const notes = item?.notes || item?.treatment_plan;
-                  if (diagnosis) infoParts.push(`Date: ${diagnosis}`);
-                  if (endDate) infoParts.push(`End: ${endDate}`);
-                  if (dosage) infoParts.push(`Dosage: ${dosage}`);
-                  if (frequency) infoParts.push(`Freq: ${frequency}`);
-                  if (severity) infoParts.push(`Severity: ${severity}`);
-                  if (notes) infoParts.push(notes);
+                  
+                  // Handle dental history separately
+                  if (sectionKey === 'dental_history' && isObject) {
+                    const examDate = item.last_dental_exam_date || item.last_dental_exam;
+                    if (examDate) infoParts.push(`Last exam: ${examDate}`);
+                    const gumDisease = item.has_gum_disease !== undefined ? item.has_gum_disease : item.gum_disease;
+                    if (gumDisease !== null && gumDisease !== undefined) infoParts.push(`Gum disease: ${gumDisease ? 'Yes' : 'No'}`);
+                    const frequentCavities = item.has_frequent_cavities !== undefined ? item.has_frequent_cavities : item.frequent_cavities;
+                    if (frequentCavities !== null && frequentCavities !== undefined) infoParts.push(`Frequent cavities: ${frequentCavities ? 'Yes' : 'No'}`);
+                    const majorWork = item.major_dental_work_notes || item.major_dental_work;
+                    if (majorWork) infoParts.push(`Major work: ${majorWork}`);
+                    const tmjIssues = item.has_tmj_issues !== undefined ? item.has_tmj_issues : item.tmj_issues;
+                    if (tmjIssues !== null && tmjIssues !== undefined) infoParts.push(`TMJ issues: ${tmjIssues ? 'Yes' : 'No'}`);
+                    const concerns = item.current_dental_concerns || item.current_concerns;
+                    if (concerns) infoParts.push(`Concerns: ${concerns}`);
+                  } else {
+                    // Other sections
+                    const diagnosis = item?.diagnosis_date || item?.entry_date || item?.date || item?.start_date;
+                    const endDate = item?.end_date;
+                    const dosage = item?.dosage;
+                    const frequency = item?.frequency;
+                    const notes = item?.notes || item?.treatment_plan;
+                    if (diagnosis) infoParts.push(`Date: ${diagnosis}`);
+                    if (endDate) infoParts.push(`End: ${endDate}`);
+                    if (dosage) infoParts.push(`Dosage: ${dosage}`);
+                    if (frequency) infoParts.push(`Freq: ${frequency}`);
+                    if (severity) infoParts.push(`Severity: ${severity}`);
+                    if (notes) infoParts.push(notes);
+                  }
 
                   // Check if light theme is active
                   const isLightTheme = document.documentElement.classList.contains('light-theme');
@@ -4794,3 +6714,4 @@ function HealthSection({ title, description, options, values, lastUpdated, onTog
     </div>
   );
 }
+

@@ -26,6 +26,7 @@ export const InsightApi = {
         metrics: (data && typeof data.metrics === 'object' && !Array.isArray(data.metrics)) ? data.metrics : {},
         // chat_id: null for new chats, or integer for existing chats
         chat_id: chatIdValue,
+        context: data?.context || 'General health education context',
         // Optional: some backends expect body.data_range; include only if provided
         ...(data?.data_range || data?.date_range ? { data_range: data.data_range || data.date_range } : {})
       };

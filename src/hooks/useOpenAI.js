@@ -1,5 +1,5 @@
 // hooks/useOpenAI.js
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { InsightApi } from '../api/insightApi';
 import { CheckQueryApi } from '../api/checkQueryApi';
 import { useAuth } from '../api/AuthContext';
@@ -10,6 +10,7 @@ const useOpenAI = () => {
   const [conversation, setConversation] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
   const [previousChats, setPreviousChats] = useState([]);
+  const conversationRef = useRef([]);
   const { user } = useAuth();
 
   // Emergency keywords detection
@@ -42,9 +43,32 @@ const useOpenAI = () => {
     return emergencyPatterns.some(pattern => pattern.test(input));
   }, []);
 
+  useEffect(() => {
+    conversationRef.current = conversation;
+  }, [conversation]);
+
   const getRandomMessage = (messages) => {
     return messages[Math.floor(Math.random() * messages.length)];
   };
+
+  const buildContextPayload = useCallback((historySnapshot = []) => {
+    const maxMessages = 8;
+    const recentMessages = historySnapshot.slice(-maxMessages);
+    const conversationText = recentMessages
+      .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+      .join('\n');
+
+    const parts = [];
+    if (user?.id) parts.push(`User ID: ${user.id}`);
+    if (user?.first_name || user?.last_name) {
+      parts.push(`User Name: ${[user.first_name, user.last_name].filter(Boolean).join(' ')}`);
+    }
+    parts.push('Purpose: Provide general health education and wellness guidance.');
+    if (conversationText) {
+      parts.push('Conversation History:\n' + conversationText);
+    }
+    return parts.join('\n').trim();
+  }, [user]);
 
   const sendMessage = useCallback(async (message) => {
     
@@ -54,7 +78,8 @@ const useOpenAI = () => {
     try {
       // Add user message to conversation immediately
       const userMessage = { role: 'user', content: message };
-      setConversation(prev => [...prev, userMessage]);
+      const conversationSnapshot = [...conversationRef.current, userMessage];
+      setConversation(conversationSnapshot);
       
       // Check for emergency content
       if (checkEmergencyContent(message)) {
@@ -127,10 +152,13 @@ const useOpenAI = () => {
         
         console.log('📤 Sending message with chat_id:', chatIdToSend, '(currentChatId:', currentChatId, ')');
         
+        const contextPayload = buildContextPayload(conversationSnapshot);
+
         response = await InsightApi.generateInsight({
           query: message,
           metrics: {}, // Add user metrics if available
-          chat_id: chatIdToSend // null for new chats, or integer for existing chats
+          chat_id: chatIdToSend, // null for new chats, or integer for existing chats
+          context: contextPayload || 'General health Q&A context.'
         });
         
         console.log('✅ generate-insight response:', response);
@@ -232,10 +260,11 @@ const useOpenAI = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, checkEmergencyContent, currentChatId]);
+  }, [user, checkEmergencyContent, currentChatId, buildContextPayload]);
 
   const clearConversation = useCallback(() => {
     setConversation([]);
+    conversationRef.current = [];
     setError(null);
     setCurrentChatId(null);
   }, []);

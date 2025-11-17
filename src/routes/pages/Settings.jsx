@@ -107,6 +107,7 @@ function PrivacyTab({ onSaved, onAction }){
   const [retention, setRetention] = React.useState('12m');
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirmType, setConfirmType] = React.useState('download');
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState('');
   
   // AI processing preferences
   const [aiHealthHistory, setAiHealthHistory] = React.useState(true);
@@ -214,7 +215,11 @@ function PrivacyTab({ onSaved, onAction }){
         <div style={{ fontWeight:600, marginBottom:8 }}>Data management</div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
           <button className="btn outline" onClick={()=>{ setConfirmType('download'); setConfirmOpen(true); }}>Download my data</button>
-          <button className="btn danger" onClick={()=>{ setConfirmType('delete'); setConfirmOpen(true); }}>Delete my data</button>
+          <button className="btn danger" onClick={()=>{ 
+            setConfirmType('delete'); 
+            setDeleteConfirmText('');
+            setConfirmOpen(true); 
+          }}>Delete my data</button>
         </div>
       </div>
       
@@ -229,18 +234,54 @@ function PrivacyTab({ onSaved, onAction }){
         </div>
       </div>
 
-      <Modal open={confirmOpen} title={confirmType === 'delete' ? 'Delete your data' : 'Download your data'} onClose={()=>setConfirmOpen(false)}>
+      <Modal open={confirmOpen} title={confirmType === 'delete' ? 'Delete your data' : 'Download your data'} onClose={()=>{
+        setConfirmOpen(false);
+        setDeleteConfirmText('');
+      }}>
         {confirmType === 'delete' ? (
           <div>
-            <p>Deleting your data is permanent and cannot be undone. Are you sure?</p>
+            <p style={{ marginBottom: 12 }}>Deleting your data is permanent and cannot be undone. Please type <strong>delete</strong> to confirm.</p>
+            <input 
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type delete"
+              style={{ 
+                width: '100%', 
+                padding: '8px 12px', 
+                marginBottom: 12,
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                fontSize: '14px',
+                background: 'var(--bg)',
+                color: 'var(--text)'
+              }} 
+            />
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <button className="btn ghost" onClick={()=>setConfirmOpen(false)}>Cancel</button>
-              <button className="btn danger" onClick={()=>{ setConfirmOpen(false); onAction && onAction('Data deletion requested'); }}>Delete permanently</button>
+              <button className="btn ghost" onClick={()=>{
+                setConfirmOpen(false);
+                setDeleteConfirmText('');
+              }}>Cancel</button>
+              <button 
+                className="btn danger" 
+                disabled={deleteConfirmText.toLowerCase() !== 'delete'}
+                onClick={()=>{ 
+                  setConfirmOpen(false); 
+                  setDeleteConfirmText('');
+                  onAction && onAction('Data deletion requested'); 
+                }}
+                style={{
+                  opacity: deleteConfirmText.toLowerCase() !== 'delete' ? 0.5 : 1,
+                  cursor: deleteConfirmText.toLowerCase() !== 'delete' ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Delete permanently
+              </button>
             </div>
           </div>
         ) : (
           <div>
-            <p>We will prepare a downloadable archive of your data and notify you when it’s ready.</p>
+            <p>We will prepare a downloadable archive of your data and notify you when it's ready.</p>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button className="btn primary" onClick={()=>{ setConfirmOpen(false); onAction && onAction('Data export requested'); }}>OK</button>
             </div>
