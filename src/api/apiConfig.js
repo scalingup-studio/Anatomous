@@ -1,5 +1,6 @@
 export const API_BASE = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:5PA_dIPO";
 export const API_BASE_AUTH = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:HBbbpjK5";
+export const API_BASE_SUBSCRIPTION = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:IqZoSRZI:feat_subscription";
 export const API_DOMEN_DEV = "https://xu6p-ejbd-2ew4.n7e.xano.io";
 
 // CRUD helper
@@ -107,5 +108,18 @@ export const CUSTOM_ENDPOINTS = {
     create: `${API_BASE}/notes`,
     update: (id) => `${API_BASE}/notes/note/${id}`,
     getNote: `${API_BASE}/notes/get/note`,
+  },
+  subscription: {
+    mySubscription: `${API_BASE_SUBSCRIPTION}/my_subscription`,
+    userPlan: `${API_BASE_SUBSCRIPTION}/user/plan`,
+    checkLimits: `${API_BASE_SUBSCRIPTION}/subscription/check-limits`,
+    updateUsage: `${API_BASE_SUBSCRIPTION}/subscription/update-usage`,
+    plans: `${API_BASE_SUBSCRIPTION}/plans`,
+    familyMembers: `${API_BASE_SUBSCRIPTION}/subscription/family_members`,
+    addFamilyMember: `${API_BASE_SUBSCRIPTION}/subscription/add_family_member`,
+    removeFamilyMember: `${API_BASE_SUBSCRIPTION}/subscription/remove_family_member`,
+  },
+  payments: {
+    upgradeSubscription: `${API_BASE}/payments/upgrade_subscription_post`,
   },
 };

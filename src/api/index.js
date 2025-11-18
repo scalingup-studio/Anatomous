@@ -17,6 +17,7 @@ export { TrendsApi } from "./trendsApi";
 export { GetAlertsInsightApi } from "./getAlertsInsightApi";
 export { VaccinationsApi } from "./vaccinationsApi";
 export { FamilyHistoryApi } from "./familyHistoryApi";
+export { SubscriptionApi } from "./subscriptionApi";
 
 // Utilities and helpers
 export { createCrudApi } from "./helpers";
@@ -40,4 +41,5 @@ export const Api = {
   GetAlertsInsight: GetAlertsInsightApi,
   Vaccinations: VaccinationsApi,
   FamilyHistory: FamilyHistoryApi,
+  Subscription: SubscriptionApi,
 };

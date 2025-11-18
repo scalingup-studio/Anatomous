@@ -1,6 +1,8 @@
 import React from "react";
 import { UpgradePrompt } from "../../components/UpgradePrompt.jsx";
 import { useAuth } from "../../api/AuthContext.jsx";
+import { SubscriptionApi } from "../../api/subscriptionApi.js";
+import { useNotifications } from "../../api/NotificationContext.jsx";
 
 function Tabs({ value, onChange }) {
   const items = [
@@ -36,6 +38,13 @@ function Tabs({ value, onChange }) {
 
 export default function SubscriptionsPage() {
   const [tab, setTab] = React.useState("current");
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  
+  const handleUpgradeSuccess = () => {
+    setRefreshKey(prev => prev + 1);
+    setTab("current");
+  };
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div className="dash-toolbar">
@@ -44,14 +53,14 @@ export default function SubscriptionsPage() {
 
       {/* Helpful banner */}
       <div className="card" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-        <div style={{ color:'var(--muted)', fontSize:13 }}>Manage your plan, view what’s included, and upgrade any time. You can switch between monthly and annual billing on the Upgrade tab.</div>
+        <div style={{ color:'var(--muted)', fontSize:13 }}>Manage your plan, view what's included, and upgrade any time. You can switch between monthly and annual billing on the Upgrade tab.</div>
         <a className="btn ghost" href="/privacy" target="_blank" rel="noreferrer">Billing FAQ</a>
       </div>
 
       <Tabs value={tab} onChange={setTab} />
 
-      {tab === "current" && <CurrentPlan />}
-      {tab === "upgrade" && <UpgradeOptions />}
+      {tab === "current" && <CurrentPlan key={refreshKey} />}
+      {tab === "upgrade" && <UpgradeOptions onUpgradeSuccess={handleUpgradeSuccess} />}
     </div>
   );
 }
@@ -64,28 +73,112 @@ function Badge({ children, tone = "secondary" }) {
 
 function CurrentPlan() {
   const { user } = useAuth();
-  // Mock of the active plan; replace with API later
-  const active = {
-    name: "Starter (Free)",
-    tier: "Active",
-    renewal: "2025-12-31",
-    limits: { familyUsed: 0, familyMax: 0, uploadsUsed: 0, uploadsMax: 3, goalsUsed: 0, goalsMax: 10, notesUsed: 0, notesMax: 3 },
-    features: [
-      "Manual Health Data Entry",
-      "10 AI Messages/month",
-      "Secure Data Backup",
-    ],
-  };
-  
+  const { showNotification } = useNotifications();
+  const [subscription, setSubscription] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
   const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
   const [upgradeFeature, setUpgradeFeature] = React.useState(null);
+
+  React.useEffect(() => {
+    loadSubscription();
+  }, []);
+
+  const loadSubscription = async () => {
+    try {
+      setLoading(true);
+      const data = await SubscriptionApi.getMySubscription();
+      setSubscription(data);
+    } catch (error) {
+      console.error("Failed to load subscription:", error);
+      showNotification(error.message || "Failed to load subscription data", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format subscription data for display
+  const active = React.useMemo(() => {
+    if (!subscription) {
+      return {
+        name: "Free",
+        tier: "Active",
+        renewal: null,
+        limits: { 
+          familyUsed: 0, 
+          familyMax: 0, 
+          uploadsUsed: 0, 
+          uploadsMax: 0, 
+          goalsUsed: 0, 
+          goalsMax: 0, 
+          notesUsed: 0, 
+          notesMax: 0,
+          aiMessagesUsed: 0,
+          aiMessagesLimit: 10
+        },
+        features: [
+          "Manual Health Data Entry",
+          "10 AI Messages/month",
+          "Secure Data Backup",
+        ],
+      };
+    }
+
+    const planName = subscription.subscription_details?.plan_name || 
+                     subscription.current_plan?.charAt(0).toUpperCase() + subscription.current_plan?.slice(1) || 
+                     "Free";
+    
+    const usage = subscription.usage || {};
+    const features = subscription.available_features || [];
+
+    return {
+      name: planName,
+      tier: subscription.subscription_status === "active" ? "Active" : subscription.subscription_status,
+      renewal: subscription.next_billing_date 
+        ? new Date(subscription.next_billing_date).toLocaleDateString()
+        : null,
+      limits: {
+        familyUsed: 0,
+        familyMax: 0,
+        uploadsUsed: usage.uploads_used || 0,
+        uploadsMax: usage.uploads_limit || 0,
+        goalsUsed: 0,
+        goalsMax: 0,
+        notesUsed: usage.notes_used || 0,
+        notesMax: usage.notes_limit || 0,
+        aiMessagesUsed: usage.ai_messages_used || 0,
+        aiMessagesLimit: usage.ai_messages_limit || 0,
+      },
+      features: features.map(f => {
+        const featureMap = {
+          ai_message: "AI Messages",
+          upload: "Document Uploads",
+          create_note: "Create Notes",
+          view_notes: "View Notes",
+          ai_risk_forecast: "AI Risk Forecasts",
+          goal_history: "Goal History",
+          custom_goal: "Custom Goals",
+        };
+        return featureMap[f] || f;
+      }),
+    };
+  }, [subscription]);
+
+  if (loading) {
+    return (
+      <div className="card" style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+        <div style={{ color: 'var(--muted)' }}>Loading subscription data...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="card" style={{ display:'grid', gap:12, maxWidth: 920 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <div>
           <div style={{ fontSize:18, fontWeight:700 }}>{active.name}</div>
-          <div style={{ color:'var(--muted)', fontSize:12 }}>Renews on {active.renewal}</div>
+          {active.renewal && (
+            <div style={{ color:'var(--muted)', fontSize:12 }}>Renews on {active.renewal}</div>
+          )}
         </div>
         <Badge>{active.tier}</Badge>
       </div>
@@ -104,6 +197,21 @@ function CurrentPlan() {
       <div className="card">
         <div style={{ fontWeight:600, marginBottom:8 }}>Active limits</div>
         <div style={{ display:'grid', gap:8 }}>
+          {active.limits.aiMessagesLimit > 0 && (
+            <div>
+              <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>AI Messages</div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div className="btn outline small" style={{ pointerEvents:'none' }}>
+                  {active.limits.aiMessagesUsed}/{active.limits.aiMessagesLimit === Infinity ? '∞' : active.limits.aiMessagesLimit} used
+                </div>
+                {active.limits.aiMessagesLimit !== Infinity && (
+                  <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
+                    <div style={{ width:`${Math.min((active.limits.aiMessagesUsed/active.limits.aiMessagesLimit)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {active.limits.uploadsMax > 0 && (
             <div>
               <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>Document & Lab Uploads</div>
@@ -113,7 +221,7 @@ function CurrentPlan() {
                 </div>
                 {active.limits.uploadsMax !== Infinity && (
                   <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
-                    <div style={{ width:`${(active.limits.uploadsUsed/active.limits.uploadsMax)*100}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                    <div style={{ width:`${Math.min((active.limits.uploadsUsed/active.limits.uploadsMax)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
                   </div>
                 )}
               </div>
@@ -128,7 +236,7 @@ function CurrentPlan() {
                 </div>
                 {active.limits.goalsMax !== Infinity && (
                   <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
-                    <div style={{ width:`${(active.limits.goalsUsed/active.limits.goalsMax)*100}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                    <div style={{ width:`${Math.min((active.limits.goalsUsed/active.limits.goalsMax)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
                   </div>
                 )}
               </div>
@@ -143,7 +251,7 @@ function CurrentPlan() {
                 </div>
                 {active.limits.notesMax !== Infinity && (
                   <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
-                    <div style={{ width:`${(active.limits.notesUsed/active.limits.notesMax)*100}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                    <div style={{ width:`${Math.min((active.limits.notesUsed/active.limits.notesMax)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
                   </div>
                 )}
               </div>
@@ -155,7 +263,7 @@ function CurrentPlan() {
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <div className="btn outline small" style={{ pointerEvents:'none' }}>{active.limits.familyUsed}/{active.limits.familyMax}</div>
                 <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
-                  <div style={{ width:`${(active.limits.familyUsed/active.limits.familyMax)*100}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                  <div style={{ width:`${Math.min((active.limits.familyUsed/active.limits.familyMax)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
                 </div>
               </div>
             </div>
@@ -326,60 +434,285 @@ function CurrentPlan() {
   );
 }
 
-function UpgradeOptions() {
+function UpgradeOptions({ onUpgradeSuccess }) {
+  const { user } = useAuth();
+  const { showNotification } = useNotifications();
   const [period, setPeriod] = React.useState("monthly");
   const [hoveredRow, setHoveredRow] = React.useState(null);
+  const [plans, setPlans] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [upgrading, setUpgrading] = React.useState(null);
   const monthly = period === "monthly";
-  const plans = [
-    { 
-      key:'starter', 
-      name:'Starter', 
-      subtitle:'Free', 
-      priceMonthly:0, 
-      priceYearly:0, 
-      features:['Manual Health Data Entry','10 AI Messages/month','Secure Data Backup'], 
-      gated:['AI Risk Forecasts','Early Alerts','Reports','CSV Export','Document Uploads','Custom Goals','Goal History','Notes (3+)','Chat History','Share with Providers','Family Sharing'], 
-      ribbon:'Free Tier',
-      recommended:false,
-      savings:null
-    },
-    { 
-      key:'core', 
-      name:'Core', 
-      subtitle:'Most Popular', 
-      priceMonthly:9, 
-      priceYearly:90, 
-      features:['Everything in Starter','50 AI Messages/month','AI Risk Forecasts','Reports (PDF)','3 Document Uploads/month','Up to 10 Custom Goals','90-day Goal History','Up to 30 Notes','30-day Chat History'], 
-      gated:['Early Alerts','CSV Export','Unlimited Uploads','Unlimited Goals','Unlimited Notes','Full Chat History','Share with Providers','Family Sharing'], 
-      ribbon:'Most popular',
-      recommended:true,
-      savings:monthly ? null : 'Save $18/year'
-    },
-    { 
-      key:'complete', 
-      name:'Complete', 
-      subtitle:'Best Value', 
-      priceMonthly:19, 
-      priceYearly:190, 
-      features:['Everything in Core','Unlimited AI Messages','Early Alerts','CSV Data Export','Unlimited Document Uploads','Unlimited Custom Goals','Unlimited Goal History','Unlimited Notes','Full Chat History','Share with Providers'], 
-      gated:['Family Sharing'], 
-      ribbon:'Best value',
-      recommended:false,
-      savings:monthly ? null : 'Save $38/year'
-    },
-    { 
-      key:'family', 
-      name:'Family', 
-      subtitle:'For Families', 
-      priceMonthly:29, 
-      priceYearly:290, 
-      features:['Everything in Complete','Family Sharing (1 linked user)'], 
-      gated:[], 
-      ribbon:null,
-      recommended:false,
-      savings:monthly ? null : 'Save $58/year'
-    },
-  ];
+
+  React.useEffect(() => {
+    loadPlans();
+  }, []);
+
+  const loadPlans = async () => {
+    try {
+      setLoading(true);
+      const response = await SubscriptionApi.getPlans();
+      // API returns data in result array
+      const plansData = response?.result || response || [];
+      
+      // Map API plans to UI format
+      const mappedPlans = plansData
+        .filter(plan => plan.is_active !== false) // Only show active plans
+        .map(plan => {
+          const planTier = plan.plan_tier?.toLowerCase() || plan.name?.toLowerCase() || 'starter';
+          const features = plan.features || [];
+          
+          // Build features list from features array
+          const featureList = features.map(feature => {
+            const featureName = feature.feature_name || feature.feature;
+            const limitValue = feature.limit_value;
+            const isLimited = feature.is_limited;
+            
+            // If not limited or limit is 0, just return feature name
+            if (!isLimited || limitValue === 0) {
+              return featureName;
+            }
+            
+            // If unlimited (-1)
+            if (limitValue === -1) {
+              // Format based on feature type
+              if (feature.feature_key === 'ai_messages') {
+                return 'Unlimited AI Messages/month';
+              } else if (feature.feature_key === 'document_uploads') {
+                return 'Unlimited Document Uploads';
+              } else if (feature.feature_key === 'notes') {
+                return 'Unlimited Notes';
+              } else if (feature.feature_key === 'custom_goals') {
+                return 'Unlimited Custom Goals';
+              } else if (feature.feature_key === 'goal_history') {
+                return 'Unlimited Goal History';
+              } else if (feature.feature_key === 'chat_history') {
+                return 'Full Chat History';
+              }
+              return featureName;
+            }
+            
+            // If limited with specific value
+            if (limitValue > 0) {
+              if (feature.feature_key === 'ai_messages') {
+                return `${limitValue} AI Messages/month`;
+              } else if (feature.feature_key === 'document_uploads') {
+                return `${limitValue} Document Uploads/month`;
+              } else if (feature.feature_key === 'notes') {
+                return `Up to ${limitValue} Notes`;
+              } else if (feature.feature_key === 'custom_goals') {
+                return `Up to ${limitValue} Custom Goals`;
+              } else if (feature.feature_key === 'goal_history') {
+                return `${limitValue}-day Goal History`;
+              } else if (feature.feature_key === 'chat_history') {
+                return `${limitValue}-day Chat History`;
+              } else if (feature.feature_key === 'family_sharing') {
+                return `Family Sharing (${limitValue} linked user${limitValue > 1 ? 's' : ''})`;
+              }
+            }
+            
+            return featureName;
+          });
+
+          // Determine subtitle and ribbon
+          let subtitle = '';
+          let ribbon = null;
+          let recommended = false;
+          
+          if (planTier === 'starter') {
+            subtitle = 'Free';
+            ribbon = 'Free Tier';
+          } else if (planTier === 'core' || planTier === 'сore') {
+            subtitle = 'Most Popular';
+            ribbon = 'Most popular';
+            recommended = true;
+          } else if (planTier === 'complete') {
+            subtitle = 'Best Value';
+            ribbon = 'Best value';
+          } else if (planTier === 'family') {
+            subtitle = 'For Families';
+          }
+
+          // Calculate savings for annual billing
+          const savings = monthly || planTier === 'starter' 
+            ? null 
+            : plan.price_annual && plan.price_monthly 
+              ? `Save $${Math.round((plan.price_monthly * 12 - plan.price_annual))}/year`
+              : null;
+
+          return {
+            key: planTier,
+            id: plan.id,
+            name: plan.display_name || plan.name,
+            subtitle,
+            priceMonthly: plan.price_monthly || plan.price || 0,
+            priceYearly: plan.price_annual || (plan.price_monthly ? plan.price_monthly * 12 : plan.price || 0),
+            features: featureList.length > 0 ? featureList : ['Manual Health Data Entry', 'Secure Data Backup'],
+            gated: [], // Will be calculated based on what's not in features
+            ribbon,
+            recommended,
+            savings,
+            maxMembers: plan.max_members || 1,
+            isFeatured: plan.is_featured || false,
+          };
+        })
+        .sort((a, b) => {
+          // Sort by tier order: starter, core, complete, family
+          const order = { starter: 0, core: 1, сore: 1, complete: 2, family: 3 };
+          return (order[a.key] || 99) - (order[b.key] || 99);
+        });
+      
+      // Fallback to default plans if API returns empty
+      const defaultPlans = [
+        { 
+          key:'starter', 
+          name:'Starter', 
+          subtitle:'Free', 
+          priceMonthly:0, 
+          priceYearly:0, 
+          features:['Manual Health Data Entry','10 AI Messages/month','Secure Data Backup'], 
+          gated:['AI Risk Forecasts','Early Alerts','Reports','CSV Export','Document Uploads','Custom Goals','Goal History','Notes (3+)','Chat History','Share with Providers','Family Sharing'], 
+          ribbon:'Free Tier',
+          recommended:false,
+          savings:null
+        },
+        { 
+          key:'core', 
+          name:'Core', 
+          subtitle:'Most Popular', 
+          priceMonthly:9, 
+          priceYearly:90, 
+          features:['Everything in Starter','50 AI Messages/month','AI Risk Forecasts','Reports (PDF)','3 Document Uploads/month','Up to 10 Custom Goals','90-day Goal History','Up to 30 Notes','30-day Chat History'], 
+          gated:['Early Alerts','CSV Export','Unlimited Uploads','Unlimited Goals','Unlimited Notes','Full Chat History','Share with Providers','Family Sharing'], 
+          ribbon:'Most popular',
+          recommended:true,
+          savings:monthly ? null : 'Save $18/year'
+        },
+        { 
+          key:'complete', 
+          name:'Complete', 
+          subtitle:'Best Value', 
+          priceMonthly:19, 
+          priceYearly:190, 
+          features:['Everything in Core','Unlimited AI Messages','Early Alerts','CSV Data Export','Unlimited Document Uploads','Unlimited Custom Goals','Unlimited Goal History','Unlimited Notes','Full Chat History','Share with Providers'], 
+          gated:['Family Sharing'], 
+          ribbon:'Best value',
+          recommended:false,
+          savings:monthly ? null : 'Save $38/year'
+        },
+        { 
+          key:'family', 
+          name:'Family', 
+          subtitle:'For Families', 
+          priceMonthly:29, 
+          priceYearly:290, 
+          features:['Everything in Complete','Family Sharing (1 linked user)'], 
+          gated:[], 
+          ribbon:null,
+          recommended:false,
+          savings:monthly ? null : 'Save $58/year'
+        },
+      ];
+      
+      setPlans(mappedPlans.length > 0 ? mappedPlans : defaultPlans);
+    } catch (error) {
+      console.error("Failed to load plans:", error);
+      showNotification(error.message || "Failed to load subscription plans", "error");
+      // Use default plans on error
+      setPlans([
+        { 
+          key:'starter', 
+          name:'Starter', 
+          subtitle:'Free', 
+          priceMonthly:0, 
+          priceYearly:0, 
+          features:['Manual Health Data Entry','10 AI Messages/month','Secure Data Backup'], 
+          gated:['AI Risk Forecasts','Early Alerts','Reports','CSV Export','Document Uploads','Custom Goals','Goal History','Notes (3+)','Chat History','Share with Providers','Family Sharing'], 
+          ribbon:'Free Tier',
+          recommended:false,
+          savings:null
+        },
+        { 
+          key:'core', 
+          name:'Core', 
+          subtitle:'Most Popular', 
+          priceMonthly:9, 
+          priceYearly:90, 
+          features:['Everything in Starter','50 AI Messages/month','AI Risk Forecasts','Reports (PDF)','3 Document Uploads/month','Up to 10 Custom Goals','90-day Goal History','Up to 30 Notes','30-day Chat History'], 
+          gated:['Early Alerts','CSV Export','Unlimited Uploads','Unlimited Goals','Unlimited Notes','Full Chat History','Share with Providers','Family Sharing'], 
+          ribbon:'Most popular',
+          recommended:true,
+          savings:monthly ? null : 'Save $18/year'
+        },
+        { 
+          key:'complete', 
+          name:'Complete', 
+          subtitle:'Best Value', 
+          priceMonthly:19, 
+          priceYearly:190, 
+          features:['Everything in Core','Unlimited AI Messages','Early Alerts','CSV Data Export','Unlimited Document Uploads','Unlimited Custom Goals','Unlimited Goal History','Unlimited Notes','Full Chat History','Share with Providers'], 
+          gated:['Family Sharing'], 
+          ribbon:'Best value',
+          recommended:false,
+          savings:monthly ? null : 'Save $38/year'
+        },
+        { 
+          key:'family', 
+          name:'Family', 
+          subtitle:'For Families', 
+          priceMonthly:29, 
+          priceYearly:290, 
+          features:['Everything in Complete','Family Sharing (1 linked user)'], 
+          gated:[], 
+          ribbon:null,
+          recommended:false,
+          savings:monthly ? null : 'Save $58/year'
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpgrade = async (planId) => {
+    if (!planId) {
+      showNotification("Plan ID is required", "error");
+      return;
+    }
+
+    try {
+      setUpgrading(planId);
+      const result = await SubscriptionApi.upgradeSubscription(planId);
+      
+      if (result.success) {
+        showNotification(result.message || "Subscription upgraded successfully!", "success");
+        // Call success callback if provided
+        if (onUpgradeSuccess) {
+          onUpgradeSuccess();
+        } else {
+          // Fallback to page reload
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }
+      } else {
+        showNotification(result.error || "Failed to upgrade subscription", "error");
+      }
+    } catch (error) {
+      console.error("Upgrade failed:", error);
+      showNotification(error.message || "Failed to upgrade subscription", "error");
+    } finally {
+      setUpgrading(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="card" style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+        <div style={{ color: 'var(--muted)' }}>Loading plans...</div>
+      </div>
+    );
+  }
 
   // Feature matrix (show everything in one place, as is common in pricing pages)
   const featureMatrix = [
@@ -564,8 +897,16 @@ function UpgradeOptions() {
                     width: '100%',
                     fontWeight: p.recommended ? 600 : 500
                   }}
+                  onClick={() => !isFree && p.id && handleUpgrade(p.id)}
+                  disabled={isFree || upgrading === p.id || !p.id}
                 >
-                  {isFree ? 'Current Plan' : monthly ? 'Upgrade Now' : 'Upgrade Annually'}
+                  {upgrading === p.id 
+                    ? 'Processing...' 
+                    : isFree 
+                      ? 'Current Plan' 
+                      : monthly 
+                        ? 'Upgrade Now' 
+                        : 'Upgrade Annually'}
                 </button>
               </div>
             </div>
