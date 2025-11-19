@@ -1,4 +1,5 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import { UpgradePrompt } from "../../components/UpgradePrompt.jsx";
 import { Modal } from "../../components/Modal.jsx";
 import { useAuth } from "../../api/AuthContext.jsx";
@@ -39,13 +40,47 @@ function Tabs({ value, onChange }) {
 }
 
 export default function SubscriptionsPage() {
-  const [tab, setTab] = React.useState("current");
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Читаємо таб з URL, якщо є, інакше "current" за замовчуванням
+  const tabFromUrl = searchParams.get("tab");
+  const validTabs = ["current", "upgrade"];
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "current";
+  
+  const [tab, setTab] = React.useState(initialTab);
   const [refreshKey, setRefreshKey] = React.useState(0);
+  
+  // Синхронізуємо таб з URL при зміні
+  const handleTabChange = (newTab) => {
+    setTab(newTab);
+    // Оновлюємо URL без перезавантаження сторінки
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("tab", newTab);
+    // Використовуємо setSearchParams для оновлення query параметрів
+    setSearchParams(newSearchParams, { replace: true });
+  };
+  
+  // Синхронізуємо таб з URL при зміні searchParams (наприклад, при прямому переході)
+  React.useEffect(() => {
+    const tabFromUrl = searchParams.get("tab");
+    if (tabFromUrl && validTabs.includes(tabFromUrl) && tabFromUrl !== tab) {
+      setTab(tabFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   
   const handleUpgradeSuccess = () => {
     setRefreshKey(prev => prev + 1);
-    setTab("current");
+    handleTabChange("current");
+    // Оновлюємо дані підписки після успішного upgrade
+    // Це спрацює через key={refreshKey} на CurrentPlan компоненті
   };
+  
+  // Callback для оновлення підписки після upgrade (передається в UpgradeOptions)
+  const handleSubscriptionUpdate = React.useCallback(() => {
+    // Оновлюємо refreshKey, щоб перезавантажити CurrentPlan
+    setRefreshKey(prev => prev + 1);
+  }, []);
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -59,10 +94,10 @@ export default function SubscriptionsPage() {
         <a className="btn ghost" href="/privacy" target="_blank" rel="noreferrer">Billing FAQ</a>
       </div>
 
-      <Tabs value={tab} onChange={setTab} />
+      <Tabs value={tab} onChange={handleTabChange} />
 
       {tab === "current" && <CurrentPlan key={refreshKey} />}
-      {tab === "upgrade" && <UpgradeOptions onUpgradeSuccess={handleUpgradeSuccess} />}
+      {tab === "upgrade" && <UpgradeOptions onUpgradeSuccess={handleUpgradeSuccess} onSubscriptionUpdate={handleSubscriptionUpdate} />}
     </div>
   );
 }
@@ -77,26 +112,100 @@ function CurrentPlan() {
   const { user } = useAuth();
   const { showNotification } = useNotifications();
   const [subscription, setSubscription] = React.useState(null);
+  const [allPlans, setAllPlans] = React.useState([]); // Store all plans from API
   const [loading, setLoading] = React.useState(true);
   const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
   const [upgradeFeature, setUpgradeFeature] = React.useState(null);
 
-  React.useEffect(() => {
-    loadSubscription();
-  }, []);
-
-  const loadSubscription = async () => {
+  const loadSubscription = React.useCallback(async () => {
     try {
       setLoading(true);
       const data = await SubscriptionApi.getMySubscription();
-      setSubscription(data);
+      console.log('📊 Subscription data from API (raw):', data);
+      
+      // Нова структура API: { result: { subscription: {...}, usage: {...}, plan_features: {...} } }
+      // Стара структура: { result: { subscription: {...} } } або { subscription: {...} }
+      const subscriptionData = data?.result?.subscription || 
+                                data?.result || 
+                                data?.subscription ||
+                                data;
+      
+      // Зберігаємо також usage та plan_features з result
+      const usageData = data?.result?.usage || null;
+      const planFeaturesData = data?.result?.plan_features || null;
+      
+      // Додаємо usage та plan_features до subscription об'єкта для зручності
+      if (subscriptionData) {
+        subscriptionData.usage = usageData || subscriptionData.usage;
+        subscriptionData.plan_features = planFeaturesData || subscriptionData.plan_features;
+      }
+      
+      console.log('📊 Subscription data (extracted):', subscriptionData);
+      console.log('📊 Usage data:', usageData);
+      console.log('📊 Plan features data:', planFeaturesData);
+      console.log('🔍 subscription_plan_id:', subscriptionData?.subscription_plan_id);
+      console.log('🔍 plan_name:', subscriptionData?.plan_name);
+      console.log('🔍 plan_tier:', subscriptionData?.plan_tier);
+      
+      setSubscription(subscriptionData);
     } catch (error) {
       console.error("Failed to load subscription:", error);
-      showNotification(error.message || "Failed to load subscription data", "error");
+      
+      // Якщо помилка 500 з повідомленням про відсутні поля - показуємо попередження
+      // але не блокуємо UI, використовуємо fallback дані
+      if (error.status === 500 && error.message?.includes('Unable to locate var')) {
+        console.warn("Backend subscription API has missing fields. Using fallback data.");
+        showNotification(
+          "Some subscription details are unavailable. Please contact support if this persists.",
+          "warning"
+        );
+        // Встановлюємо null, щоб використати fallback дані з useMemo
+        setSubscription(null);
+      } else {
+        // Для інших помилок показуємо повідомлення
+        showNotification(
+          error.message || "Failed to load subscription data. Using default plan information.",
+          "error"
+        );
+        // Встановлюємо null для fallback
+        setSubscription(null);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [showNotification]);
+
+  // Load plans to get features
+  const loadPlans = React.useCallback(async () => {
+    try {
+      const response = await SubscriptionApi.getPlans();
+      const plansData = response?.result || response || [];
+      setAllPlans(plansData);
+      console.log('📋 Plans loaded for features:', plansData);
+    } catch (error) {
+      console.error("Failed to load plans:", error);
+      // Не критично, продовжуємо без планів
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadSubscription();
+    loadPlans();
+  }, [loadSubscription, loadPlans]);
+
+  // Оновлюємо дані при фокусі на вкладці (якщо користувач повернувся на цю вкладку)
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Перезавантажуємо дані, коли сторінка стає видимою
+        loadSubscription();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [loadSubscription]);
+
 
   // Format subscription data for display
   const active = React.useMemo(() => {
@@ -125,32 +234,215 @@ function CurrentPlan() {
       };
     }
 
-    const planName = subscription.subscription_details?.plan_name || 
+    // Отримуємо назву плану з різних можливих місць в response
+    // API повертає plan_name та plan_tier в subscription об'єкті
+    const planName = subscription.plan_name?.charAt(0).toUpperCase() + subscription.plan_name?.slice(1) ||
+                     subscription.plan_tier?.charAt(0).toUpperCase() + subscription.plan_tier?.slice(1) ||
+                     subscription.subscription_details?.plan_name || 
                      subscription.current_plan?.charAt(0).toUpperCase() + subscription.current_plan?.slice(1) || 
+                     subscription.plan?.name ||
                      "Free";
     
+    // Отримуємо usage дані - нова структура: data.result.usage
+    // Формат: { ai_messages: { enabled, current_value, max_value, feature_name }, ... }
     const usage = subscription.usage || {};
-    const features = subscription.available_features || [];
-
-    return {
-      name: planName,
-      tier: subscription.subscription_status === "active" ? "Active" : subscription.subscription_status,
-      renewal: subscription.next_billing_date 
-        ? new Date(subscription.next_billing_date).toLocaleDateString()
-        : null,
-      limits: {
-        familyUsed: 0,
-        familyMax: 0,
-        uploadsUsed: usage.uploads_used || 0,
-        uploadsMax: usage.uploads_limit || 0,
-        goalsUsed: 0,
-        goalsMax: 0,
-        notesUsed: usage.notes_used || 0,
-        notesMax: usage.notes_limit || 0,
-        aiMessagesUsed: usage.ai_messages_used || 0,
-        aiMessagesLimit: usage.ai_messages_limit || 0,
-      },
-      features: features.map(f => {
+    
+    // Конвертуємо новий формат usage в старий формат для сумісності
+    // Зберігаємо також інформацію про enabled та feature_name
+    const normalizedUsage = {};
+    const usageMetadata = {}; // Зберігаємо метадані для кожного usage item
+    
+    if (usage && typeof usage === 'object') {
+      // Новий формат: { ai_messages: { enabled, current_value, max_value, feature_name }, ... }
+      Object.keys(usage).forEach(key => {
+        const usageItem = usage[key];
+        if (usageItem && typeof usageItem === 'object' && usageItem.enabled === true) {
+          // Мапимо ключі тільки якщо enabled === true
+          if (key === 'ai_messages') {
+            normalizedUsage.ai_messages_used = usageItem.current_value || 0;
+            normalizedUsage.ai_messages_limit = usageItem.max_value || 0;
+            usageMetadata.ai_messages = {
+              enabled: true,
+              feature_name: usageItem.feature_name || 'AI Messages',
+              current_value: usageItem.current_value || 0,
+              max_value: usageItem.max_value || 0
+            };
+          } else if (key === 'pdf_reports') {
+            normalizedUsage.uploads_used = usageItem.current_value || 0;
+            normalizedUsage.uploads_limit = usageItem.max_value || 0;
+            usageMetadata.pdf_reports = {
+              enabled: true,
+              feature_name: usageItem.feature_name || 'Reports (PDF Export)',
+              current_value: usageItem.current_value || 0,
+              max_value: usageItem.max_value || 0
+            };
+          } else if (key === 'csv_export') {
+            usageMetadata.csv_export = {
+              enabled: true,
+              feature_name: usageItem.feature_name || 'CSV Data Export',
+              current_value: usageItem.current_value || 0,
+              max_value: usageItem.max_value || 0
+            };
+          }
+        }
+      });
+    }
+    
+    // Отримуємо subscription_plan_id для пошуку плану
+    const subscriptionPlanId = subscription.subscription_plan_id ||
+                                subscription.subscription_details?.subscription_plan_id ||
+                                subscription.plan_id ||
+                                null;
+    
+    // Знаходимо план з API /plans, який відповідає поточній підписці
+    let currentPlanFromApi = null;
+    if (subscriptionPlanId && allPlans.length > 0) {
+      currentPlanFromApi = allPlans.find(plan => plan.id === subscriptionPlanId || String(plan.id) === String(subscriptionPlanId));
+    }
+    
+    // Якщо не знайдено за ID, пробуємо знайти за plan_name або plan_tier
+    if (!currentPlanFromApi && allPlans.length > 0) {
+      const planName = subscription.plan_name || subscription.plan_tier;
+      if (planName) {
+        currentPlanFromApi = allPlans.find(plan => 
+          plan.plan_tier?.toLowerCase() === planName.toLowerCase() ||
+          plan.name?.toLowerCase() === planName.toLowerCase()
+        );
+      }
+    }
+    
+    console.log('🔍 Current plan from API:', currentPlanFromApi);
+    console.log('🔍 Subscription plan ID:', subscriptionPlanId);
+    console.log('🔍 Plan name/tier:', subscription.plan_name || subscription.plan_tier);
+    
+    // Отримуємо features з плану з API /plans або з plan_features з API /my_subscription
+    let features = [];
+    
+    // Спочатку пробуємо використати plan_features з API /my_subscription (нова структура)
+    const planFeatures = subscription.plan_features || {};
+    if (Object.keys(planFeatures).length > 0) {
+      // Форматуємо plan_features в список features
+      const featureNames = [];
+      
+      if (planFeatures.manual_data_entry) featureNames.push("Manual Health Data Entry");
+      if (planFeatures.ai_messages) {
+        // Перевіряємо ліміт з subscription
+        const aiLimit = subscription.ai_messages_limit;
+        if (aiLimit === 0 || aiLimit === -1) {
+          featureNames.push("Unlimited AI Messages/month");
+        } else if (aiLimit > 0) {
+          featureNames.push(`${aiLimit} AI Messages/month`);
+        } else {
+          featureNames.push("AI Messages");
+        }
+      }
+      if (planFeatures.ai_risk_forecasts) featureNames.push("AI-Driven Risk Forecasts");
+      if (planFeatures.early_alerts) featureNames.push("Early Alerts");
+      if (planFeatures.pdf_reports) featureNames.push("Reports (PDF Export)");
+      if (planFeatures.csv_export) featureNames.push("CSV Data Export");
+      if (planFeatures.document_uploads) {
+        const uploadLimit = subscription.file_uploads_limit;
+        if (uploadLimit === 0 || uploadLimit === -1) {
+          featureNames.push("Unlimited Document Uploads");
+        } else if (uploadLimit > 0) {
+          featureNames.push(`${uploadLimit} Document Uploads/month`);
+        } else {
+          featureNames.push("Document Uploads");
+        }
+      }
+      if (planFeatures.custom_goals) {
+        const goalsLimit = subscription.goals_limit;
+        if (goalsLimit === 0 || goalsLimit === -1) {
+          featureNames.push("Unlimited Custom Goals");
+        } else if (goalsLimit > 0) {
+          featureNames.push(`Up to ${goalsLimit} Custom Goals`);
+        } else {
+          featureNames.push("Custom Goals");
+        }
+      }
+      if (planFeatures.goal_history) featureNames.push("Goal History");
+      if (planFeatures.notes) {
+        const notesLimit = subscription.notes_limit;
+        if (notesLimit === 0 || notesLimit === -1) {
+          featureNames.push("Unlimited Notes");
+        } else if (notesLimit > 0) {
+          featureNames.push(`Up to ${notesLimit} Notes`);
+        } else {
+          featureNames.push("Notes");
+        }
+      }
+      if (planFeatures.chat_history) featureNames.push("Chat History Access");
+      if (planFeatures.provider_sharing) featureNames.push("Share with Providers");
+      if (planFeatures.family_sharing) {
+        const familyLimit = subscription.max_members || 1;
+        featureNames.push(`Family Sharing (${familyLimit} linked user${familyLimit > 1 ? 's' : ''})`);
+      }
+      if (planFeatures.secure_data_backup) featureNames.push("Secure Data Backup");
+      
+      features = featureNames;
+      console.log('✅ Using plan_features from API:', features);
+    } else if (currentPlanFromApi?.features) {
+      // Fallback: використовуємо features з плану з API /plans
+      // Форматуємо features з плану
+      features = currentPlanFromApi.features.map(feature => {
+        const featureName = feature.feature_name || feature.feature;
+        const limitValue = feature.limit_value;
+        const isLimited = feature.is_limited;
+        const featureKey = feature.feature_key;
+        
+        // Якщо не обмежено або ліміт 0, просто повертаємо назву
+        if (!isLimited || limitValue === 0) {
+          return featureName;
+        }
+        
+        // Якщо unlimited (-1)
+        if (limitValue === -1) {
+          if (featureKey === 'ai_messages') {
+            return 'Unlimited AI Messages/month';
+          } else if (featureKey === 'document_uploads') {
+            return 'Unlimited Document Uploads';
+          } else if (featureKey === 'notes') {
+            return 'Unlimited Notes';
+          } else if (featureKey === 'custom_goals') {
+            return 'Unlimited Custom Goals';
+          } else if (featureKey === 'goal_history') {
+            return 'Unlimited Goal History';
+          } else if (featureKey === 'chat_history') {
+            return 'Full Chat History';
+          }
+          return featureName;
+        }
+        
+        // Якщо обмежено з конкретним значенням
+        if (limitValue > 0) {
+          if (featureKey === 'ai_messages') {
+            return `${limitValue} AI Messages/month`;
+          } else if (featureKey === 'document_uploads') {
+            return `${limitValue} Document Uploads/month`;
+          } else if (featureKey === 'notes') {
+            return `Up to ${limitValue} Notes`;
+          } else if (featureKey === 'custom_goals') {
+            return `Up to ${limitValue} Custom Goals`;
+          } else if (featureKey === 'goal_history') {
+            return `${limitValue}-day Goal History`;
+          } else if (featureKey === 'chat_history') {
+            return `${limitValue}-day Chat History`;
+          } else if (featureKey === 'family_sharing') {
+            return `Family Sharing (${limitValue} linked user${limitValue > 1 ? 's' : ''})`;
+          }
+        }
+        
+        return featureName;
+      });
+    } else {
+      // Fallback: використовуємо features з subscription, якщо план не знайдено
+      const fallbackFeatures = subscription.available_features || 
+                                subscription.features || 
+                                subscription.plan?.features || 
+                                [];
+      
+      // Мапимо fallback features до читабельного формату
+      features = fallbackFeatures.map(f => {
         const featureMap = {
           ai_message: "AI Messages",
           upload: "Document Uploads",
@@ -159,11 +451,55 @@ function CurrentPlan() {
           ai_risk_forecast: "AI Risk Forecasts",
           goal_history: "Goal History",
           custom_goal: "Custom Goals",
+          family_sharing: "Family Sharing",
         };
         return featureMap[f] || f;
-      }),
+      });
+      
+      console.warn('⚠️ Plan not found in /plans API, using fallback features from subscription');
+    }
+    
+    // Отримуємо статус підписки
+    const status = subscription.status ||
+                   subscription.subscription_status || 
+                   subscription.subscription?.status || 
+                   "active";
+    
+    // Отримуємо дату наступного платежу
+    const nextBilling = subscription.next_billing_date || 
+                        subscription.next_billing || 
+                        subscription.subscription?.next_billing_date ||
+                        subscription.billing_date;
+
+    // Отримуємо family members дані, якщо є
+    const familyData = subscription.family_members || subscription.family || {};
+    const familyUsed = familyData.used || familyData.active_count || 0;
+    const familyMax = familyData.limit || familyData.max || 0;
+
+    return {
+      name: planName,
+      tier: status === "active" ? "Active" : status.charAt(0).toUpperCase() + status.slice(1),
+      renewal: nextBilling 
+        ? new Date(nextBilling).toLocaleDateString()
+        : null,
+            limits: {
+              familyUsed: familyUsed,
+              familyMax: familyMax,
+              uploadsUsed: normalizedUsage.uploads_used ?? usage.uploads_used ?? usage.upload_used ?? 0,
+              uploadsMax: normalizedUsage.uploads_limit ?? usage.uploads_limit ?? usage.upload_limit ?? 0,
+              goalsUsed: usage.goals_used ?? usage.goal_used ?? 0,
+              goalsMax: usage.goals_limit ?? usage.goal_limit ?? 0,
+              notesUsed: usage.notes_used ?? usage.note_used ?? 0,
+              notesMax: usage.notes_limit ?? usage.note_limit ?? 0,
+              aiMessagesUsed: normalizedUsage.ai_messages_used ?? usage.ai_messages_used ?? usage.ai_message_used ?? 0,
+              aiMessagesLimit: normalizedUsage.ai_messages_limit ?? usage.ai_messages_limit ?? usage.ai_message_limit ?? 10, // Default fallback
+            },
+      features: features, // Features вже відформатовані з API /plans
+      // Додаткова інформація для відображення
+      rawData: subscription, // Зберігаємо raw дані для debugging
+      usageMetadata: usageMetadata, // Метадані usage для відображення в Active limits
     };
-  }, [subscription]);
+  }, [subscription, allPlans]);
 
   if (loading) {
     return (
@@ -199,7 +535,66 @@ function CurrentPlan() {
       <div className="card">
         <div style={{ fontWeight:600, marginBottom:8 }}>Active limits</div>
         <div style={{ display:'grid', gap:8 }}>
-          {active.limits.aiMessagesLimit > 0 && (
+          {/* Відображаємо всі limits з enabled === true, навіть якщо значення 0 */}
+          {active.usageMetadata?.ai_messages?.enabled && (
+            <div>
+              <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>
+                {active.usageMetadata.ai_messages.feature_name || 'AI Messages'}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div className="btn outline small" style={{ pointerEvents:'none' }}>
+                  {active.usageMetadata.ai_messages.max_value === 0 || active.usageMetadata.ai_messages.max_value === Infinity
+                    ? '∞'
+                    : `${active.usageMetadata.ai_messages.current_value}/${active.usageMetadata.ai_messages.max_value} used`}
+                </div>
+                {active.usageMetadata.ai_messages.enabled && active.usageMetadata.ai_messages.max_value > 0 && active.usageMetadata.ai_messages.max_value !== Infinity && (
+                  <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
+                    <div style={{ width:`${Math.min((active.usageMetadata.ai_messages.current_value/active.usageMetadata.ai_messages.max_value)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {active.usageMetadata?.pdf_reports?.enabled && (
+            <div>
+              <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>
+                {active.usageMetadata.pdf_reports.feature_name || 'Reports (PDF Export)'}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div className="btn outline small" style={{ pointerEvents:'none' }}>
+                  {active.usageMetadata.pdf_reports.max_value === 0 || active.usageMetadata.pdf_reports.max_value === Infinity
+                    ? '∞'
+                    : `${active.usageMetadata.pdf_reports.current_value}/${active.usageMetadata.pdf_reports.max_value} used`}
+                </div>
+                {active.usageMetadata.pdf_reports.enabled && active.usageMetadata.pdf_reports.max_value > 0 && active.usageMetadata.pdf_reports.max_value !== Infinity && (
+                  <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
+                    <div style={{ width:`${Math.min((active.usageMetadata.pdf_reports.current_value/active.usageMetadata.pdf_reports.max_value)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {active.usageMetadata?.csv_export?.enabled && (
+            <div>
+              <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>
+                {active.usageMetadata.csv_export.feature_name || 'CSV Data Export'}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div className="btn outline small" style={{ pointerEvents:'none' }}>
+                  {active.usageMetadata.csv_export.max_value === 0 || active.usageMetadata.csv_export.max_value === Infinity
+                    ? '∞'
+                    : `${active.usageMetadata.csv_export.current_value}/${active.usageMetadata.csv_export.max_value} used`}
+                </div>
+                {active.usageMetadata.csv_export.enabled && active.usageMetadata.csv_export.max_value > 0 && active.usageMetadata.csv_export.max_value !== Infinity && (
+                  <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:999 }}>
+                    <div style={{ width:`${Math.min((active.usageMetadata.csv_export.current_value/active.usageMetadata.csv_export.max_value)*100, 100)}%`, height:6, background:'var(--primary)', borderRadius:999 }} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {/* Fallback для інших limits, якщо вони не в usage але є в limits */}
+          {!active.usageMetadata?.ai_messages?.enabled && active.limits.aiMessagesLimit > 0 && (
             <div>
               <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>AI Messages</div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -214,7 +609,7 @@ function CurrentPlan() {
               </div>
             </div>
           )}
-          {active.limits.uploadsMax > 0 && (
+          {!active.usageMetadata?.pdf_reports?.enabled && active.limits.uploadsMax > 0 && (
             <div>
               <div style={{ fontSize:12, color:'var(--muted)', marginBottom:4 }}>Document & Lab Uploads</div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -273,7 +668,16 @@ function CurrentPlan() {
         </div>
       </div>
 
-      <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center' }}>
+        <button 
+          className="btn ghost" 
+          onClick={loadSubscription}
+          disabled={loading}
+          title="Refresh subscription data"
+          style={{ fontSize: 12, padding: '6px 12px' }}
+        >
+          {loading ? '⏳' : '🔄'} Refresh
+        </button>
         <button className="btn outline">Manage billing</button>
         <button className="btn primary" onClick={() => {
           const tabs = document.querySelector('[role="tablist"]');
@@ -320,7 +724,7 @@ function CurrentPlan() {
             </div>
             <div style={{ marginTop: 8 }}>
               <button className="btn outline small" style={{ fontSize: 12 }}>
-                🔓 See Upgrade Prompt
+                🔓 Upgrade Now
               </button>
             </div>
           </div>
@@ -353,7 +757,7 @@ function CurrentPlan() {
             </div>
             <div style={{ marginTop: 8 }}>
               <button className="btn outline small" style={{ fontSize: 12 }}>
-                🔓 See Upgrade Prompt
+                🔓 Upgrade Now
               </button>
             </div>
           </div>
@@ -386,7 +790,7 @@ function CurrentPlan() {
             </div>
             <div style={{ marginTop: 8 }}>
               <button className="btn outline small" style={{ fontSize: 12 }}>
-                🔓 See Upgrade Prompt
+                🔓 Upgrade Now
               </button>
             </div>
           </div>
@@ -419,7 +823,7 @@ function CurrentPlan() {
             </div>
             <div style={{ marginTop: 8 }}>
               <button className="btn outline small" style={{ fontSize: 12 }}>
-                🔓 See Upgrade Prompt
+                🔓 Upgrade Now
               </button>
             </div>
           </div>
@@ -436,12 +840,13 @@ function CurrentPlan() {
   );
 }
 
-function UpgradeOptions({ onUpgradeSuccess }) {
+function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
   const { user } = useAuth();
   const { showNotification } = useNotifications();
   const [period, setPeriod] = React.useState("monthly");
-  const [hoveredRow, setHoveredRow] = React.useState(null);
+  const [hoveredRow, setHoveredRow] = React.useState(null); // Track hovered row index
   const [allPlans, setAllPlans] = React.useState([]); // Store all loaded plans
+  const [currentSubscription, setCurrentSubscription] = React.useState(null); // Current user subscription
   const [loading, setLoading] = React.useState(true);
   const [upgrading, setUpgrading] = React.useState(null);
   const [confirmUpgrade, setConfirmUpgrade] = React.useState({ open: false, plan: null });
@@ -460,22 +865,177 @@ function UpgradeOptions({ onUpgradeSuccess }) {
     return () => observer.disconnect();
   }, []);
 
-  // Load plans only once on mount
-  React.useEffect(() => {
-    loadPlans();
+  // Load current subscription to identify active plan
+  const loadCurrentSubscription = React.useCallback(async () => {
+    try {
+      const data = await SubscriptionApi.getMySubscription();
+      console.log('📊 Current subscription in UpgradeOptions (raw):', data);
+
+      // Нова структура API: { result: { subscription: {...}, usage: {...}, plan_features: {...} } }
+      // Стара структура: { result: { subscription: {...} } } або { subscription: {...} }
+      const subscriptionData = data?.result?.subscription ||
+                               data?.result ||
+                               data?.subscription ||
+                               data;
+      
+      // Зберігаємо також usage та plan_features з result
+      const usageData = data?.result?.usage || null;
+      const planFeaturesData = data?.result?.plan_features || null;
+      
+      // Додаємо usage та plan_features до subscription об'єкта для зручності
+      if (subscriptionData) {
+        subscriptionData.usage = usageData || subscriptionData.usage;
+        subscriptionData.plan_features = planFeaturesData || subscriptionData.plan_features;
+      }
+      
+      console.log('📊 Current subscription data (extracted):', subscriptionData);
+      console.log('📊 Usage data:', usageData);
+      console.log('📊 Plan features data:', planFeaturesData);
+      console.log('🔍 subscription_plan_id:', subscriptionData?.subscription_plan_id);
+      console.log('🔍 plan_name:', subscriptionData?.plan_name);
+      console.log('🔍 plan_tier:', subscriptionData?.plan_tier);
+      console.log('🔍 subscription_details:', subscriptionData?.subscription_details);
+      console.log('🔍 current_plan:', subscriptionData?.current_plan);
+      console.log('🔍 plan_id:', subscriptionData?.plan_id);
+
+      setCurrentSubscription(subscriptionData);
+    } catch (error) {
+      console.error("Failed to load current subscription:", error);
+      // Не показуємо помилку, бо це не критично для відображення планів
+      setCurrentSubscription(null);
+    }
   }, []);
 
-  // Sort plans based on current period (without reloading from API)
+  // Load plans and current subscription on mount
+  React.useEffect(() => {
+    loadPlans();
+    loadCurrentSubscription();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Оновлюємо поточну підписку при поверненні на вкладку (після upgrade)
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadCurrentSubscription();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [loadCurrentSubscription]);
+
+  // Determine current plan identifier
+  // Використовуємо subscription_plan_id з API /my_subscription, який збігається з id плану
+  const currentPlanId = React.useMemo(() => {
+    if (!currentSubscription) {
+      console.log('⚠️ No current subscription data');
+      return null;
+    }
+    
+    // Перевіряємо subscription_plan_id (основне поле для порівняння)
+    // API повертає subscription_plan_id безпосередньо в subscription об'єкті
+    const subscriptionPlanId = currentSubscription.subscription_plan_id ||
+                                currentSubscription.subscription_details?.subscription_plan_id ||
+                                currentSubscription.plan_id ||
+                                currentSubscription.subscription_details?.plan_id ||
+                                currentSubscription.current_plan_id ||
+                                currentSubscription.plan?.id ||
+                                null;
+    
+    console.log('🔍 Current plan ID from subscription:', subscriptionPlanId);
+    console.log('🔍 All subscription fields:', {
+      subscription_plan_id: currentSubscription.subscription_plan_id,
+      plan_name: currentSubscription.plan_name,
+      plan_tier: currentSubscription.plan_tier,
+      'subscription_details.subscription_plan_id': currentSubscription.subscription_details?.subscription_plan_id,
+      plan_id: currentSubscription.plan_id,
+      'subscription_details.plan_id': currentSubscription.subscription_details?.plan_id,
+      current_plan_id: currentSubscription.current_plan_id,
+      'plan.id': currentSubscription.plan?.id,
+      final: subscriptionPlanId
+    });
+    return subscriptionPlanId;
+  }, [currentSubscription]);
+
+  // Determine current plan name/key for matching (fallback, якщо ID не знайдено)
+  const currentPlanKey = React.useMemo(() => {
+    if (!currentSubscription || currentPlanId) return null; // Якщо є ID, не використовуємо name
+    
+    // Отримуємо назву/ключ плану для порівняння (тільки якщо немає ID)
+    const planName = currentSubscription.subscription_details?.plan_name?.toLowerCase() ||
+                     currentSubscription.plan_name?.toLowerCase() ||
+                     currentSubscription.current_plan?.toLowerCase() ||
+                     currentSubscription.plan?.name?.toLowerCase() ||
+                     null;
+    
+    return planName;
+  }, [currentSubscription, currentPlanId]);
+
+  // Sort plans based on current period and determine recommended plan
   const plans = React.useMemo(() => {
     if (allPlans.length === 0) return [];
     
-    return [...allPlans].sort((a, b) => {
-      // Sort by price (ascending) - use monthly or yearly price based on selected period
+    // Створюємо копію планів
+    const plansCopy = [...allPlans].map(p => ({ ...p }));
+    
+    // Скидаємо всі recommended
+    plansCopy.forEach(plan => {
+      plan.recommended = false;
+    });
+    
+    // Визначаємо поточний план
+    let currentPlan = null;
+    if (currentPlanId) {
+      currentPlan = plansCopy.find(p => p.id && String(p.id) === String(currentPlanId));
+    }
+    if (!currentPlan && currentPlanKey) {
+      currentPlan = plansCopy.find(p => p.key && p.key.toLowerCase() === currentPlanKey.toLowerCase());
+    }
+    
+    // Якщо не знайдено поточний план, вважаємо що це Starter
+    if (!currentPlan) {
+      currentPlan = plansCopy.find(p => p.key === 'starter') || plansCopy[0];
+    }
+    
+    // Знаходимо найближчий план, який дорожчий за поточний
+    // Використовуємо monthly ціну для порівняння
+    const currentPrice = currentPlan.priceMonthly || 0;
+    const availablePlans = plansCopy.filter(p => 
+      p.key !== currentPlan.key && 
+      (p.priceMonthly || 0) > currentPrice
+    );
+    
+    if (availablePlans.length > 0) {
+      // Сортуємо за ціною (від найдешевшого до найдорожчого)
+      availablePlans.sort((a, b) => (a.priceMonthly || 0) - (b.priceMonthly || 0));
+      const recommendedPlan = availablePlans[0]; // Найближчий дорожчий план
+      
+      // Встановлюємо recommended для цього плану
+      const planToUpdate = plansCopy.find(p => p.key === recommendedPlan.key);
+      if (planToUpdate) {
+        planToUpdate.recommended = true;
+        // Оновлюємо subtitle та ribbon для рекомендованого плану
+        if (planToUpdate.key === 'core') {
+          planToUpdate.subtitle = 'Most Popular';
+          planToUpdate.ribbon = 'Most popular';
+        } else if (planToUpdate.key === 'complete') {
+          planToUpdate.subtitle = 'Best Value';
+          planToUpdate.ribbon = 'Best value';
+        } else if (planToUpdate.key === 'family') {
+          planToUpdate.subtitle = 'For Families';
+          planToUpdate.ribbon = null;
+        }
+      }
+    }
+    
+    // Сортуємо за ціною (ascending) - use monthly or yearly price based on selected period
+    return plansCopy.sort((a, b) => {
       const priceA = monthly ? a.priceMonthly : a.priceYearly;
       const priceB = monthly ? b.priceMonthly : b.priceYearly;
       return priceA - priceB;
     });
-  }, [allPlans, monthly]);
+  }, [allPlans, monthly, currentPlanId, currentPlanKey]);
 
   const loadPlans = async () => {
     try {
@@ -642,7 +1202,10 @@ function UpgradeOptions({ onUpgradeSuccess }) {
         },
       ];
       
-      setAllPlans(mappedPlans.length > 0 ? mappedPlans : defaultPlans);
+      const finalPlans = mappedPlans.length > 0 ? mappedPlans : defaultPlans;
+      
+      // Рекомендований план буде визначено в useMemo для plans на основі поточного плану користувача
+      setAllPlans(finalPlans);
     } catch (error) {
       console.error("Failed to load plans:", error);
       showNotification(error.message || "Failed to load subscription plans", "error");
@@ -715,26 +1278,208 @@ function UpgradeOptions({ onUpgradeSuccess }) {
     try {
       setUpgrading(planId);
       setConfirmUpgrade({ open: false, plan: null });
-      const result = await PaymentApi.upgradeSubscription(planId);
-      
-      if (result.success) {
-        showNotification(result.message || "Subscription upgraded successfully!", "success");
-        // Call success callback if provided
-        if (onUpgradeSuccess) {
-          onUpgradeSuccess();
-        } else {
-          // Fallback to page reload
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-        }
-      } else {
-        showNotification(result.error || "Failed to upgrade subscription", "error");
+
+      // Build success and cancel URLs (for HashRouter)
+      const baseUrl = window.location.origin;
+      const successUrl = `${baseUrl}/#/dashboard/subscriptions/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${baseUrl}/#/dashboard/subscriptions/checkout/cancel`;
+
+      // Create Stripe Checkout Session
+      // According to API spec: required fields are plan_id, success_url, cancel_url
+      // payment_type is optional with default "subscription"
+      const sessionResult = await PaymentApi.createCheckoutSession({
+        plan_id: planId,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        payment_type: 'subscription'
+      });
+
+      // Log response for debugging
+      console.log('🔍 createCheckoutSession response:', sessionResult);
+
+      if (!sessionResult) {
+        throw new Error("Failed to create checkout session: empty response");
       }
+
+      // Check for error in response
+      // Якщо success: false або є error поле - це помилка
+      // message може бути інформаційним повідомленням (наприклад, "MOCK: ...")
+      if (sessionResult.success === false || sessionResult.error) {
+        throw new Error(sessionResult.error || sessionResult.message || "Failed to create checkout session");
+      }
+      
+      // Якщо success: true, message - це просто інформація, не помилка
+      if (sessionResult.success === true && sessionResult.message) {
+        console.log('ℹ️ Info message:', sessionResult.message);
+      }
+
+      // Backend returns checkout URL directly (no need for Stripe.js on frontend)
+      // According to API spec and actual response, we check multiple possible fields:
+      // - checkout_session.url (actual response structure)
+      // - checkout_url (direct URL to redirect)
+      // - url (Stripe Checkout URL)
+      // - session_url (alternative field name)
+      // - result.checkout_url (if wrapped in result object)
+      // - result.url (if wrapped in result object)
+      const checkoutUrl = sessionResult.checkout_session?.url ||
+                         sessionResult.checkout_url || 
+                         sessionResult.url || 
+                         sessionResult.session_url ||
+                         sessionResult.result?.checkout_url ||
+                         sessionResult.result?.url ||
+                         sessionResult.result?.session_url;
+
+      if (!checkoutUrl) {
+        // Log full response for debugging
+        console.error('❌ No checkout URL in response:', sessionResult);
+        
+        // Fallback: if backend only returns session_id, we can't construct URL manually
+        // Backend must return full checkout URL
+        if (sessionResult.session_id || sessionResult.result?.session_id) {
+          const sessionId = sessionResult.session_id || sessionResult.result?.session_id;
+          throw new Error(
+            `Backend returned session_id (${sessionId}) but not checkout_url. ` +
+            `Please update backend to return full checkout URL in 'checkout_url' or 'url' field.`
+          );
+        }
+        throw new Error(
+          "No checkout URL returned from backend. " +
+          "Expected fields: checkout_url, url, or session_url. " +
+          `Received: ${JSON.stringify(Object.keys(sessionResult))}`
+        );
+      }
+
+      // Clean up URL: fix double ? and remove placeholder session_id={CHECKOUT_SESSION_ID}
+      // Example: "http://localhost:5173/#/dashboard/...?session_id={CHECKOUT_SESSION_ID}?session_id=real_id&mock=true" 
+      // Should be: "http://localhost:5173/#/dashboard/...?session_id=real_id&mock=true"
+      let cleanUrl = checkoutUrl;
+      
+      // Функція для виправлення подвійних ? на &
+      const fixDoubleQuestionMarks = (url) => {
+        // Знаходимо всі входження ? після першого
+        const parts = url.split('?');
+        if (parts.length <= 2) return url; // Немає подвійних ?
+        
+        // Перший ? залишаємо, решту замінюємо на &
+        const base = parts[0];
+        const queryParts = parts.slice(1);
+        const fixedQuery = queryParts.join('&');
+        
+        return `${base}?${fixedQuery}`;
+      };
+      
+      // Функція для видалення placeholder session_id
+      const removePlaceholderSessionId = (url) => {
+        const hashIndex = url.indexOf('#');
+        let beforeHash = '';
+        let afterHash = '';
+        
+        if (hashIndex !== -1) {
+          beforeHash = url.substring(0, hashIndex);
+          afterHash = url.substring(hashIndex);
+        } else {
+          beforeHash = url;
+        }
+        
+        // Обробляємо hash частину
+        if (afterHash.includes('?')) {
+          const hashParts = afterHash.split('?');
+          const hashBase = hashParts[0];
+          const queryString = hashParts.slice(1).join('&'); // Об'єднуємо всі query частини через &
+          
+          // Парсимо query параметри
+          const params = new URLSearchParams(queryString);
+          
+          // Знаходимо всі session_id параметри
+          const allSessionIds = Array.from(params.entries())
+            .filter(([key]) => key === 'session_id')
+            .map(([, value]) => decodeURIComponent(value));
+          
+          // Видаляємо всі session_id
+          params.delete('session_id');
+          
+          // Додаємо тільки реальне значення (без {CHECKOUT_SESSION_ID})
+          const realSessionId = allSessionIds.find(id => !id.includes('{CHECKOUT_SESSION_ID}'));
+          if (realSessionId) {
+            params.set('session_id', realSessionId);
+          }
+          
+          const newQuery = params.toString();
+          return beforeHash + hashBase + (newQuery ? '?' + newQuery : '');
+        }
+        
+        // Обробляємо URL без hash
+        if (beforeHash.includes('?')) {
+          const urlParts = beforeHash.split('?');
+          const baseUrl = urlParts[0];
+          const queryString = urlParts.slice(1).join('&');
+          const params = new URLSearchParams(queryString);
+          
+          const sessionIdValue = params.get('session_id');
+          if (sessionIdValue && sessionIdValue.includes('{CHECKOUT_SESSION_ID}')) {
+            params.delete('session_id');
+          }
+          
+          const newQuery = params.toString();
+          return newQuery ? `${baseUrl}?${newQuery}` : baseUrl;
+        }
+        
+        return url;
+      };
+      
+      // Спочатку виправляємо подвійні ?
+      cleanUrl = fixDoubleQuestionMarks(checkoutUrl);
+      
+      // Потім видаляємо placeholder session_id
+      if (cleanUrl !== checkoutUrl || cleanUrl.includes('{CHECKOUT_SESSION_ID}')) {
+        cleanUrl = removePlaceholderSessionId(cleanUrl);
+        console.warn('⚠️ Fixed URL:', checkoutUrl, '→', cleanUrl);
+      }
+      
+      console.log('✅ Redirecting to checkout URL:', cleanUrl);
+      console.log('🔍 URL type check:', {
+        isAbsolute: cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://'),
+        isHashRouter: cleanUrl.includes('#'),
+        fullUrl: cleanUrl,
+        urlLength: cleanUrl.length
+      });
+      
+      // Перевіряємо, чи URL валідний
+      if (!cleanUrl || cleanUrl.trim() === '') {
+        throw new Error('Invalid checkout URL: empty or undefined');
+      }
+      
+      // Redirect to checkout URL
+      // Для HashRouter URLs (#/dashboard/...) використовуємо window.location.href
+      console.log('🚀 Executing redirect...');
+      console.log('📍 Current location before redirect:', window.location.href);
+      
+      // Використовуємо href для HashRouter (має працювати для обох випадків)
+      window.location.href = cleanUrl;
+      
+      // Додаткова перевірка через 300ms (якщо redirect не спрацював)
+      setTimeout(() => {
+        const currentUrl = window.location.href;
+        const expectedHash = cleanUrl.split('#')[1]?.split('?')[0]; // hash path without query
+        const currentHash = currentUrl.split('#')[1]?.split('?')[0];
+        
+        if (expectedHash && currentHash !== expectedHash) {
+          console.warn('⚠️ Redirect might have failed!');
+          console.warn('   Expected hash:', expectedHash);
+          console.warn('   Current hash:', currentHash);
+          console.warn('   Full expected URL:', cleanUrl);
+          console.warn('   Full current URL:', currentUrl);
+          console.warn('   Retrying redirect...');
+          
+          // Спробуємо ще раз
+          window.location.href = cleanUrl;
+      } else {
+          console.log('✅ Redirect successful!');
+      }
+      }, 300);
     } catch (error) {
       console.error("Upgrade failed:", error);
-      showNotification(error.message || "Failed to upgrade subscription", "error");
-    } finally {
+      showNotification(error.message || "Failed to start checkout process", "error");
       setUpgrading(null);
     }
   };
@@ -785,6 +1530,45 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           const pricePerMonth = monthly ? price : Math.round(price / 12);
           const isLightTheme = document.documentElement.classList.contains('light-theme');
           
+          // Логування для Starter плану
+          if (p.key === 'starter') {
+            console.log('🔍 Starter plan check:', {
+              planKey: p.key,
+              isFree: isFree,
+              planId: p.id,
+              currentPlanId: currentPlanId,
+              isCurrentPlan: false // Will be calculated below
+            });
+          }
+          
+          // Перевіряємо, чи це поточний план користувача
+          // Основне порівняння: subscription_plan_id з API === id плану
+          // Starter (Free) НЕ може бути поточним планом, якщо є активна підписка
+          const planIdMatch = currentPlanId && p.id && String(currentPlanId) === String(p.id);
+          const planKeyMatch = !currentPlanId && currentPlanKey && p.key && currentPlanKey === p.key.toLowerCase() && p.key !== 'starter';
+          const planNameMatch = !currentPlanId && currentPlanKey && p.name && currentPlanKey === p.name.toLowerCase() && p.key !== 'starter';
+          
+          // Starter не може бути поточним планом, якщо є currentPlanId (тобто є активна підписка)
+          const isCurrentPlan = (planIdMatch || planKeyMatch || planNameMatch) && 
+                                 !(p.key === 'starter' && currentPlanId); // Starter не є поточним, якщо є активна підписка
+          
+          // Детальне логування для debugging
+          if (p.key === 'starter' || p.key === 'complete' || isCurrentPlan) {
+            console.log(`🔍 Plan ${p.key} (${p.name}):`, {
+              planKey: p.key,
+              planName: p.name,
+              planId: p.id,
+              planIdType: typeof p.id,
+              currentPlanId: currentPlanId,
+              currentPlanIdType: typeof currentPlanId,
+              planIdMatch: planIdMatch,
+              planKeyMatch: planKeyMatch,
+              planNameMatch: planNameMatch,
+              isCurrentPlan: isCurrentPlan,
+              comparison: currentPlanId && p.id ? `${String(currentPlanId)} === ${String(p.id)}` : 'N/A'
+            });
+          }
+          
           return (
             <div 
               key={p.key} 
@@ -794,8 +1578,14 @@ function UpgradeOptions({ onUpgradeSuccess }) {
                 flexDirection:'column',
                 gap:12, 
                 position:'relative',
-                border: p.recommended ? '2px solid var(--primary)' : '1px solid var(--border)',
-                background: p.recommended 
+                    border: isCurrentPlan
+                      ? '2px solid var(--success)'
+                      : p.recommended
+                        ? '2px solid var(--primary)'
+                        : '1px solid var(--border)',
+                    background: isCurrentPlan
+                      ? (isLightTheme ? 'rgba(0, 195, 122, 0.08)' : 'rgba(0, 195, 122, 0.05)')
+                      : p.recommended
                   ? (isLightTheme ? 'rgba(0, 186, 206, 0.08)' : 'rgba(0, 186, 206, 0.05)')
                   : (isLightTheme ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17,17,17,.85)'),
                 transition: 'all 0.2s',
@@ -803,7 +1593,13 @@ function UpgradeOptions({ onUpgradeSuccess }) {
                 height: '100%'
               }}
               onMouseEnter={(e) => {
-                if (!p.recommended) {
+                    // Поточний план завжди залишається зеленим
+                    if (isCurrentPlan) {
+                      e.currentTarget.style.border = '2px solid var(--success)';
+                      e.currentTarget.style.background = isLightTheme
+                        ? 'rgba(0, 195, 122, 0.12)'
+                        : 'rgba(0, 195, 122, 0.08)';
+                    } else if (!p.recommended) {
                   e.currentTarget.style.border = '1px solid var(--primary)';
                   e.currentTarget.style.background = isLightTheme 
                     ? 'rgba(0, 186, 206, 0.1)' 
@@ -811,7 +1607,13 @@ function UpgradeOptions({ onUpgradeSuccess }) {
                 }
               }}
               onMouseLeave={(e) => {
-                if (!p.recommended) {
+                    // Поточний план завжди залишається зеленим
+                    if (isCurrentPlan) {
+                      e.currentTarget.style.border = '2px solid var(--success)';
+                      e.currentTarget.style.background = isLightTheme
+                        ? 'rgba(0, 195, 122, 0.08)'
+                        : 'rgba(0, 195, 122, 0.05)';
+                    } else if (!p.recommended) {
                   e.currentTarget.style.border = '1px solid var(--border)';
                   e.currentTarget.style.background = isLightTheme 
                     ? 'rgba(249, 250, 251, 0.8)' 
@@ -819,7 +1621,17 @@ function UpgradeOptions({ onUpgradeSuccess }) {
                 }
               }}
             >
-              {p.ribbon && (
+              {/* Current Plan Badge */}
+              {isCurrentPlan && (
+                <div style={{ position:'absolute', top:12, right:12, zIndex: 2 }}>
+                  <Badge tone="success">
+                    Current Plan
+                  </Badge>
+                </div>
+              )}
+              
+              {/* Other badges (ribbon) - показуємо тільки якщо не поточний план */}
+              {p.ribbon && !isCurrentPlan && (
                 <div style={{ position:'absolute', top:12, right:12 }}>
                   <Badge tone={p.ribbon==='Free Tier' ? 'secondary' : p.ribbon==='Most popular' ? 'success' : 'primary'}>
                     {p.ribbon}
@@ -932,21 +1744,31 @@ function UpgradeOptions({ onUpgradeSuccess }) {
               
               <div style={{ display:'flex', justifyContent:'flex-end', paddingTop:8, flexShrink: 0, marginTop: 'auto' }}>
                 <button 
-                  className={`btn ${isFree ? 'outline' : p.recommended ? 'primary' : 'primary'}`}
+                  className={`btn ${isCurrentPlan ? 'outline' : isFree ? 'outline' : p.recommended ? 'primary' : 'primary'}`}
                   style={{ 
                     width: '100%',
-                    fontWeight: p.recommended ? 600 : 500
+                    fontWeight: p.recommended ? 600 : 500,
+                    opacity: isCurrentPlan ? 0.7 : 1
                   }}
-                  onClick={() => !isFree && p.id && handleUpgradeClick(p)}
-                  disabled={isFree || upgrading === p.id || !p.id}
+                  onClick={() => {
+                    if (isCurrentPlan) return; // Не робимо нічого для поточного плану
+                    // Для Free плану та інших планів - однакова дія (виклик handleUpgradeClick)
+                    if (p.id) {
+                      handleUpgradeClick(p);
+                    } else if (isFree) {
+                      // Якщо Free план не має ID, показуємо повідомлення
+                      showNotification("Please select a paid plan to upgrade", "info");
+                    }
+                  }}
+                  disabled={isCurrentPlan || upgrading === p.id || (isFree && !p.id)}
+                  title={isCurrentPlan ? 'This is your current plan' : isFree ? 'Free plan - click to see upgrade options' : undefined}
                 >
-                  {upgrading === p.id 
-                    ? 'Processing...' 
-                    : isFree 
-                      ? 'Current Plan' 
-                      : monthly 
-                        ? 'Upgrade Now' 
-                        : 'Upgrade Annually'}
+                  {(() => {
+                    if (upgrading === p.id) return 'Processing...';
+                    if (isCurrentPlan) return 'Current Plan';
+                    if (isFree) return 'Free Plan';
+                    return monthly ? 'Upgrade Now' : 'Upgrade Annually';
+                  })()}
                 </button>
               </div>
             </div>

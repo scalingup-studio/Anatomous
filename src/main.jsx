@@ -21,6 +21,8 @@ import DashboardReports from "./routes/pages/Reports.jsx";
 import SharedReportPage from "./routes/pages/SharedReport.jsx";
 import HelpCenterPage from "./routes/pages/HelpCenter.jsx";
 import SubscriptionsPage from "./routes/pages/Subscriptions.jsx";
+import CheckoutSuccessPage from "./routes/pages/CheckoutSuccess.jsx";
+import CheckoutCancelPage from "./routes/pages/CheckoutCancel.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage-TEST.jsx";
 import OnboardingPage from "./routes/OnboardingLayout.jsx";
 import Logout from "./pages/Logout.jsx";
@@ -144,6 +146,8 @@ function AppRouter() {
           <Route path="nutrition" element={<DashboardNutrition />} />
           <Route path="reports" element={<DashboardReports />} />
           <Route path="subscriptions" element={<SubscriptionsPage />} />
+          <Route path="subscriptions/checkout/success" element={<CheckoutSuccessPage />} />
+          <Route path="subscriptions/checkout/cancel" element={<CheckoutCancelPage />} />
           <Route path="help" element={<HelpCenterPage />} />
           <Route path="profile" element={<DashboardProfile />} />
           <Route path="settings" element={<DashboardSettings />} />

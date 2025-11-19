@@ -136,10 +136,6 @@ export default function NotesPage() {
                 minDate={filters.start_date || undefined}
               />
             </div>
-           
-            <div style={{ alignSelf: "end" }}>
-              <button className="btn secondary" onClick={load}>Filter</button>
-            </div>
           </div>
         </div>
 

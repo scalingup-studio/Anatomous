@@ -1,23 +1,104 @@
 import React from "react";
 import { Modal } from "./Modal.jsx";
-import { getNextTierForFeature, PLAN_TIERS } from "../utils/subscriptionUtils.js";
+import { getNextTierForFeature, PLAN_TIERS, getUserPlan, getRequiredPlan, PLAN_ORDER } from "../utils/subscriptionUtils.js";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../api/AuthContext.jsx";
+import { SubscriptionApi } from "../api/subscriptionApi.js";
 
 /**
  * Upgrade prompt component for gated features
  * Displays when user tries to access a feature not available in their plan
  */
-export function UpgradePrompt({ open, onClose, feature, user }) {
+export function UpgradePrompt({ open, onClose, feature, user: userProp }) {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
+  const user = userProp || authUser;
   
-  if (!open || !feature) return null;
-  
+  // Завантажуємо поточну підписку для визначення плану
+  const [currentPlan, setCurrentPlan] = React.useState(null);
+  const [loadingPlan, setLoadingPlan] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open && feature) {
+      const loadCurrentPlan = async () => {
+        try {
+          setLoadingPlan(true);
+          const data = await SubscriptionApi.getMySubscription();
+          
+          // Нова структура API: { result: { subscription: {...}, usage: {...}, plan_features: {...} } }
+          const subscription = data?.result?.subscription ||
+                              data?.result ||
+                              data?.subscription ||
+                              data;
+          
+          // Визначаємо поточний план
+          const planName = subscription?.plan_name?.toLowerCase() ||
+                          subscription?.plan_tier?.toLowerCase() ||
+                          subscription?.subscription_details?.plan_name?.toLowerCase() ||
+                          'starter';
+          setCurrentPlan(planName);
+        } catch (error) {
+          console.error('Failed to load current plan:', error);
+          // Fallback до плану з user об'єкта
+          const userPlan = getUserPlan(user);
+          setCurrentPlan(userPlan);
+        } finally {
+          setLoadingPlan(false);
+        }
+      };
+      
+      loadCurrentPlan();
+    }
+  }, [open, feature, user]);
+
+  // Визначаємо поточний план користувача
+  const userCurrentPlan = React.useMemo(() => {
+    if (currentPlan) return currentPlan;
+    return getUserPlan(user) || PLAN_TIERS.STARTER;
+  }, [currentPlan, user]);
+
+  // Визначаємо план, який потрібен для feature
+  const getRequiredPlanForFeature = (featureKey) => {
+    const requiredPlan = getRequiredPlan(featureKey);
+    return requiredPlan;
+  };
+
+  // Визначаємо наступний план для upgrade (враховуючи поточний план)
+  const getNextUpgradePlan = (featureKey, currentPlanTier) => {
+    const requiredPlan = getRequiredPlanForFeature(featureKey);
+    const currentOrder = PLAN_ORDER[currentPlanTier] || 0;
+    const requiredOrder = PLAN_ORDER[requiredPlan] || 0;
+    
+    // Якщо поточний план вже має доступ - повертаємо requiredPlan
+    if (currentOrder >= requiredOrder) {
+      return requiredPlan;
+    }
+    
+    // Інакше повертаємо мінімальний план, який має доступ
+    return requiredPlan;
+  };
+
+  // Отримуємо назву плану для відображення
+  const getPlanDisplayName = (planTier) => {
+    const names = {
+      [PLAN_TIERS.STARTER]: 'Free',
+      [PLAN_TIERS.CORE]: 'Core',
+      [PLAN_TIERS.COMPLETE]: 'Complete',
+      [PLAN_TIERS.FAMILY]: 'Family'
+    };
+    return names[planTier] || planTier;
+  };
+
   const featureConfig = {
     aiRiskForecasts: {
       name: "AI Risk Forecasts",
-      description: "AI Risk Forecasts are not available on the Free plan.",
-      nextTier: PLAN_TIERS.CORE,
-      nextTierName: "Core",
+      getDescription: (currentPlan) => {
+        if (currentPlan === PLAN_TIERS.STARTER) {
+          return "AI Risk Forecasts are not available on the Free plan.";
+        }
+        return "AI Risk Forecasts are not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('aiRiskForecasts', currentPlan),
       benefits: [
         "Intelligent health forecasting based on your data",
         "50 AI messages per month",
@@ -27,9 +108,13 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     earlyAlerts: {
       name: "Early Alerts",
-      description: "Early Alerts are available only on the Complete and Family plans.",
-      nextTier: PLAN_TIERS.COMPLETE,
-      nextTierName: "Complete",
+      getDescription: (currentPlan) => {
+        if (currentPlan === PLAN_TIERS.STARTER || currentPlan === PLAN_TIERS.CORE) {
+          return "Early Alerts are available only on the Complete and Family plans.";
+        }
+        return "Early Alerts are not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('earlyAlerts', currentPlan),
       benefits: [
         "Proactive health warnings based on trend analysis",
         "Unlimited AI messages",
@@ -40,9 +125,13 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     reportsPdf: {
       name: "PDF Reports",
-      description: "PDF Reports are not included in your current plan.",
-      nextTier: PLAN_TIERS.CORE,
-      nextTierName: "Core",
+      getDescription: (currentPlan) => {
+        if (currentPlan === PLAN_TIERS.STARTER) {
+          return "PDF Reports are not available on the Free plan.";
+        }
+        return "PDF Reports are not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('reportsPdf', currentPlan),
       benefits: [
         "Generate exportable reports of your health insights",
         "50 AI messages per month",
@@ -52,9 +141,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     csvExport: {
       name: "CSV Data Export",
-      description: "CSV Data Export is not included in your current plan.",
-      nextTier: PLAN_TIERS.COMPLETE,
-      nextTierName: "Complete",
+      getDescription: (currentPlan) => {
+        return "CSV Data Export is not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('csvExport', currentPlan),
       benefits: [
         "Export your health data in CSV format",
         "Unlimited AI messages",
@@ -64,9 +154,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     shareWithProviders: {
       name: "Share with Providers",
-      description: "Share with Providers is not included in your current plan.",
-      nextTier: PLAN_TIERS.COMPLETE,
-      nextTierName: "Complete",
+      getDescription: (currentPlan) => {
+        return "Share with Providers is not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('shareWithProviders', currentPlan),
       benefits: [
         "Share your health reports with healthcare providers",
         "Unlimited AI messages",
@@ -76,9 +167,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     familySharing: {
       name: "Family Sharing",
-      description: "Family Sharing is only available on the Family Plan.",
-      nextTier: PLAN_TIERS.FAMILY,
-      nextTierName: "Family",
+      getDescription: (currentPlan) => {
+        return "Family Sharing is only available on the Family Plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('familySharing', currentPlan),
       benefits: [
         "Manage up to 2 users under one shared health dashboard",
         "All Complete plan features",
@@ -87,9 +179,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     customGoals: {
       name: "Custom Goals",
-      description: "Custom Goals are not included in your current plan.",
-      nextTier: PLAN_TIERS.CORE,
-      nextTierName: "Core",
+      getDescription: (currentPlan) => {
+        return "Custom Goals are not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('customGoals', currentPlan),
       benefits: [
         "Create and track custom health goals",
         "50 AI messages per month",
@@ -99,9 +192,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     goalHistory: {
       name: "Goal History",
-      description: "Goal History is not included in your current plan.",
-      nextTier: PLAN_TIERS.CORE,
-      nextTierName: "Core",
+      getDescription: (currentPlan) => {
+        return "Goal History is not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('goalHistory', currentPlan),
       benefits: [
         "Access to 90-day goal history",
         "Up to 10 custom goals",
@@ -110,9 +204,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     notes: {
       name: "Notes",
-      description: "You've reached the limit for Notes on your current plan.",
-      nextTier: PLAN_TIERS.CORE,
-      nextTierName: "Core",
+      getDescription: (currentPlan) => {
+        return "You've reached the limit for Notes on your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('notes', currentPlan),
       benefits: [
         "Up to 30 notes",
         "50 AI messages per month",
@@ -121,9 +216,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     documentUploads: {
       name: "Document & Lab Uploads",
-      description: "You've reached the upload limit for your current plan.",
-      nextTier: PLAN_TIERS.CORE,
-      nextTierName: "Core",
+      getDescription: (currentPlan) => {
+        return "You've reached the upload limit for your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('documentUploads', currentPlan),
       benefits: [
         "3 document uploads per month",
         "50 AI messages per month",
@@ -132,9 +228,13 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     },
     chatHistory: {
       name: "Chat History",
-      description: "Chat History is not available on the Free plan.",
-      nextTier: PLAN_TIERS.CORE,
-      nextTierName: "Core",
+      getDescription: (currentPlan) => {
+        if (currentPlan === PLAN_TIERS.STARTER) {
+          return "Chat History is not available on the Free plan.";
+        }
+        return "Chat History is not included in your current plan.";
+      },
+      getNextTier: (currentPlan) => getNextUpgradePlan('chatHistory', currentPlan),
       benefits: [
         "30-day chat history access",
         "50 AI messages per month",
@@ -143,12 +243,19 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     }
   };
   
-  const config = featureConfig[feature] || {
-    name: feature,
-    description: `This feature isn't included in your current plan.`,
-    nextTier: getNextTierForFeature(feature),
-    nextTierName: "Core",
-    benefits: []
+  const featureData = featureConfig[feature];
+  const nextTier = featureData ? featureData.getNextTier(userCurrentPlan) : getNextUpgradePlan(feature, userCurrentPlan);
+  const nextTierName = getPlanDisplayName(nextTier);
+  const description = featureData ? featureData.getDescription(userCurrentPlan) : `This feature isn't included in your current plan.`;
+  const featureName = featureData ? featureData.name : feature;
+  const benefits = featureData ? featureData.benefits : [];
+  
+  const config = {
+    name: featureName,
+    description: description,
+    nextTier: nextTier,
+    nextTierName: nextTierName,
+    benefits: benefits
   };
   
   const handleUpgrade = () => {
@@ -210,6 +317,10 @@ export function UpgradePrompt({ open, onClose, feature, user }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, feature]);
+
+  if (!open || !feature) {
+    return null;
+  }
 
   return (
     <Modal open={open} title="Upgrade Required" onClose={onClose}>

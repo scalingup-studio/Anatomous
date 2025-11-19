@@ -54,6 +54,23 @@ export const authRequest = async (url, options = {}, retry = true) => {
     config.body = JSON.stringify(config.body);
   }
 
+  // Debug log for specific endpoints (e.g., /my_subscription)
+  try {
+    if (url?.includes("/my_subscription")) {
+      const method = (config.method || "GET").toUpperCase();
+      let bodyPreview = null;
+      if (isFormData) {
+        bodyPreview = "[FormData]";
+      } else if (config.body) {
+        bodyPreview = typeof config.body === "string" ? config.body : JSON.stringify(config.body);
+      }
+      console.log("🔍 Request to /my_subscription", {
+        method,
+        body: bodyPreview,
+      });
+    }
+  } catch {}
+
   try {
     let response = await fetch(url, config);
 

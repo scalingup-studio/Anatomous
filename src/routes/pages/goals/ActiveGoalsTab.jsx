@@ -417,8 +417,10 @@ export default function ActiveGoalsTab() {
 
   // Load goals with API parameters and save meta
   const loadWithMeta = React.useCallback(async (isLoadMore = false) => {
-    // Only show loading on initial load or filter change, not on "Load More"
-    if (!isLoadMore) {
+    // Don't show loading state - keep existing goals visible during filter changes
+    // Only set loading for initial load (when goals array is empty)
+    const isInitialLoad = goalsRef.current.length === 0;
+    if (isInitialLoad && !isLoadMore) {
       setLoading(true);
     }
     
@@ -438,6 +440,7 @@ export default function ActiveGoalsTab() {
         });
       } else {
         // Replace goals on initial load or filter change
+        // Keep opacity transition smooth
         setGoals(newGoals);
         goalsRef.current = newGoals;
       }
@@ -451,7 +454,7 @@ export default function ActiveGoalsTab() {
     } catch (e) {
       addNotification(e.message || "Failed to load goals", "error");
     } finally {
-      if (!isLoadMore) {
+      if (isInitialLoad && !isLoadMore) {
         setLoading(false);
       }
     }
@@ -470,11 +473,11 @@ export default function ActiveGoalsTab() {
     previousFilterRef.current = statusFilter;
   }, [statusFilter, limit, loadWithMeta]);
 
-  // Reset limit when filter changes
+  // Reset limit when filter changes (but don't clear goals immediately - let them fade out)
   React.useEffect(() => {
     setLimit(5);
-    setGoals([]); // Clear goals when filter changes
-    goalsRef.current = []; // Clear ref too
+    // Don't clear goals immediately - keep them visible until new ones load
+    // This prevents the list from disappearing when filter changes
   }, [statusFilter]);
 
   // Wrap createGoal to reload with current params
@@ -516,78 +519,77 @@ export default function ActiveGoalsTab() {
     <div style={{ display: "grid", gap: 16 }}>
       <AddGoalForm onCreate={handleCreateGoal} loading={loading} />
       
-      {/* Filter Section */}
-      {!loading && displayedGoals.length > 0 && (
-        <div className="card" style={{ display: "grid", gap: 16, padding: 20 }}>
-          {/* Filter Buttons */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, color: "var(--muted)", marginRight: 4 }}>Filter:</span>
-            <button
-              onClick={() => {
-                setStatusFilter("all");
-              }}
-              style={{
-                padding: "6px 16px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: statusFilter === "all" ? "var(--primary)" : "transparent",
-                color: statusFilter === "all" ? "white" : "var(--text)",
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: statusFilter === "all" ? 600 : 400,
-                transition: "all 0.2s",
-              }}
-            >
-              All Active
-            </button>
-            <button
-              onClick={() => {
-                setStatusFilter("on track");
-              }}
-              style={{
-                padding: "6px 16px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: statusFilter === "on track" ? "var(--success)" : "transparent",
-                color: statusFilter === "on track" ? "white" : "var(--text)",
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: statusFilter === "on track" ? 600 : 400,
-                transition: "all 0.2s",
-              }}
-            >
-              On Track
-            </button>
-            <button
-              onClick={() => {
-                setStatusFilter("paused");
-              }}
-              style={{
-                padding: "6px 16px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: statusFilter === "paused" ? "var(--warning)" : "transparent",
-                color: statusFilter === "paused" ? "white" : "var(--text)",
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: statusFilter === "paused" ? 600 : 400,
-                transition: "all 0.2s",
-              }}
-            >
-              Paused
-            </button>
-          </div>
-
+      {/* Filter Section - Always visible, never hidden */}
+      <div className="card" style={{ display: "grid", gap: 16, padding: 20 }}>
+        {/* Filter Buttons */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14, color: "var(--muted)", marginRight: 4 }}>Filter:</span>
+          <button
+            onClick={() => {
+              setStatusFilter("all");
+            }}
+            disabled={loading}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: statusFilter === "all" ? "var(--primary)" : "transparent",
+              color: statusFilter === "all" ? "white" : "var(--text)",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: 14,
+              fontWeight: statusFilter === "all" ? 600 : 400,
+              transition: "all 0.2s",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            All Active
+          </button>
+          <button
+            onClick={() => {
+              setStatusFilter("on track");
+            }}
+            disabled={loading}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: statusFilter === "on track" ? "var(--success)" : "transparent",
+              color: statusFilter === "on track" ? "white" : "var(--text)",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: 14,
+              fontWeight: statusFilter === "on track" ? 600 : 400,
+              transition: "all 0.2s",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            On Track
+          </button>
+          <button
+            onClick={() => {
+              setStatusFilter("paused");
+            }}
+            disabled={loading}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: statusFilter === "paused" ? "var(--warning)" : "transparent",
+              color: statusFilter === "paused" ? "white" : "var(--text)",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: 14,
+              fontWeight: statusFilter === "paused" ? 600 : 400,
+              transition: "all 0.2s",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            Paused
+          </button>
         </div>
-      )}
 
-      {loading && (
-        <div className="card" style={{ textAlign: "center", padding: 40 }}>
-          <div style={{ color: "var(--muted)" }}>Loading goals...</div>
-        </div>
-      )}
-      
-      {!loading && displayedGoals.length === 0 && (
+      </div>
+
+      {/* Show empty state only when not loading and no goals */}
+      {!loading && displayedGoals.length === 0 && totalActiveGoals === 0 && (
         <div className="card" style={{ textAlign: "center", padding: 40 }}>
           <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🎯</div>
           <p style={{ color: "var(--muted)", marginBottom: 12, fontSize: 16 }}>No active goals yet</p>
@@ -595,6 +597,7 @@ export default function ActiveGoalsTab() {
         </div>
       )}
       
+      {/* Show filter mismatch message only when not loading, no goals, but total > 0 */}
       {!loading && displayedGoals.length === 0 && totalActiveGoals > 0 && (
         <div className="card" style={{ textAlign: "center", padding: 40 }}>
           <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🔍</div>
@@ -609,13 +612,17 @@ export default function ActiveGoalsTab() {
         </div>
       )}
       
-      {!loading && displayedGoals.length > 0 && (
+      {/* Always show goals list, even during loading - never hide it */}
+      {displayedGoals.length > 0 && (
         <div style={{ display: "grid", gap: 12 }}>
           {displayedGoals.map((g, index) => (
             <div 
               key={g.id} 
               style={{ 
                 animation: `fadeIn 0.3s ease-in-out ${index * 0.05}s both`,
+                opacity: loading ? 0.7 : 1,
+                transition: 'opacity 0.3s ease-in-out',
+                pointerEvents: loading ? 'none' : 'auto'
               }}
             >
               <GoalItem goal={g} onUpdate={handleUpdateGoal} onDelete={requestDelete} onEdit={openEdit} />
@@ -632,22 +639,49 @@ export default function ActiveGoalsTab() {
                   const loadAmount = remainingCount < 5 ? remainingCount : 5;
                   setLimit(prev => prev + loadAmount);
                 }}
+                disabled={loading}
                 style={{ 
                   display: "flex", 
                   alignItems: "center", 
                   gap: 8,
-                  padding: "10px 20px"
+                  padding: "10px 20px",
+                  opacity: loading ? 0.6 : 1,
+                  cursor: loading ? 'not-allowed' : 'pointer'
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M19 9l-7 7-7-7" />
                 </svg>
-                {remainingCount < 5 ? (
-                  `Load ${remainingCount} more ${remainingCount === 1 ? 'goal' : 'goals'}`
-                ) : (
-                  'Load 5 more goals'
+                {loading ? 'Loading...' : (
+                  remainingCount < 5 ? (
+                    `Load ${remainingCount} more ${remainingCount === 1 ? 'goal' : 'goals'}`
+                  ) : (
+                    'Load 5 more goals'
+                  )
                 )}
               </button>
+            </div>
+          )}
+          
+          {/* Subtle loading indicator when loading (only show if there are goals) */}
+          {loading && displayedGoals.length > 0 && (
+            <div style={{ 
+              textAlign: "center", 
+              padding: 12,
+              color: "var(--muted)",
+              fontSize: 13
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <div style={{ 
+                  width: 14, 
+                  height: 14, 
+                  border: "2px solid var(--muted)", 
+                  borderTopColor: "transparent",
+                  borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite"
+                }}></div>
+                <span>Updating...</span>
+              </div>
             </div>
           )}
           
@@ -660,6 +694,11 @@ export default function ActiveGoalsTab() {
               to {
                 opacity: 1;
                 transform: translateY(0);
+              }
+            }
+            @keyframes spin {
+              to {
+                transform: rotate(360deg);
               }
             }
           `}</style>
