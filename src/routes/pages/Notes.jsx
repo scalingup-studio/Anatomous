@@ -48,8 +48,7 @@ export default function NotesPage() {
   const [showEditMoodDropdown, setShowEditMoodDropdown] = React.useState(false);
   const [editDropdownPosition, setEditDropdownPosition] = React.useState(null);
   
-  // Keyword search state
-  const [keywordSearch, setKeywordSearch] = React.useState('');
+  // Keyword search is now part of filters and handled by API
 
   // Function to add note with mood
   const addNoteWithMood = React.useCallback(async (moodValue) => {
@@ -81,15 +80,15 @@ export default function NotesPage() {
               <div style={{ position: 'relative', width: '100%' }}>
                 <input 
                   type="text"
-                  value={keywordSearch} 
-                  onChange={(e) => setKeywordSearch(e.target.value)}
+                  value={filters.search || ''} 
+                  onChange={(e) => setFilters(v => ({ ...v, search: e.target.value }))}
                   placeholder="Search notes by text, mood, or keywords..."
-                  style={{ width: '100%', paddingRight: keywordSearch ? '32px' : '8px' }}
+                  style={{ width: '100%', paddingRight: filters.search ? '32px' : '8px' }}
                 />
-                {keywordSearch && (
+                {filters.search && (
                   <button
                     type="button"
-                    onClick={() => setKeywordSearch('')}
+                    onClick={() => setFilters(v => ({ ...v, search: '' }))}
                     style={{
                       position: 'absolute',
                       right: '8px',
@@ -273,19 +272,10 @@ export default function NotesPage() {
         </div>
 
         {(() => {
-          // Filter items by keyword search (client-side filtering)
-          const filteredItems = keywordSearch.trim() 
-            ? items.filter(n => {
-                const searchTerm = keywordSearch.toLowerCase();
-                const noteText = (n.text || '').toLowerCase();
-                const moodTag = (n.mood_tag || '').toLowerCase();
-                return noteText.includes(searchTerm) || moodTag.includes(searchTerm);
-              })
-            : items;
-          
-          return filteredItems?.length > 0 ? (
+          // Items are now filtered by API, no need for client-side filtering
+          return items?.length > 0 ? (
             <div style={{ display: "grid", gap: 8 }}>
-              {filteredItems.map((n) => (
+              {items.map((n) => (
               <div key={n.id} className="card" style={{ cursor: "default"}}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems:'center', gap:8, marginBottom: 8  }}>
                   <div>{n.text}</div>
@@ -323,10 +313,10 @@ export default function NotesPage() {
             <div className="card" style={{ textAlign: "center" }}>
               <p style={{ color: "var(--muted)", marginBottom: 12 }}>
                 {items?.length === 0 
-                  ? "No notes yet" 
-                  : keywordSearch.trim() 
-                    ? "No notes match your search" 
-                    : "No notes yet"}
+                  ? (filters.search || filters.start_date || filters.end_date || filters.mood_tag)
+                    ? "No notes match your filters" 
+                    : "No notes yet"
+                  : "No notes yet"}
               </p>
             </div>
           );

@@ -5,6 +5,7 @@ import { Modal } from "../../../components/Modal.jsx";
 import { ConfirmDeleteModal } from "../../../components/ConfirmDeleteModal.jsx";
 import { useGoals } from "../../../hooks/useGoals.js";
 import { useNotifications } from "../../../api/NotificationContext.jsx";
+import { GoalsApi } from "../../../api/goalsApi.js";
 
 function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
   const formatDate = (v) => {
@@ -376,9 +377,10 @@ function AddGoalForm({ onCreate, loading }) {
 }
 
 export default function ActiveGoalsTab() {
+  const { addNotification } = useNotifications();
   const {
-    loading,
-    goals,
+    loading: goalsLoading,
+    goals: goalsFromHook,
     confirm, setConfirm,
     edit, openEdit, closeEdit,
     createGoal,
@@ -386,29 +388,288 @@ export default function ActiveGoalsTab() {
     requestDelete,
     confirmDelete,
     saveEdit,
+    load,
   } = useGoals();
+
+  // Filter for active goals (On Track and Paused only)
+  const [statusFilter, setStatusFilter] = React.useState("all"); // "all", "on track", "paused"
+  const [limit, setLimit] = React.useState(5); // Start with 5, increase by 5 on "Load more"
+  const [meta, setMeta] = React.useState(null); // Store meta from API response
+  const [loading, setLoading] = React.useState(false); // Loading state for initial load
+  const [goals, setGoals] = React.useState([]); // Local goals state to work with meta
+  const previousLimitRef = React.useRef(0); // Track previous limit to detect "Load More"
+  const previousFilterRef = React.useRef(statusFilter); // Track previous filter
+  const goalsRef = React.useRef([]); // Track current goals for "Load More" detection
+
+  // Map UI filter values to API filter values
+  const getApiFilter = (filter) => {
+    if (filter === "all") return "all active";
+    return filter; // "on track" or "paused"
+  };
+
+  // Store current params for reloading after mutations
+  const getCurrentParams = React.useCallback(() => {
+    return {
+      limit: limit,
+      filter: getApiFilter(statusFilter)
+    };
+  }, [statusFilter, limit]);
+
+  // Load goals with API parameters and save meta
+  const loadWithMeta = React.useCallback(async (isLoadMore = false) => {
+    // Only show loading on initial load or filter change, not on "Load More"
+    if (!isLoadMore) {
+      setLoading(true);
+    }
+    
+    try {
+      const res = await GoalsApi.listGoals(getCurrentParams());
+      const newGoals = res?.result || res || [];
+      
+      if (isLoadMore) {
+        // Append new goals to existing ones (silently, no loading indicator)
+        setGoals(prev => {
+          // Create a map to avoid duplicates
+          const existingIds = new Set(prev.map(g => g.id || g.goal_id));
+          const uniqueNewGoals = newGoals.filter(g => !existingIds.has(g.id || g.goal_id));
+          const updated = [...prev, ...uniqueNewGoals];
+          goalsRef.current = updated;
+          return updated;
+        });
+      } else {
+        // Replace goals on initial load or filter change
+        setGoals(newGoals);
+        goalsRef.current = newGoals;
+      }
+      
+      // Save meta data from response
+      if (res?.meta) {
+        setMeta(res.meta);
+      } else {
+        setMeta(null);
+      }
+    } catch (e) {
+      addNotification(e.message || "Failed to load goals", "error");
+    } finally {
+      if (!isLoadMore) {
+        setLoading(false);
+      }
+    }
+  }, [getCurrentParams, addNotification]);
+
+  React.useEffect(() => {
+    // Check if this is a "Load More" action (limit increased, filter unchanged) or initial/filter change
+    const filterChanged = previousFilterRef.current !== statusFilter;
+    const limitIncreased = previousLimitRef.current > 0 && limit > previousLimitRef.current;
+    const isLoadMoreAction = !filterChanged && limitIncreased && goalsRef.current.length > 0;
+    
+    loadWithMeta(isLoadMoreAction);
+    
+    // Update refs
+    previousLimitRef.current = limit;
+    previousFilterRef.current = statusFilter;
+  }, [statusFilter, limit, loadWithMeta]);
+
+  // Reset limit when filter changes
+  React.useEffect(() => {
+    setLimit(5);
+    setGoals([]); // Clear goals when filter changes
+    goalsRef.current = []; // Clear ref too
+  }, [statusFilter]);
+
+  // Wrap createGoal to reload with current params
+  const handleCreateGoal = React.useCallback(async (data) => {
+    const success = await createGoal(data);
+    if (success) {
+      await loadWithMeta();
+    }
+    return success;
+  }, [createGoal, loadWithMeta]);
+
+  // Wrap updateGoal to reload with current params
+  const handleUpdateGoal = React.useCallback(async (goal, patch) => {
+    await updateGoal(goal, patch);
+    await loadWithMeta();
+  }, [updateGoal, loadWithMeta]);
+
+  // Wrap confirmDelete to reload with current params
+  const handleConfirmDelete = React.useCallback(async () => {
+    await confirmDelete();
+    await loadWithMeta();
+  }, [confirmDelete, loadWithMeta]);
+
+  // Wrap saveEdit to reload with current params
+  const handleSaveEdit = React.useCallback(async (payload) => {
+    await saveEdit(payload);
+    await loadWithMeta();
+  }, [saveEdit, loadWithMeta]);
+
+  // Use goals directly from API (already filtered and limited)
+  const displayedGoals = goals || [];
+
+  // Check if there are more goals to load using meta.total_active_goals
+  const totalActiveGoals = meta?.total_active_goals || 0;
+  const hasMore = totalActiveGoals > displayedGoals.length;
+  const remainingCount = totalActiveGoals - displayedGoals.length;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <AddGoalForm onCreate={createGoal} loading={loading} />
-      {loading && <div className="card">Loading…</div>}
-      {!loading && goals?.length === 0 && (
-        <div className="card" style={{ textAlign: "center" }}>
-          <p style={{ color: "var(--muted)", marginBottom: 12 }}>No goals yet</p>
+      <AddGoalForm onCreate={handleCreateGoal} loading={loading} />
+      
+      {/* Filter Section */}
+      {!loading && displayedGoals.length > 0 && (
+        <div className="card" style={{ display: "grid", gap: 16, padding: 20 }}>
+          {/* Filter Buttons */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, color: "var(--muted)", marginRight: 4 }}>Filter:</span>
+            <button
+              onClick={() => {
+                setStatusFilter("all");
+              }}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: statusFilter === "all" ? "var(--primary)" : "transparent",
+                color: statusFilter === "all" ? "white" : "var(--text)",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: statusFilter === "all" ? 600 : 400,
+                transition: "all 0.2s",
+              }}
+            >
+              All Active
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter("on track");
+              }}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: statusFilter === "on track" ? "var(--success)" : "transparent",
+                color: statusFilter === "on track" ? "white" : "var(--text)",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: statusFilter === "on track" ? 600 : 400,
+                transition: "all 0.2s",
+              }}
+            >
+              On Track
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter("paused");
+              }}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: statusFilter === "paused" ? "var(--warning)" : "transparent",
+                color: statusFilter === "paused" ? "white" : "var(--text)",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: statusFilter === "paused" ? 600 : 400,
+                transition: "all 0.2s",
+              }}
+            >
+              Paused
+            </button>
+          </div>
+
         </div>
       )}
-      {!loading && goals?.length > 0 && (
+
+      {loading && (
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ color: "var(--muted)" }}>Loading goals...</div>
+        </div>
+      )}
+      
+      {!loading && displayedGoals.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🎯</div>
+          <p style={{ color: "var(--muted)", marginBottom: 12, fontSize: 16 }}>No active goals yet</p>
+          <p style={{ color: "var(--muted)", fontSize: 14 }}>Create your first goal above to get started!</p>
+        </div>
+      )}
+      
+      {!loading && displayedGoals.length === 0 && totalActiveGoals > 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>🔍</div>
+          <p style={{ color: "var(--muted)", marginBottom: 12, fontSize: 16 }}>No goals match the selected filter</p>
+          <button 
+            className="btn outline" 
+            onClick={() => setStatusFilter("all")}
+            style={{ marginTop: 8 }}
+          >
+            Show All Active Goals
+          </button>
+        </div>
+      )}
+      
+      {!loading && displayedGoals.length > 0 && (
         <div style={{ display: "grid", gap: 12 }}>
-          {goals.map((g) => (
-            <GoalItem key={g.id} goal={g} onUpdate={updateGoal} onDelete={requestDelete} onEdit={openEdit} />
+          {displayedGoals.map((g, index) => (
+            <div 
+              key={g.id} 
+              style={{ 
+                animation: `fadeIn 0.3s ease-in-out ${index * 0.05}s both`,
+              }}
+            >
+              <GoalItem goal={g} onUpdate={handleUpdateGoal} onDelete={requestDelete} onEdit={openEdit} />
+            </div>
           ))}
+          
+          {/* Load More Button at the bottom of the list */}
+          {hasMore && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 8 }}>
+              <button 
+                className="btn outline" 
+                onClick={() => {
+                  // If less than 5 remaining, load the exact amount, otherwise load 5 more
+                  const loadAmount = remainingCount < 5 ? remainingCount : 5;
+                  setLimit(prev => prev + loadAmount);
+                }}
+                style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8,
+                  padding: "10px 20px"
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 9l-7 7-7-7" />
+                </svg>
+                {remainingCount < 5 ? (
+                  `Load ${remainingCount} more ${remainingCount === 1 ? 'goal' : 'goals'}`
+                ) : (
+                  'Load 5 more goals'
+                )}
+              </button>
+            </div>
+          )}
+          
+          <style>{`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+                transform: translateY(10px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+          `}</style>
         </div>
       )}
 
       <ConfirmDeleteModal
         isOpen={confirm.open}
         onClose={() => setConfirm({ open: false, item: null })}
-        onConfirm={confirmDelete}
+        onConfirm={handleConfirmDelete}
         title="Delete goal"
         message="This action cannot be undone. Are you sure?"
       />
@@ -417,7 +678,7 @@ export default function ActiveGoalsTab() {
         open={edit.open}
         goal={edit.item}
         onClose={closeEdit}
-        onSave={saveEdit}
+        onSave={handleSaveEdit}
       />
     </div>
   );

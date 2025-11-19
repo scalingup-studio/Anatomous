@@ -10,24 +10,25 @@ export function useGoals() {
   const [confirm, setConfirm] = React.useState({ open: false, item: null });
   const [edit, setEdit] = React.useState({ open: false, item: null });
 
-  const load = React.useCallback(async () => {
+  const load = React.useCallback(async (params = {}) => {
     setLoading(true);
     try {
-      const res = await GoalsApi.listGoals();
+      const res = await GoalsApi.listGoals(params);
       setGoals(res?.result || res || []);
     } catch (e) {
       addNotification(e.message || "Failed to load goals", "error");
     } finally { setLoading(false); }
   }, [addNotification]);
 
-  React.useEffect(() => { load(); }, [load]);
+  // Don't auto-load - let components call load() with params
+  // React.useEffect(() => { load(); }, [load]);
 
   const createGoal = async (data) => {
     try {
       setLoading(true);
       await GoalsApi.createGoal(data);
       addNotification("Goal added", "success");
-      load();
+      // Don't auto-load - let components call load() with params
       return true;
     } catch (e) { addNotification(e.message, "error"); return false; } finally { setLoading(false); }
   };
@@ -41,7 +42,7 @@ export function useGoals() {
       console.log('Update Goal Status - Endpoint: PATCH /goals/' + id);
       await GoalsApi.updateGoal(id, payload);
       addNotification("Goal updated", "success");
-      load();
+      // Don't auto-load - let components call load() with params
     } catch (e) { addNotification(e.message, "error"); } finally { setLoading(false); }
   };
 
@@ -54,7 +55,7 @@ export function useGoals() {
       await GoalsApi.removeGoal(goal.id || goal.goals_id || goal.goal_id);
       addNotification("Goal deleted", "success");
       setConfirm({ open: false, item: null });
-      load();
+      // Don't auto-load - let components call load() with params
     } catch (e) { addNotification(e.message, "error"); } finally { setLoading(false); }
   };
 
@@ -72,7 +73,7 @@ export function useGoals() {
       await GoalsApi.updateGoal(id, fullPayload);
       addNotification("Goal updated", "success");
       closeEdit();
-      load();
+      // Don't auto-load - let components call load() with params
     } catch (e) { addNotification(e.message, "error"); } finally { setLoading(false); }
   };
 

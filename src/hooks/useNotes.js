@@ -7,7 +7,7 @@ export function useNotes() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
 
-  const [filters, setFilters] = React.useState({ start_date: "", end_date: "", mood_tag: "" });
+  const [filters, setFilters] = React.useState({ start_date: "", end_date: "", mood_tag: "", search: "" });
   const [items, setItems] = React.useState([]);
   const [note, setNote] = React.useState("");
   const [mood, setMood] = React.useState("");

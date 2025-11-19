@@ -2,14 +2,36 @@ import { request } from "./apiClient";
 import { CUSTOM_ENDPOINTS } from "./apiConfig";
 
 // Helper function to get IP address
+// Returns 'unknown' if IP cannot be retrieved (non-blocking, silent failure)
 async function getIPAddress() {
+  // Return 'unknown' immediately to avoid CORS issues
+  // IP address is optional and should not block authentication
+  return Promise.resolve('unknown');
+  
+  // Uncomment below if you have a backend endpoint to get IP
+  /*
   try {
-    const response = await fetch('https://api.ipify.org?format=json');
-    const data = await response.json();
-    return data.ip;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
+    
+    const response = await fetch('https://api.ipify.org?format=json', {
+      method: 'GET',
+      mode: 'cors',
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.ip || 'unknown';
+    }
   } catch (error) {
-    return 'unknown';
+    // Silently fail - IP is optional
   }
+  
+  return 'unknown';
+  */
 }
 
 // Function to clear cookies

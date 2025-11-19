@@ -1,7 +1,9 @@
 import React from "react";
 import { UpgradePrompt } from "../../components/UpgradePrompt.jsx";
+import { Modal } from "../../components/Modal.jsx";
 import { useAuth } from "../../api/AuthContext.jsx";
 import { SubscriptionApi } from "../../api/subscriptionApi.js";
+import { PaymentApi } from "../../api/paymentApi.js";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 
 function Tabs({ value, onChange }) {
@@ -439,14 +441,41 @@ function UpgradeOptions({ onUpgradeSuccess }) {
   const { showNotification } = useNotifications();
   const [period, setPeriod] = React.useState("monthly");
   const [hoveredRow, setHoveredRow] = React.useState(null);
-  const [plans, setPlans] = React.useState([]);
+  const [allPlans, setAllPlans] = React.useState([]); // Store all loaded plans
   const [loading, setLoading] = React.useState(true);
   const [upgrading, setUpgrading] = React.useState(null);
+  const [confirmUpgrade, setConfirmUpgrade] = React.useState({ open: false, plan: null });
   const monthly = period === "monthly";
+  
+  // Detect theme
+  const [isLightTheme, setIsLightTheme] = React.useState(() => {
+    return document.documentElement.classList.contains('light-theme');
+  });
+  
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsLightTheme(document.documentElement.classList.contains('light-theme'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
+  // Load plans only once on mount
   React.useEffect(() => {
     loadPlans();
   }, []);
+
+  // Sort plans based on current period (without reloading from API)
+  const plans = React.useMemo(() => {
+    if (allPlans.length === 0) return [];
+    
+    return [...allPlans].sort((a, b) => {
+      // Sort by price (ascending) - use monthly or yearly price based on selected period
+      const priceA = monthly ? a.priceMonthly : a.priceYearly;
+      const priceB = monthly ? b.priceMonthly : b.priceYearly;
+      return priceA - priceB;
+    });
+  }, [allPlans, monthly]);
 
   const loadPlans = async () => {
     try {
@@ -533,33 +562,36 @@ function UpgradeOptions({ onUpgradeSuccess }) {
             subtitle = 'For Families';
           }
 
-          // Calculate savings for annual billing
-          const savings = monthly || planTier === 'starter' 
-            ? null 
-            : plan.price_annual && plan.price_monthly 
-              ? `Save $${Math.round((plan.price_monthly * 12 - plan.price_annual))}/year`
-              : null;
-
+          // Normalize key - handle both latin and cyrillic 'c'
+          const normalizedKey = planTier === 'сore' ? 'core' : planTier;
+          
+          // Format name with first letter capitalized (preserve rest of the string)
+          const formatName = (name) => {
+            if (!name) return '';
+            // Only capitalize first letter, keep the rest as is
+            return name.charAt(0).toUpperCase() + name.slice(1);
+          };
+          
+          const planName = plan.display_name || plan.name || '';
+          const formattedName = planName ? formatName(planName) : '';
+          
+          const priceMonthly = plan.price_monthly || plan.price || 0;
+          const priceYearly = plan.price_annual || (plan.price_monthly ? plan.price_monthly * 12 : plan.price || 0);
+          
           return {
-            key: planTier,
+            key: normalizedKey,
             id: plan.id,
-            name: plan.display_name || plan.name,
+            name: formattedName,
             subtitle,
-            priceMonthly: plan.price_monthly || plan.price || 0,
-            priceYearly: plan.price_annual || (plan.price_monthly ? plan.price_monthly * 12 : plan.price || 0),
+            priceMonthly,
+            priceYearly,
             features: featureList.length > 0 ? featureList : ['Manual Health Data Entry', 'Secure Data Backup'],
             gated: [], // Will be calculated based on what's not in features
             ribbon,
             recommended,
-            savings,
             maxMembers: plan.max_members || 1,
             isFeatured: plan.is_featured || false,
           };
-        })
-        .sort((a, b) => {
-          // Sort by tier order: starter, core, complete, family
-          const order = { starter: 0, core: 1, сore: 1, complete: 2, family: 3 };
-          return (order[a.key] || 99) - (order[b.key] || 99);
         });
       
       // Fallback to default plans if API returns empty
@@ -574,7 +606,6 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           gated:['AI Risk Forecasts','Early Alerts','Reports','CSV Export','Document Uploads','Custom Goals','Goal History','Notes (3+)','Chat History','Share with Providers','Family Sharing'], 
           ribbon:'Free Tier',
           recommended:false,
-          savings:null
         },
         { 
           key:'core', 
@@ -585,8 +616,7 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           features:['Everything in Starter','50 AI Messages/month','AI Risk Forecasts','Reports (PDF)','3 Document Uploads/month','Up to 10 Custom Goals','90-day Goal History','Up to 30 Notes','30-day Chat History'], 
           gated:['Early Alerts','CSV Export','Unlimited Uploads','Unlimited Goals','Unlimited Notes','Full Chat History','Share with Providers','Family Sharing'], 
           ribbon:'Most popular',
-          recommended:true,
-          savings:monthly ? null : 'Save $18/year'
+          recommended:true
         },
         { 
           key:'complete', 
@@ -597,8 +627,7 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           features:['Everything in Core','Unlimited AI Messages','Early Alerts','CSV Data Export','Unlimited Document Uploads','Unlimited Custom Goals','Unlimited Goal History','Unlimited Notes','Full Chat History','Share with Providers'], 
           gated:['Family Sharing'], 
           ribbon:'Best value',
-          recommended:false,
-          savings:monthly ? null : 'Save $38/year'
+          recommended:false
         },
         { 
           key:'family', 
@@ -609,17 +638,16 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           features:['Everything in Complete','Family Sharing (1 linked user)'], 
           gated:[], 
           ribbon:null,
-          recommended:false,
-          savings:monthly ? null : 'Save $58/year'
+          recommended:false
         },
       ];
       
-      setPlans(mappedPlans.length > 0 ? mappedPlans : defaultPlans);
+      setAllPlans(mappedPlans.length > 0 ? mappedPlans : defaultPlans);
     } catch (error) {
       console.error("Failed to load plans:", error);
       showNotification(error.message || "Failed to load subscription plans", "error");
       // Use default plans on error
-      setPlans([
+      setAllPlans([
         { 
           key:'starter', 
           name:'Starter', 
@@ -630,7 +658,6 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           gated:['AI Risk Forecasts','Early Alerts','Reports','CSV Export','Document Uploads','Custom Goals','Goal History','Notes (3+)','Chat History','Share with Providers','Family Sharing'], 
           ribbon:'Free Tier',
           recommended:false,
-          savings:null
         },
         { 
           key:'core', 
@@ -641,8 +668,7 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           features:['Everything in Starter','50 AI Messages/month','AI Risk Forecasts','Reports (PDF)','3 Document Uploads/month','Up to 10 Custom Goals','90-day Goal History','Up to 30 Notes','30-day Chat History'], 
           gated:['Early Alerts','CSV Export','Unlimited Uploads','Unlimited Goals','Unlimited Notes','Full Chat History','Share with Providers','Family Sharing'], 
           ribbon:'Most popular',
-          recommended:true,
-          savings:monthly ? null : 'Save $18/year'
+          recommended:true
         },
         { 
           key:'complete', 
@@ -653,8 +679,7 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           features:['Everything in Core','Unlimited AI Messages','Early Alerts','CSV Data Export','Unlimited Document Uploads','Unlimited Custom Goals','Unlimited Goal History','Unlimited Notes','Full Chat History','Share with Providers'], 
           gated:['Family Sharing'], 
           ribbon:'Best value',
-          recommended:false,
-          savings:monthly ? null : 'Save $38/year'
+          recommended:false
         },
         { 
           key:'family', 
@@ -665,13 +690,20 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           features:['Everything in Complete','Family Sharing (1 linked user)'], 
           gated:[], 
           ribbon:null,
-          recommended:false,
-          savings:monthly ? null : 'Save $58/year'
+          recommended:false
         },
       ]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpgradeClick = (plan) => {
+    if (!plan || !plan.id) {
+      showNotification("Plan ID is required", "error");
+      return;
+    }
+    setConfirmUpgrade({ open: true, plan });
   };
 
   const handleUpgrade = async (planId) => {
@@ -682,7 +714,8 @@ function UpgradeOptions({ onUpgradeSuccess }) {
 
     try {
       setUpgrading(planId);
-      const result = await SubscriptionApi.upgradeSubscription(planId);
+      setConfirmUpgrade({ open: false, plan: null });
+      const result = await PaymentApi.upgradeSubscription(planId);
       
       if (result.success) {
         showNotification(result.message || "Subscription upgraded successfully!", "success");
@@ -843,19 +876,26 @@ function UpgradeOptions({ onUpgradeSuccess }) {
                     ${pricePerMonth}/mo billed annually
                   </div>
                 )}
-                {p.savings && (
-                  <div style={{ 
-                    fontSize:11, 
-                    fontWeight:600, 
-                    color:'var(--success)', 
-                    padding: '4px 8px', 
-                    background: 'rgba(0, 195, 122, 0.1)', 
-                    borderRadius: 4,
-                    width: 'fit-content'
-                  }}>
-                    💰 {p.savings}
-                  </div>
-                )}
+                {(() => {
+                  // Calculate savings dynamically based on current period
+                  const savings = !monthly && p.key !== 'starter' && p.priceMonthly && p.priceYearly
+                    ? `Save $${Math.round((p.priceMonthly * 12 - p.priceYearly))}/year`
+                    : null;
+                  
+                  return savings && (
+                    <div style={{ 
+                      fontSize:11, 
+                      fontWeight:600, 
+                      color:'var(--success)', 
+                      padding: '4px 8px', 
+                      background: 'rgba(0, 195, 122, 0.1)', 
+                      borderRadius: 4,
+                      width: 'fit-content'
+                    }}>
+                      💰 {savings}
+                    </div>
+                  );
+                })()}
               </div>
               
               <div style={{ display:'flex', flexDirection:'column', gap:8, flex: 1 }}>
@@ -897,7 +937,7 @@ function UpgradeOptions({ onUpgradeSuccess }) {
                     width: '100%',
                     fontWeight: p.recommended ? 600 : 500
                   }}
-                  onClick={() => !isFree && p.id && handleUpgrade(p.id)}
+                  onClick={() => !isFree && p.id && handleUpgradeClick(p)}
                   disabled={isFree || upgrading === p.id || !p.id}
                 >
                   {upgrading === p.id 
@@ -1059,15 +1099,30 @@ function UpgradeOptions({ onUpgradeSuccess }) {
                           onMouseEnter={() => setHoveredRow(idx)}
                           onMouseLeave={() => setHoveredRow(null)}
                         >
-                          {typeof row.keys[p.key] === 'boolean' ? (
-                            row.keys[p.key] ? (
-                              <span style={{ fontSize: 16 }}>✓</span>
-                            ) : (
-                              <span style={{ color: 'var(--muted)' }}>—</span>
-                            )
-                          ) : (
-                            <span style={{ fontSize: 12, fontWeight: 500 }}>{row.keys[p.key]}</span>
-                          )}
+                          {(() => {
+                            const value = row.keys[p.key];
+                            // Handle undefined values - try alternative keys
+                            const actualValue = value !== undefined ? value : 
+                              (p.key === 'сore' ? row.keys['core'] : 
+                               p.key === 'core' ? row.keys['сore'] : 
+                               undefined);
+                            
+                            if (actualValue === undefined) {
+                              return <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>;
+                            }
+                            
+                            if (typeof actualValue === 'boolean') {
+                              return actualValue ? (
+                                <span style={{ fontSize: 16 }}>✓</span>
+                              ) : (
+                                <span style={{ color: 'var(--muted)' }}>—</span>
+                              );
+                            }
+                            
+                            return (
+                              <span style={{ fontSize: 12, fontWeight: 500 }}>{actualValue}</span>
+                            );
+                          })()}
                         </div>
                       ))}
                     </React.Fragment>
@@ -1078,6 +1133,163 @@ function UpgradeOptions({ onUpgradeSuccess }) {
           })()}
         </div>
       </div>
+
+      {/* Upgrade Confirmation Modal */}
+      <Modal 
+        open={confirmUpgrade.open} 
+        title="Confirm Subscription Upgrade"
+        onClose={() => setConfirmUpgrade({ open: false, plan: null })}
+      >
+        {confirmUpgrade.plan && (
+          <div style={{ 
+            display: "grid", 
+            gap: 20,
+            padding: "8px 0"
+          }}>
+            <div style={{
+              padding: 16,
+              borderRadius: 8,
+              background: isLightTheme 
+                ? 'rgba(0, 186, 206, 0.08)' 
+                : 'rgba(0, 186, 206, 0.12)',
+              border: `1px solid ${isLightTheme 
+                ? 'rgba(0, 186, 206, 0.2)' 
+                : 'rgba(0, 186, 206, 0.3)'}`
+            }}>
+              <div style={{ 
+                fontSize: 18, 
+                fontWeight: 600, 
+                marginBottom: 8,
+                color: 'var(--text)'
+              }}>
+                {confirmUpgrade.plan.name}
+              </div>
+              {confirmUpgrade.plan.subtitle && (
+                <div style={{ 
+                  fontSize: 13, 
+                  color: 'var(--muted)', 
+                  marginBottom: 12 
+                }}>
+                  {confirmUpgrade.plan.subtitle}
+                </div>
+              )}
+              <div style={{ 
+                fontSize: 24, 
+                fontWeight: 700,
+                color: 'var(--primary)'
+              }}>
+                ${monthly ? confirmUpgrade.plan.priceMonthly : confirmUpgrade.plan.priceYearly}
+                <span style={{ 
+                  fontSize: 14, 
+                  fontWeight: 400,
+                  color: 'var(--muted)',
+                  marginLeft: 4
+                }}>
+                  /{monthly ? 'month' : 'year'}
+                </span>
+              </div>
+              {(() => {
+                // Calculate savings dynamically based on current period
+                const savings = !monthly && confirmUpgrade.plan.key !== 'starter' && confirmUpgrade.plan.priceMonthly && confirmUpgrade.plan.priceYearly
+                  ? `Save $${Math.round((confirmUpgrade.plan.priceMonthly * 12 - confirmUpgrade.plan.priceYearly))}/year`
+                  : null;
+                
+                return savings && (
+                  <div style={{ 
+                    fontSize: 12, 
+                    color: 'var(--success)',
+                    marginTop: 8,
+                    fontWeight: 500
+                  }}>
+                    {savings}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div style={{
+              padding: 16,
+              borderRadius: 8,
+              background: isLightTheme 
+                ? 'rgba(249, 250, 251, 0.6)' 
+                : 'rgba(0, 0, 0, 0.2)',
+              border: `1px solid var(--border)`
+            }}>
+              <div style={{ 
+                fontSize: 14, 
+                fontWeight: 600, 
+                marginBottom: 12,
+                color: 'var(--text)'
+              }}>
+                What's included:
+              </div>
+              <ul style={{ 
+                margin: 0, 
+                paddingLeft: 20, 
+                display: "grid", 
+                gap: 8,
+                color: 'var(--text)'
+              }}>
+                {confirmUpgrade.plan.features?.slice(0, 5).map((feature, idx) => (
+                  <li key={idx} style={{ fontSize: 13, lineHeight: 1.6 }}>
+                    {feature}
+                  </li>
+                ))}
+                {confirmUpgrade.plan.features?.length > 5 && (
+                  <li style={{ fontSize: 13, color: 'var(--muted)' }}>
+                    +{confirmUpgrade.plan.features.length - 5} more features
+                  </li>
+                )}
+              </ul>
+            </div>
+
+            <div style={{
+              padding: 12,
+              borderRadius: 8,
+              background: isLightTheme 
+                ? 'rgba(255, 193, 7, 0.1)' 
+                : 'rgba(255, 193, 7, 0.15)',
+              border: `1px solid ${isLightTheme 
+                ? 'rgba(255, 193, 7, 0.3)' 
+                : 'rgba(255, 193, 7, 0.4)'}`,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12
+            }}>
+              <div style={{ fontSize: 20, flexShrink: 0 }}>ℹ️</div>
+              <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>
+                Your subscription will be updated immediately. You'll be charged the new rate starting from your next billing cycle.
+              </div>
+            </div>
+
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "flex-end", 
+              gap: 12,
+              paddingTop: 8,
+              borderTop: '1px solid var(--border)'
+            }}>
+              <button 
+                className="btn secondary" 
+                onClick={() => setConfirmUpgrade({ open: false, plan: null })}
+                style={{ minWidth: 100 }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn primary" 
+                onClick={() => handleUpgrade(confirmUpgrade.plan.id)}
+                disabled={upgrading === confirmUpgrade.plan.id}
+                style={{ minWidth: 140 }}
+              >
+                {upgrading === confirmUpgrade.plan.id 
+                  ? 'Processing...' 
+                  : `Confirm Upgrade`}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

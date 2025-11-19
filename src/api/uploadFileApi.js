@@ -70,11 +70,26 @@ export const UploadFileApi = {
   },
 
   /**
-   * Get all uploaded files for a specific user
+   * Get all uploaded files for a specific user with optional filter parameters
+   * @param {string} userId - User ID
+   * @param {Object} filterParams - Optional filter parameters
+   * @param {string} filterParams.filename - Search by file name (partial match)
+   * @param {string} filterParams.start_date - Filter files from this date (YYYY-MM-DD format)
+   * @param {string} filterParams.end_date - Filter files to this date (YYYY-MM-DD format)
    */
-  async getUserFiles(userId) {
+  async getUserFiles(userId, filterParams = {}) {
     try {
-      return await authRequest(`${CUSTOM_ENDPOINTS.uploudFile.getUserUploudFiles}?user_id=${userId}`);
+      // Build query string from filter parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append('user_id', userId);
+      
+      // Add filter parameters (only non-empty values)
+      if (filterParams.filename) queryParams.append('filename', filterParams.filename);
+      if (filterParams.start_date) queryParams.append('start_date', filterParams.start_date);
+      if (filterParams.end_date) queryParams.append('end_date', filterParams.end_date);
+      
+      const url = `${CUSTOM_ENDPOINTS.uploudFile.getUserUploudFiles}?${queryParams.toString()}`;
+      return await authRequest(url);
     } catch (error) {
       console.error('Error getting user files:', error);
       throw error;

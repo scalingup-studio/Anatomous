@@ -1932,10 +1932,33 @@ function UploadsTab() {
     }
   }, [user]);
 
+  // Auto-reload when filters change (with debounce to avoid too many requests)
+  useEffect(() => {
+    if (user?.id) {
+      const timeoutId = setTimeout(() => {
+        loadFiles();
+      }, 500); // Debounce 500ms
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [filterDateFrom, filterDateTo, filterFileName, user?.id]);
+
   const loadFiles = async () => {
     try {
       setLoading(true);
-      const response = await UploadFileApi.getUserFiles(user.id);
+      // Prepare filter parameters for API
+      const filterParams = {
+        filename: filterFileName || undefined,
+        start_date: filterDateFrom || undefined,
+        end_date: filterDateTo || undefined
+      };
+      
+      // Remove undefined values
+      Object.keys(filterParams).forEach(key => 
+        filterParams[key] === undefined && delete filterParams[key]
+      );
+      
+      const response = await UploadFileApi.getUserFiles(user.id, filterParams);
       setFiles(response.result || response || []);
     } catch (error) {
       console.error('Error loading files:', error);
@@ -1945,41 +1968,10 @@ function UploadsTab() {
     }
   };
 
-  // Filter files based on filters
+  // Files are now filtered by API, no need for client-side filtering
+  // Keeping this function for backward compatibility but it just returns all files
   const getFilteredFiles = () => {
-    let filtered = [...files];
-
-    // Filter by file name
-    if (filterFileName) {
-      const searchTerm = filterFileName.toLowerCase();
-      filtered = filtered.filter(file => {
-        const fileName = (file.filename || file.file_name || '').toLowerCase();
-        return fileName.includes(searchTerm);
-      });
-    }
-
-    // Filter by date range
-    if (filterDateFrom) {
-      const fromDate = new Date(filterDateFrom);
-      fromDate.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(file => {
-        const fileDate = new Date(file.created_at || file.uploaded_at || 0);
-        fileDate.setHours(0, 0, 0, 0);
-        return fileDate >= fromDate;
-      });
-    }
-
-    if (filterDateTo) {
-      const toDate = new Date(filterDateTo);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(file => {
-        const fileDate = new Date(file.created_at || file.uploaded_at || 0);
-        fileDate.setHours(0, 0, 0, 0);
-        return fileDate <= toDate;
-      });
-    }
-
-    return filtered;
+    return files;
   };
 
   const handleFileChange = async (e) => {
@@ -2265,12 +2257,7 @@ function UploadsTab() {
                 fontWeight: 'normal', 
                 color: 'var(--muted)', 
               }}>
-                {(() => {
-                  const filteredCount = getFilteredFiles().length;
-                  return filteredCount === files.length 
-                    ? `(${files.length} files)`
-                    : `(${filteredCount} of ${files.length} files)`;
-                })()}
+                ({files.length} {files.length === 1 ? 'file' : 'files'})
               </span>
             )}
           </div>
@@ -2347,10 +2334,11 @@ function UploadsTab() {
             Loading files...
           </div>
         ) : (() => {
-          const filteredFiles = getFilteredFiles();
-          return filteredFiles.length === 0 ? (
+          return files.length === 0 ? (
             <div style={{ textAlign: "center", padding: 20, color: "var(--muted)" }}>
-              {files.length === 0 ? "No files uploaded yet" : "No files match your filters"}
+              {(filterDateFrom || filterDateTo || filterFileName)
+                ? "No files match your filters"
+                : "No files uploaded yet"}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -2375,7 +2363,7 @@ function UploadsTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredFiles.map((file, idx) => (
+                  {files.map((file, idx) => (
                   <tr 
                     key={idx} 
                     style={{ 

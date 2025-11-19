@@ -393,17 +393,65 @@ function AddGoalForm({ onCreate, loading }) {
 function HistoryTab() {
   const { addNotification } = useNotifications();
   const [items, setItems] = React.useState([]);
-  const [filters, setFilters] = React.useState({ status: "Completed", start_date: "", end_date: "" });
+  const [filters, setFilters] = React.useState({ 
+    status: "all", // "all", "completed", "archived"
+    category: "", 
+    start_date: "", 
+    end_date: "" 
+  });
+  const [loading, setLoading] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    if (!filters.status) return;
+    setLoading(true);
     try {
-      const params = { status: String(filters.status).toLowerCase() };
-      if (filters.start_date) params.start_date = filters.start_date;
-      if (filters.end_date) params.end_date = filters.end_date;
+      // Build params - only include parameters that have values
+      const params = {};
+      
+      // Map UI status values to API status values
+      // API expects: "complete" or "archived"
+      // UI uses: "completed" or "archived"
+      if (filters.status !== "all") {
+        const mapStatusToApi = (status) => {
+          if (status === "completed") return "complete";
+          return status; // "archived" stays the same
+        };
+        params.status = mapStatusToApi(filters.status);
+      }
+      
+      if (filters.start_date && filters.start_date.trim() !== "") {
+        params.start_date = filters.start_date;
+      }
+      if (filters.end_date && filters.end_date.trim() !== "") {
+        params.end_date = filters.end_date;
+      }
+      
+      // Make single API call (without status if "all" is selected)
       const res = await GoalsApi.getHistory(params);
-      setItems(res?.result || res || []);
-    } catch (e) { addNotification(e.message, "error"); }
+      let allItems = res?.result || res || [];
+      
+      // Map status for items (API returns "complete", but we display as "completed")
+      allItems = allItems.map(g => {
+        const status = String(g.status || "").toLowerCase();
+        // Map "complete" back to "completed" for UI consistency
+        const uiStatus = status === "complete" ? "completed" : status;
+        return { ...g, _status: uiStatus || g._status };
+      });
+      
+      // Apply category filter if set
+      if (filters.category) {
+        allItems = allItems.filter(g => {
+          const goalType = String(g.type || "").toLowerCase();
+          const filterCategory = String(filters.category).toLowerCase();
+          return goalType === filterCategory;
+        });
+      }
+      
+      setItems(allItems);
+    } catch (e) { 
+      addNotification(e.message, "error"); 
+    } finally {
+      setLoading(false);
+    }
   }, [filters, addNotification]);
 
   React.useEffect(() => { load(); }, [load]);
@@ -412,71 +460,218 @@ function HistoryTab() {
     try {
       await GoalsApi.readd(goal.id || goal.goal_id);
       addNotification("Goal re-added", "success");
+      load(); // Reload after re-adding
     } catch (e) { addNotification(e.message, "error"); }
   };
 
+  // Get unique categories from all goals
+  const categories = React.useMemo(() => {
+    const cats = new Set();
+    items.forEach(g => {
+      if (g.type) cats.add(g.type);
+    });
+    return Array.from(cats).sort();
+  }, [items]);
+
+
+  const formatDate = (v) => {
+    if (!v) return "";
+    try {
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return String(v);
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${month}/${day}/${year}`;
+    } catch {
+      return String(v);
+    }
+  };
+
   return (
-    <div className="card history-filters" style={{ display: "grid", gap: 12 }}>
-      <div className="form-row">
-        <div className="form-field" style={{ width: 180 }}>
-          <label>Status</label>
-          <select value={filters.status} onChange={(e) => setFilters(v => ({ ...v, status: e.target.value.toLowerCase() }))}>
-            <option>Completed</option>
-            <option>Archived</option>
-          </select>
-        </div>
-        <div className="form-field" style={{ width: 180 }}>
-          <label>Start date</label>
-          <DatePicker 
-            value={filters.start_date} 
-            onChange={(val) => {
-              setFilters(v => {
-                const updated = { ...v, start_date: val };
-                // If end_date is before new start_date, clear it
-                if (updated.end_date && val && updated.end_date < val) {
-                  updated.end_date = '';
-                }
-                return updated;
-              });
-            }}
-            maxDate={filters.end_date || undefined}
-          />
-        </div>
-        <div className="form-field" style={{ width: 180 }}>
-          <label>End date</label>
-          <DatePicker 
-            value={filters.end_date} 
-            onChange={(val) => setFilters(v => ({ ...v, end_date: val }))}
-            minDate={filters.start_date || undefined}
-          />
-        </div>
-        <div style={{ alignSelf: "end" }}>
-          <button className="btn secondary" onClick={load}>Filter</button>
+    <div style={{ display: "grid", gap: 16 }}>
+      {/* Filter Section */}
+      <div className="card" style={{ display: "grid", gap: 16, padding: 20 }}>
+        {/* Filter Controls */}
+        <div style={{ display: "grid", gap: 12 }}>
+          {/* Status Filter Buttons */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, color: "var(--muted)", marginRight: 4, minWidth: 60 }}>Status:</span>
+            <button
+              onClick={() => setFilters(v => ({ ...v, status: "all" }))}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: filters.status === "all" ? "var(--primary)" : "transparent",
+                color: filters.status === "all" ? "white" : "var(--text)",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: filters.status === "all" ? 600 : 400,
+                transition: "all 0.2s",
+              }}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilters(v => ({ ...v, status: "completed" }))}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: filters.status === "completed" ? "var(--success)" : "transparent",
+                color: filters.status === "completed" ? "white" : "var(--text)",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: filters.status === "completed" ? 600 : 400,
+                transition: "all 0.2s",
+              }}
+            >
+              Completed
+            </button>
+            <button
+              onClick={() => setFilters(v => ({ ...v, status: "archived" }))}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: filters.status === "archived" ? "var(--muted)" : "transparent",
+                color: filters.status === "archived" ? "white" : "var(--text)",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: filters.status === "archived" ? 600 : 400,
+                transition: "all 0.2s",
+              }}
+            >
+              Archived
+            </button>
+          </div>
+
+          {/* Category and Date Filters */}
+          <div className="form-row" style={{ flexWrap: "wrap", gap: 12 }}>
+            <div className="form-field" style={{ minWidth: 180, flex: 1 }}>
+              <label>Category</label>
+              <select 
+                value={filters.category} 
+                onChange={(e) => setFilters(v => ({ ...v, category: e.target.value }))}
+                style={{ width: "100%" }}
+              >
+                <option value="">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-field" style={{ minWidth: 160, flex: 1 }}>
+              <label>Start date</label>
+              <DatePicker 
+                value={filters.start_date} 
+                onChange={(val) => {
+                  setFilters(v => {
+                    const updated = { ...v, start_date: val };
+                    if (updated.end_date && val && updated.end_date < val) {
+                      updated.end_date = '';
+                    }
+                    return updated;
+                  });
+                }}
+                maxDate={filters.end_date || undefined}
+              />
+            </div>
+            <div className="form-field" style={{ minWidth: 160, flex: 1 }}>
+              <label>End date</label>
+              <DatePicker 
+                value={filters.end_date} 
+                onChange={(val) => setFilters(v => ({ ...v, end_date: val }))}
+                minDate={filters.start_date || undefined}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      {items?.length === 0 && <Empty title="No results for selected filters" />}
-      {items?.length > 0 && (
-        <div style={{ display: "grid", gap: 8 }}>
-          {items.map((g) => (
-            <div key={g.id} className="card history-goal-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>{g.title}</div>
-                {g.completed_at && (() => {
-                  try {
-                    const d = new Date(g.completed_at);
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const year = d.getFullYear();
-                    return <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Completed: {`${month}/${day}/${year}`}</div>;
-                  } catch {
-                    return <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4 }}>Completed: {g.completed_at}</div>;
-                  }
-                })()}
+      {/* Results */}
+      {loading && (
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ color: "var(--muted)" }}>Loading history...</div>
+        </div>
+      )}
+      
+      {!loading && items?.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>📜</div>
+          <p style={{ color: "var(--muted)", marginBottom: 12, fontSize: 16 }}>No results for selected filters</p>
+        </div>
+      )}
+      
+      {!loading && items?.length > 0 && (
+        <div style={{ display: "grid", gap: 12 }}>
+          {items.map((g, index) => (
+            <div 
+              key={g.id || g.goal_id} 
+              style={{ 
+                animation: `fadeIn 0.3s ease-in-out ${index * 0.03}s both`,
+              }}
+            >
+              <div className="card history-goal-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: 16 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                    <div style={{ fontWeight: 600, wordBreak: 'break-word', fontSize: 15 }}>{g.title}</div>
+                    <span 
+                      style={{ 
+                        fontSize: 11, 
+                        padding: "4px 10px", 
+                        borderRadius: 12,
+                        background: g._status === "completed" ? "var(--success-light)" : "var(--muted-light)",
+                        color: g._status === "completed" ? "var(--success)" : "var(--muted)",
+                        textTransform: "capitalize",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {g._status || g.status}
+                    </span>
+                  </div>
+                  {g.type && (
+                    <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ opacity: 0.7 }}>📁</span>
+                      <span>{g.type}</span>
+                    </div>
+                  )}
+                  {g.target_date && (
+                    <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ opacity: 0.7 }}>🎯</span>
+                      <span>Target: {formatDate(g.target_date)}</span>
+                    </div>
+                  )}
+                  {(g.completed_at || g.archived_at) && (
+                    <div style={{ color: "var(--muted)", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ opacity: 0.7 }}>📅</span>
+                      <span>{g.completed_at ? `Completed: ${formatDate(g.completed_at)}` : `Archived: ${formatDate(g.archived_at)}`}</span>
+                    </div>
+                  )}
+                </div>
+                <button 
+                  className="btn outline small" 
+                  onClick={() => readd(g)} 
+                  style={{ flexShrink: 0, padding: "8px 16px" }}
+                >
+                  Re-add
+                </button>
               </div>
-              <button className="btn outline small" onClick={() => readd(g)} style={{ flexShrink: 0 }}>Re-add</button>
             </div>
           ))}
+          <style>{`
+            @keyframes fadeIn {
+              from {
+                opacity: 0;
+                transform: translateY(10px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+          `}</style>
         </div>
       )}
     </div>

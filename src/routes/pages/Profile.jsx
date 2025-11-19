@@ -6,6 +6,7 @@ import { useAuth } from "../../api/AuthContext.jsx";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import DatePicker from "../../components/DatePicker.jsx";
+import DateTimePicker from "../../components/DateTimePicker.jsx";
 import { ProfilesApi } from "../../api/profilesApi.js";
 import { UploadFileApi } from "../../api/uploadFileApi.js";
 import { HealthApi } from "../../api/healthApi.js";
@@ -129,7 +130,15 @@ export default function DashboardProfile() {
 
   // Health Data state
   const [healthData, setHealthData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: (() => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    })(),
     heart_rate: '',
     blood_pressure_systolic: '',
     blood_pressure_diastolic: '',
@@ -823,44 +832,59 @@ export default function DashboardProfile() {
       };
       
       // Prepare data for API
+      // API expects date format (YYYY-MM-DD), so extract date part from datetime
+      const dateForApi = healthData.date 
+        ? (healthData.date.includes('T') ? healthData.date.split('T')[0] : healthData.date)
+        : null;
+      
+      // Extract time from datetime (format: HH:MM)
+      const timeForApi = healthData.date && healthData.date.includes('T')
+        ? healthData.date.split('T')[1]?.substring(0, 5) || null // Extract HH:MM part
+        : null;
+      
+      // Only include fields with non-empty values
       const healthDataPayload = {
         user_id: user.id,
-        date: healthData.date || null,
-        // Convert string values to appropriate types
-        heart_rate: healthData.heart_rate ? parseInt(healthData.heart_rate) : 0,
-        blood_pressure_systolic: healthData.blood_pressure_systolic ? parseInt(healthData.blood_pressure_systolic) : 0,
-        blood_pressure_diastolic: healthData.blood_pressure_diastolic ? parseInt(healthData.blood_pressure_diastolic) : 0,
-        weekly_activity_minutes: healthData.weekly_activity_minutes ? parseFloat(healthData.weekly_activity_minutes) : 0,
-        activity_level: healthData.activity_level ? parseInt(healthData.activity_level) : 0,
-        hydration_liters: healthData.hydration_liters ? parseFloat(healthData.hydration_liters) : 0,
-        pulse_oximetry: healthData.pulse_oximetry ? parseInt(healthData.pulse_oximetry) : 0,
-        respiratory_rate: healthData.respiratory_rate ? parseInt(healthData.respiratory_rate) : 0,
-        body_mass_index: healthData.body_mass_index ? parseFloat(healthData.body_mass_index) : 0,
-        blood_glucose: healthData.blood_glucose ? parseFloat(healthData.blood_glucose) : 0,
-        blood_glucose_unit: glucoseType || '',
-        // Do NOT convert temperature - send it as-is in the unit specified by body_temperature_unit
-        body_temperature: healthData.body_temperature && healthData.body_temperature.trim() !== ''
-          ? parseFloat(healthData.body_temperature)
-          : null,
-        // Send temperature unit to API
-        body_temperature_unit: temperatureUnit || '',
-        // Convert weight to kg for API
-        body_weight: healthData.body_weight && healthData.body_weight.trim() !== ''
-          ? (healthDataWeightUnit === 'lb' ? lbToKg(parseFloat(healthData.body_weight)) : parseFloat(healthData.body_weight))
-          : 0,
-        body_weight_unit: healthDataWeightUnit || '',
-        sleep_duration: healthData.sleep_duration ? parseFloat(healthData.sleep_duration) : 0,
-        sleep_quality: healthData.sleep_quality ? (healthData.sleep_quality.toString().trim() !== '' ? healthData.sleep_quality.toString() : '') : '',
-        // Convert waist circumference to cm for API
-        waist_circumference: healthData.waist_circumference && healthData.waist_circumference.trim() !== ''
-          ? (waistUnit === 'in' ? inToCm(parseFloat(healthData.waist_circumference)) : parseFloat(healthData.waist_circumference))
-          : 0,
-        waist_circumference_unit: waistUnit || '',
-        HRV: healthData.hrv ? parseFloat(healthData.hrv) : 0,
-        mood: healthData.mood ? (healthData.mood.toString().trim() !== '' ? healthData.mood.toString() : '') : '',
-        stress_level: healthData.stress_level ? (healthData.stress_level.toString().trim() !== '' ? healthData.stress_level.toString() : '') : '',
-        daily_step_count: healthData.daily_step_count ? parseInt(healthData.daily_step_count) : 0,
-        visibility_scope: healthData.visibility_scope || '',
+        ...(dateForApi && { date: dateForApi }),
+        ...(timeForApi && { time: timeForApi }),
+        ...(healthData.heart_rate && healthData.heart_rate.trim() !== '' && { heart_rate: parseInt(healthData.heart_rate) }),
+        ...(healthData.blood_pressure_systolic && healthData.blood_pressure_systolic.trim() !== '' && { blood_pressure_systolic: parseInt(healthData.blood_pressure_systolic) }),
+        ...(healthData.blood_pressure_diastolic && healthData.blood_pressure_diastolic.trim() !== '' && { blood_pressure_diastolic: parseInt(healthData.blood_pressure_diastolic) }),
+        ...(healthData.weekly_activity_minutes && healthData.weekly_activity_minutes.trim() !== '' && { weekly_activity_minutes: parseFloat(healthData.weekly_activity_minutes) }),
+        ...(healthData.activity_level && healthData.activity_level.trim() !== '' && { activity_level: parseInt(healthData.activity_level) }),
+        ...(healthData.hydration_liters && healthData.hydration_liters.trim() !== '' && { 
+          // hydration_liters is stored in liters, convert to selected unit for API
+          hydration_liters: waterUnit === 'oz' 
+            ? litersToOz(parseFloat(healthData.hydration_liters))
+            : parseFloat(healthData.hydration_liters),
+          hydration_liter_unit: waterUnit === 'oz' ? 'ounces' : 'liter'
+        }),
+        ...(healthData.pulse_oximetry && healthData.pulse_oximetry.trim() !== '' && { pulse_oximetry: parseInt(healthData.pulse_oximetry) }),
+        ...(healthData.respiratory_rate && healthData.respiratory_rate.trim() !== '' && { respiratory_rate: parseInt(healthData.respiratory_rate) }),
+        ...(healthData.body_mass_index && healthData.body_mass_index.trim() !== '' && { body_mass_index: parseFloat(healthData.body_mass_index) }),
+        ...(healthData.blood_glucose && healthData.blood_glucose.trim() !== '' && { 
+          blood_glucose: parseFloat(healthData.blood_glucose),
+          blood_glucose_unit: glucoseType || 'fasting'
+        }),
+        ...(healthData.body_temperature && healthData.body_temperature.trim() !== '' && {
+          body_temperature: parseFloat(healthData.body_temperature),
+          body_temperature_unit: temperatureUnit || 'F'
+        }),
+        ...(healthData.body_weight && healthData.body_weight.trim() !== '' && {
+          body_weight: healthDataWeightUnit === 'lb' ? lbToKg(parseFloat(healthData.body_weight)) : parseFloat(healthData.body_weight),
+          body_weight_unit: healthDataWeightUnit || 'lb'
+        }),
+        ...(healthData.sleep_duration && healthData.sleep_duration.trim() !== '' && { sleep_duration: parseFloat(healthData.sleep_duration) }),
+        ...(healthData.sleep_quality && healthData.sleep_quality.toString().trim() !== '' && { sleep_quality: healthData.sleep_quality.toString() }),
+        ...(healthData.waist_circumference && healthData.waist_circumference.trim() !== '' && {
+          waist_circumference: waistUnit === 'in' ? inToCm(parseFloat(healthData.waist_circumference)) : parseFloat(healthData.waist_circumference),
+          waist_circumference_unit: waistUnit || 'in'
+        }),
+        ...(healthData.hrv && healthData.hrv.trim() !== '' && { HRV: parseFloat(healthData.hrv) }),
+        ...(healthData.mood && healthData.mood.toString().trim() !== '' && { mood: healthData.mood.toString() }),
+        ...(healthData.stress_level && healthData.stress_level.toString().trim() !== '' && { stress_level: healthData.stress_level.toString() }),
+        ...(healthData.daily_step_count && healthData.daily_step_count.trim() !== '' && { daily_step_count: parseInt(healthData.daily_step_count) }),
+        ...(healthData.visibility_scope && { visibility_scope: healthData.visibility_scope }),
       };
       
       // Validate data (before conversion)
@@ -875,11 +899,17 @@ export default function DashboardProfile() {
       // Call API endpoint using HealthApi
       const response = await HealthApi.create(healthDataPayload);
 
-      console.log('Health data API response:', response);
+      console.log('✅ Health data create response:', response);
 
       // Reset form
+      const resetNow = new Date();
+      const resetYear = resetNow.getFullYear();
+      const resetMonth = String(resetNow.getMonth() + 1).padStart(2, '0');
+      const resetDay = String(resetNow.getDate()).padStart(2, '0');
+      const resetHours = String(resetNow.getHours()).padStart(2, '0');
+      const resetMinutes = String(resetNow.getMinutes()).padStart(2, '0');
       setHealthData({
-        date: new Date().toISOString().split('T')[0],
+        date: `${resetYear}-${resetMonth}-${resetDay}T${resetHours}:${resetMinutes}`,
         heart_rate: '',
         blood_pressure_systolic: '',
         blood_pressure_diastolic: '',
@@ -1057,6 +1087,10 @@ export default function DashboardProfile() {
     // Set units first
     setHealthDataWeightUnit(recordWeightUnit);
     setWaistUnit(recordWaistUnit);
+    const recordHydrationUnit = (record.hydration_liter_unit || record.hydration_unit || '').toString().trim().toLowerCase();
+    // Handle both 'liter' and 'liters' from API, default to 'oz' if not recognized
+    const resolvedWaterUnit = ['l', 'liter', 'liters'].includes(recordHydrationUnit) ? 'L' : 'oz';
+    setWaterUnit(resolvedWaterUnit);
     
     // Handle body_weight: check both new field (body_weight) and old field (body_weight_trend)
     // API may return body_weight_trend for old records, but we use body_weight
@@ -1100,8 +1134,32 @@ export default function DashboardProfile() {
     }
     
     // Populate form with record data
+    // Handle date: if API returns datetime, use it; if only date, add current time
+    let dateValue = '';
+    if (record.date) {
+      if (record.date.includes('T')) {
+        // Already has time, use as-is
+        dateValue = record.date;
+      } else {
+        // Only date, add current time
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        dateValue = `${record.date}T${hours}:${minutes}`;
+      }
+    } else {
+      // No date, use current datetime
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      dateValue = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    
     setHealthData({
-      date: record.date || '',
+      date: dateValue,
       heart_rate: toFormValue(record.heart_rate),
       blood_pressure_systolic: toFormValue(record.blood_pressure_systolic),
       blood_pressure_diastolic: toFormValue(record.blood_pressure_diastolic),
@@ -1240,44 +1298,59 @@ export default function DashboardProfile() {
       }
       
       // Prepare data for API
+      // API expects date format (YYYY-MM-DD), so extract date part from datetime
+      const dateForApi = healthData.date 
+        ? (healthData.date.includes('T') ? healthData.date.split('T')[0] : healthData.date)
+        : null;
+      
+      // Extract time from datetime (format: HH:MM)
+      const timeForApi = healthData.date && healthData.date.includes('T')
+        ? healthData.date.split('T')[1]?.substring(0, 5) || null // Extract HH:MM part
+        : null;
+      
+      // Only include fields with non-empty values
       const healthDataPayload = {
         user_id: user.id,
-        date: healthData.date || null,
-        // Convert string values to appropriate types
-        heart_rate: healthData.heart_rate ? parseInt(healthData.heart_rate) : 0,
-        blood_pressure_systolic: healthData.blood_pressure_systolic ? parseInt(healthData.blood_pressure_systolic) : 0,
-        blood_pressure_diastolic: healthData.blood_pressure_diastolic ? parseInt(healthData.blood_pressure_diastolic) : 0,
-        weekly_activity_minutes: healthData.weekly_activity_minutes ? parseFloat(healthData.weekly_activity_minutes) : 0,
-        activity_level: healthData.activity_level ? parseInt(healthData.activity_level) : 0,
-        hydration_liters: healthData.hydration_liters ? parseFloat(healthData.hydration_liters) : 0,
-        pulse_oximetry: healthData.pulse_oximetry ? parseInt(healthData.pulse_oximetry) : 0,
-        respiratory_rate: healthData.respiratory_rate ? parseInt(healthData.respiratory_rate) : 0,
-        body_mass_index: healthData.body_mass_index ? parseFloat(healthData.body_mass_index) : 0,
-        blood_glucose: healthData.blood_glucose ? parseFloat(healthData.blood_glucose) : 0,
-        blood_glucose_unit: glucoseType || '',
-        // Do NOT convert temperature - send it as-is in the unit specified by body_temperature_unit
-        body_temperature: healthData.body_temperature && healthData.body_temperature.trim() !== ''
-          ? parseFloat(healthData.body_temperature)
-          : null,
-        // Send temperature unit to API
-        body_temperature_unit: temperatureUnit || '',
-        // Convert weight to kg for API
-        body_weight: healthData.body_weight && healthData.body_weight.trim() !== ''
-          ? (healthDataWeightUnit === 'lb' ? lbToKg(parseFloat(healthData.body_weight)) : parseFloat(healthData.body_weight))
-          : 0,
-        body_weight_unit: healthDataWeightUnit || '',
-        sleep_duration: healthData.sleep_duration ? parseFloat(healthData.sleep_duration) : 0,
-        sleep_quality: healthData.sleep_quality ? (healthData.sleep_quality.toString().trim() !== '' ? healthData.sleep_quality.toString() : '') : '',
-        // Convert waist circumference to cm for API
-        waist_circumference: healthData.waist_circumference && healthData.waist_circumference.trim() !== ''
-          ? (waistUnit === 'in' ? inToCm(parseFloat(healthData.waist_circumference)) : parseFloat(healthData.waist_circumference))
-          : 0,
-        waist_circumference_unit: waistUnit || '',
-        HRV: healthData.hrv ? parseFloat(healthData.hrv) : 0,
-        mood: healthData.mood ? (healthData.mood.toString().trim() !== '' ? healthData.mood.toString() : '') : '',
-        stress_level: healthData.stress_level ? (healthData.stress_level.toString().trim() !== '' ? healthData.stress_level.toString() : '') : '',
-        daily_step_count: healthData.daily_step_count ? parseInt(healthData.daily_step_count) : 0,
-        visibility_scope: healthData.visibility_scope || '',
+        ...(dateForApi && { date: dateForApi }),
+        ...(timeForApi && { time: timeForApi }),
+        ...(healthData.heart_rate && healthData.heart_rate.trim() !== '' && { heart_rate: parseInt(healthData.heart_rate) }),
+        ...(healthData.blood_pressure_systolic && healthData.blood_pressure_systolic.trim() !== '' && { blood_pressure_systolic: parseInt(healthData.blood_pressure_systolic) }),
+        ...(healthData.blood_pressure_diastolic && healthData.blood_pressure_diastolic.trim() !== '' && { blood_pressure_diastolic: parseInt(healthData.blood_pressure_diastolic) }),
+        ...(healthData.weekly_activity_minutes && healthData.weekly_activity_minutes.trim() !== '' && { weekly_activity_minutes: parseFloat(healthData.weekly_activity_minutes) }),
+        ...(healthData.activity_level && healthData.activity_level.trim() !== '' && { activity_level: parseInt(healthData.activity_level) }),
+        ...(healthData.hydration_liters && healthData.hydration_liters.trim() !== '' && { 
+          // hydration_liters is stored in liters, convert to selected unit for API
+          hydration_liters: waterUnit === 'oz' 
+            ? litersToOz(parseFloat(healthData.hydration_liters))
+            : parseFloat(healthData.hydration_liters),
+          hydration_liter_unit: waterUnit === 'oz' ? 'ounces' : 'liter'
+        }),
+        ...(healthData.pulse_oximetry && healthData.pulse_oximetry.trim() !== '' && { pulse_oximetry: parseInt(healthData.pulse_oximetry) }),
+        ...(healthData.respiratory_rate && healthData.respiratory_rate.trim() !== '' && { respiratory_rate: parseInt(healthData.respiratory_rate) }),
+        ...(healthData.body_mass_index && healthData.body_mass_index.trim() !== '' && { body_mass_index: parseFloat(healthData.body_mass_index) }),
+        ...(healthData.blood_glucose && healthData.blood_glucose.trim() !== '' && { 
+          blood_glucose: parseFloat(healthData.blood_glucose),
+          blood_glucose_unit: glucoseType || 'fasting'
+        }),
+        ...(healthData.body_temperature && healthData.body_temperature.trim() !== '' && {
+          body_temperature: parseFloat(healthData.body_temperature),
+          body_temperature_unit: temperatureUnit || 'F'
+        }),
+        ...(healthData.body_weight && healthData.body_weight.trim() !== '' && {
+          body_weight: healthDataWeightUnit === 'lb' ? lbToKg(parseFloat(healthData.body_weight)) : parseFloat(healthData.body_weight),
+          body_weight_unit: healthDataWeightUnit || 'lb'
+        }),
+        ...(healthData.sleep_duration && healthData.sleep_duration.trim() !== '' && { sleep_duration: parseFloat(healthData.sleep_duration) }),
+        ...(healthData.sleep_quality && healthData.sleep_quality.toString().trim() !== '' && { sleep_quality: healthData.sleep_quality.toString() }),
+        ...(healthData.waist_circumference && healthData.waist_circumference.trim() !== '' && {
+          waist_circumference: waistUnit === 'in' ? inToCm(parseFloat(healthData.waist_circumference)) : parseFloat(healthData.waist_circumference),
+          waist_circumference_unit: waistUnit || 'in'
+        }),
+        ...(healthData.hrv && healthData.hrv.trim() !== '' && { HRV: parseFloat(healthData.hrv) }),
+        ...(healthData.mood && healthData.mood.toString().trim() !== '' && { mood: healthData.mood.toString() }),
+        ...(healthData.stress_level && healthData.stress_level.toString().trim() !== '' && { stress_level: healthData.stress_level.toString() }),
+        ...(healthData.daily_step_count && healthData.daily_step_count.trim() !== '' && { daily_step_count: parseInt(healthData.daily_step_count) }),
+        ...(healthData.visibility_scope && { visibility_scope: healthData.visibility_scope }),
       };
 
       console.log('Update Health Data - Request payload:', healthDataPayload);
@@ -1287,8 +1360,14 @@ export default function DashboardProfile() {
       setIsHealthDataModalOpen(false);
       setEditingRecord(null);
       // Reset form
+      const resetNow = new Date();
+      const resetYear = resetNow.getFullYear();
+      const resetMonth = String(resetNow.getMonth() + 1).padStart(2, '0');
+      const resetDay = String(resetNow.getDate()).padStart(2, '0');
+      const resetHours = String(resetNow.getHours()).padStart(2, '0');
+      const resetMinutes = String(resetNow.getMinutes()).padStart(2, '0');
       setHealthData({
-        date: '',
+        date: `${resetYear}-${resetMonth}-${resetDay}T${resetHours}:${resetMinutes}`,
         heart_rate: '',
         blood_pressure_systolic: '',
         blood_pressure_diastolic: '',
@@ -1334,6 +1413,60 @@ export default function DashboardProfile() {
       console.log('API URL:', ENDPOINTS.healthData.getAll);
       console.log('User ID:', user?.id);
       
+      // Map sort column names to API format
+      const sortColumnMap = {
+        'date': 'date',
+        'heart_rate': 'heart_rate',
+        'blood_pressure': 'bp_systolic', // API might sort by systolic for blood pressure
+        'activity': 'activity_minutes',
+        'bmi': 'bmi',
+        'temperature': 'temperature',
+        'glucose': 'glucose'
+      };
+      
+      // Prepare filter parameters for API
+      const parseNumber = (value) => {
+        if (value === undefined || value === null) return undefined;
+        const trimmed = value.toString().trim();
+        if (trimmed === '') return undefined;
+        const parsed = parseFloat(trimmed);
+        return isNaN(parsed) ? undefined : parsed;
+      };
+
+      const filterParams = {
+        start_date: filters.dateFrom || undefined,
+        end_date: filters.dateTo || undefined,
+        heart_rate_min: parseNumber(filters.heartRateMin),
+        heart_rate_max: parseNumber(filters.heartRateMax),
+        bp_systolic_min: parseNumber(filters.bloodPressureSystolicMin),
+        bp_systolic_max: parseNumber(filters.bloodPressureSystolicMax),
+        bp_diastolic_min: parseNumber(filters.bloodPressureDiastolicMin),
+        bp_diastolic_max: parseNumber(filters.bloodPressureDiastolicMax),
+        activity_minutes_min: parseNumber(filters.activityMin),
+        activity_minutes_max: parseNumber(filters.activityMax),
+        activity_level_min: undefined, // Activity level filters not in UI yet
+        activity_level_max: undefined,
+        bmi_min: parseNumber(filters.bmiMin),
+        bmi_max: parseNumber(filters.bmiMax),
+        temperature_min: parseNumber(filters.temperatureMin),
+        temperature_max: parseNumber(filters.temperatureMax),
+        glucose_min: parseNumber(filters.glucoseMin),
+        glucose_max: parseNumber(filters.glucoseMax),
+        // Don't send sort_by and sort_order, only use specific sort_* parameters
+        sort_date: sortColumn === 'date' ? sortDirection : undefined,
+        sort_heart_rate: sortColumn === 'heart_rate' ? sortDirection : undefined,
+        sort_blood_pressure: sortColumn === 'blood_pressure' ? sortDirection : undefined,
+        sort_activity: sortColumn === 'activity' ? sortDirection : undefined,
+        sort_bmi: sortColumn === 'bmi' ? sortDirection : undefined,
+        sort_temperature: sortColumn === 'temperature' ? sortDirection : undefined,
+        sort_glucose: sortColumn === 'glucose' ? sortDirection : undefined,
+      };
+
+      // Remove undefined keys
+      Object.keys(filterParams).forEach(key => filterParams[key] === undefined && delete filterParams[key]);
+      
+      console.log('Filter parameters:', filterParams);
+      
       // First, let's test if the API is working with a known endpoint
       try {
         console.log('Testing API with users endpoint...');
@@ -1343,22 +1476,30 @@ export default function DashboardProfile() {
         console.error('Users API test failed:', testError);
       }
       
-      // Try to get health data by user ID first
+      // Try to get health data by user ID first with filter parameters
       let response;
       try {
-        response = await HealthApi.getByUserId(user.id);
-        console.log('Health data by user ID response:', response);
+        response = await HealthApi.getByUserId(user.id, filterParams);
+        console.log('📥 Health data API response (filtered):', response);
       } catch (userError) {
         console.log('getByUserId failed, trying getAll...', userError);
         response = await HealthApi.getAll();
-        console.log('Health data getAll response:', response);
+        console.log('📥 Health data API response (fallback getAll):', response);
       }
       
-      // Handle API response format: { result: [...], succes: true }
-      const healthDataArray = response?.result || response;
+      // Handle API response format: { result: [...] } or { health_data: [...] } or direct array
+      let healthDataArray = null;
+      if (response?.result && Array.isArray(response.result)) {
+        healthDataArray = response.result;
+      } else if (response?.health_data && Array.isArray(response.health_data)) {
+        healthDataArray = response.health_data;
+      } else if (Array.isArray(response)) {
+        healthDataArray = response;
+      } else {
+        console.warn('Unexpected health data response format:', response);
+      }
       
       if (healthDataArray && Array.isArray(healthDataArray)) {
-        // Filter out records with all zero values (empty records)
         const filteredRecords = healthDataArray.filter(record => {
           const hasValidData = record.heart_rate > 0 || 
                               record.blood_pressure_systolic > 0 || 
@@ -1373,9 +1514,10 @@ export default function DashboardProfile() {
                               (record.body_weight_trend && record.body_weight_trend.trim() !== '');
           return hasValidData;
         });
-        
-        setHealthDataRecords(filteredRecords);
-        console.log('Health data loaded successfully:', filteredRecords.length, 'valid records out of', healthDataArray.length, 'total');
+
+        const recordsToDisplay = filteredRecords.length > 0 ? filteredRecords : healthDataArray;
+        setHealthDataRecords(recordsToDisplay);
+        console.log('Health data loaded successfully:', recordsToDisplay.length, 'records (filtered:', filteredRecords.length, 'raw total:', healthDataArray.length, ')');
       } else {
         console.log('No health data found or invalid response format');
         console.log('Response structure:', response);
@@ -1395,9 +1537,15 @@ export default function DashboardProfile() {
         // Try with user_id as path parameter
         const altResponse = await authRequest(`${ENDPOINTS.healthData.getAll}/${user?.id}`);
         console.log('Alternative endpoint response:', altResponse);
-        const altHealthDataArray = altResponse?.result || altResponse;
+        let altHealthDataArray = null;
+        if (altResponse?.result && Array.isArray(altResponse.result)) {
+          altHealthDataArray = altResponse.result;
+        } else if (altResponse?.health_data && Array.isArray(altResponse.health_data)) {
+          altHealthDataArray = altResponse.health_data;
+        } else if (Array.isArray(altResponse)) {
+          altHealthDataArray = altResponse;
+        }
         if (altHealthDataArray && Array.isArray(altHealthDataArray)) {
-          // Filter out records with all zero values (empty records)
           const filteredAltRecords = altHealthDataArray.filter(record => {
             const hasValidData = record.heart_rate > 0 || 
                                 record.blood_pressure_systolic > 0 || 
@@ -1412,8 +1560,8 @@ export default function DashboardProfile() {
                                 (record.body_weight_trend && record.body_weight_trend.trim() !== '');
             return hasValidData;
           });
-          
-          setHealthDataRecords(filteredAltRecords);
+
+          setHealthDataRecords(filteredAltRecords.length > 0 ? filteredAltRecords : altHealthDataArray);
           return;
         }
       } catch (altError) {
@@ -1439,144 +1587,10 @@ export default function DashboardProfile() {
     }
   };
 
-  // Apply filters and sorting to health data records
+  // Records are already filtered and sorted by API, just return them as-is
   const getFilteredAndSortedRecords = () => {
-    let filtered = [...healthDataRecords];
-
-    // Apply filters
-    if (filters.dateFrom) {
-      filtered = filtered.filter(record => {
-        const recordDate = new Date(record.date);
-        const fromDate = new Date(filters.dateFrom);
-        return recordDate >= fromDate;
-      });
-    }
-    if (filters.dateTo) {
-      filtered = filtered.filter(record => {
-        const recordDate = new Date(record.date);
-        const toDate = new Date(filters.dateTo);
-        toDate.setHours(23, 59, 59, 999); // Include entire day
-        return recordDate <= toDate;
-      });
-    }
-    if (filters.heartRateMin) {
-      const min = parseFloat(filters.heartRateMin);
-      filtered = filtered.filter(record => record.heart_rate && parseFloat(record.heart_rate) >= min);
-    }
-    if (filters.heartRateMax) {
-      const max = parseFloat(filters.heartRateMax);
-      filtered = filtered.filter(record => record.heart_rate && parseFloat(record.heart_rate) <= max);
-    }
-    if (filters.bloodPressureSystolicMin) {
-      const min = parseFloat(filters.bloodPressureSystolicMin);
-      filtered = filtered.filter(record => record.blood_pressure_systolic && parseFloat(record.blood_pressure_systolic) >= min);
-    }
-    if (filters.bloodPressureSystolicMax) {
-      const max = parseFloat(filters.bloodPressureSystolicMax);
-      filtered = filtered.filter(record => record.blood_pressure_systolic && parseFloat(record.blood_pressure_systolic) <= max);
-    }
-    if (filters.bloodPressureDiastolicMin) {
-      const min = parseFloat(filters.bloodPressureDiastolicMin);
-      filtered = filtered.filter(record => record.blood_pressure_diastolic && parseFloat(record.blood_pressure_diastolic) >= min);
-    }
-    if (filters.bloodPressureDiastolicMax) {
-      const max = parseFloat(filters.bloodPressureDiastolicMax);
-      filtered = filtered.filter(record => record.blood_pressure_diastolic && parseFloat(record.blood_pressure_diastolic) <= max);
-    }
-    if (filters.activityMin) {
-      const min = parseFloat(filters.activityMin);
-      filtered = filtered.filter(record => record.weekly_activity_minutes && parseFloat(record.weekly_activity_minutes) >= min);
-    }
-    if (filters.activityMax) {
-      const max = parseFloat(filters.activityMax);
-      filtered = filtered.filter(record => record.weekly_activity_minutes && parseFloat(record.weekly_activity_minutes) <= max);
-    }
-    if (filters.bmiMin) {
-      const min = parseFloat(filters.bmiMin);
-      filtered = filtered.filter(record => record.body_mass_index && parseFloat(record.body_mass_index) >= min);
-    }
-    if (filters.bmiMax) {
-      const max = parseFloat(filters.bmiMax);
-      filtered = filtered.filter(record => record.body_mass_index && parseFloat(record.body_mass_index) <= max);
-    }
-    if (filters.temperatureMin) {
-      const min = parseFloat(filters.temperatureMin);
-      filtered = filtered.filter(record => record.body_temperature && parseFloat(record.body_temperature) >= min);
-    }
-    if (filters.temperatureMax) {
-      const max = parseFloat(filters.temperatureMax);
-      filtered = filtered.filter(record => record.body_temperature && parseFloat(record.body_temperature) <= max);
-    }
-    if (filters.glucoseMin) {
-      const min = parseFloat(filters.glucoseMin);
-      filtered = filtered.filter(record => (record.fasting_glucose || record.blood_glucose) && parseFloat(record.fasting_glucose || record.blood_glucose) >= min);
-    }
-    if (filters.glucoseMax) {
-      const max = parseFloat(filters.glucoseMax);
-      filtered = filtered.filter(record => (record.fasting_glucose || record.blood_glucose) && parseFloat(record.fasting_glucose || record.blood_glucose) <= max);
-    }
-
-    // Apply sorting
-    if (sortColumn) {
-      filtered.sort((a, b) => {
-        let aValue, bValue;
-
-        switch (sortColumn) {
-          case 'date':
-            aValue = new Date(a.date);
-            bValue = new Date(b.date);
-            break;
-          case 'heart_rate':
-            aValue = parseFloat(a.heart_rate) || 0;
-            bValue = parseFloat(b.heart_rate) || 0;
-            break;
-          case 'blood_pressure':
-            // Sort by systolic first, then diastolic
-            const aSystolic = parseFloat(a.blood_pressure_systolic) || 0;
-            const bSystolic = parseFloat(b.blood_pressure_systolic) || 0;
-            if (aSystolic !== bSystolic) {
-              return sortDirection === 'asc' ? aSystolic - bSystolic : bSystolic - aSystolic;
-            }
-            // If systolic values are equal, sort by diastolic
-            const aDiastolic = parseFloat(a.blood_pressure_diastolic) || 0;
-            const bDiastolic = parseFloat(b.blood_pressure_diastolic) || 0;
-            return sortDirection === 'asc' ? aDiastolic - bDiastolic : bDiastolic - aDiastolic;
-          case 'activity':
-            aValue = parseFloat(a.weekly_activity_minutes) || 0;
-            bValue = parseFloat(b.weekly_activity_minutes) || 0;
-            break;
-          case 'bmi':
-            aValue = parseFloat(a.body_mass_index) || 0;
-            bValue = parseFloat(b.body_mass_index) || 0;
-            break;
-          case 'temperature':
-            aValue = parseFloat(a.body_temperature) || 0;
-            bValue = parseFloat(b.body_temperature) || 0;
-            break;
-          case 'glucose':
-            aValue = parseFloat(a.fasting_glucose || a.blood_glucose) || 0;
-            bValue = parseFloat(b.fasting_glucose || b.blood_glucose) || 0;
-            break;
-          default:
-            return 0;
-        }
-
-        if (sortDirection === 'asc') {
-          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-        } else {
-          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
-        }
-      });
-    } else {
-      // Default: sort by date descending (newest first)
-      filtered.sort((a, b) => {
-        const aDate = new Date(a.date);
-        const bDate = new Date(b.date);
-        return bDate - aDate;
-      });
-    }
-
-    return filtered;
+    // API handles all filtering and sorting, so we just return the records
+    return healthDataRecords;
   };
 
   const healthOptions = {
@@ -1969,6 +1983,17 @@ const calculateAgeFromDOB = (dob) => {
       loadDentalHistory();
     }
   }, [activeTab, user?.id]);
+
+  // Reload health data when filters or sorting change (with debounce to avoid too many requests)
+  useEffect(() => {
+    if (activeTab === 'health_data' && user?.id) {
+      const timeoutId = setTimeout(() => {
+        loadHealthData();
+      }, 500); // Debounce 500ms
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [filters, sortColumn, sortDirection]);
 
   // Helper: load dental history from API
   const loadDentalHistory = async () => {
@@ -3220,7 +3245,7 @@ const calculateAgeFromDOB = (dob) => {
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <div className="core-body-metrics-circumference-row">
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input 
                   type="number" 
                   inputMode="numeric"
@@ -3231,21 +3256,71 @@ const calculateAgeFromDOB = (dob) => {
                   step="0.1"
                   min={personalWaistUnit === 'cm' ? "40" : "15.7"}
                   max={personalWaistUnit === 'cm' ? "200" : "78.7"}
+                  style={{ flex: 1 }}
                 />
-                <div className="core-body-metrics-unit-toggle">
+                <div style={{ 
+                  display: 'flex', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                }}>
                   <button
                     type="button"
                     onClick={() => handlePersonalWaistUnitChange('cm')}
-                    className={personalWaistUnit === 'cm' ? 'active' : ''}
                     title="Centimeters"
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: personalWaistUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                      color: personalWaistUnit === 'cm' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      borderRight: '1px solid var(--border)',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (personalWaistUnit !== 'cm') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (personalWaistUnit !== 'cm') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
                   >
                     cm
                   </button>
                   <button
                     type="button"
                     onClick={() => handlePersonalWaistUnitChange('in')}
-                    className={personalWaistUnit === 'in' ? 'active' : ''}
                     title="Inches"
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: personalWaistUnit === 'in' ? 'var(--primary)' : 'transparent',
+                      color: personalWaistUnit === 'in' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (personalWaistUnit !== 'in') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (personalWaistUnit !== 'in') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
                   >
                     in
                   </button>
@@ -3266,42 +3341,90 @@ const calculateAgeFromDOB = (dob) => {
               </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-              <div className="core-body-metrics-circumference-row">
-                <div className="core-body-metrics-measure-group">
-                  <input 
-                    type="number" 
-                    inputMode="numeric"
-                    name="hip_circumference" 
-                    value={formValues.hip_circumference} 
-                    onChange={handleChange} 
-                    placeholder={formValues.hip_circumference ? "" : (hipUnit === 'cm' ? "e.g. 95" : "e.g. 37.4")}
-                    step="0.1"
-                    min={hipUnit === 'cm' ? "40" : "15.7"}
-                    max={hipUnit === 'cm' ? "200" : "78.7"}
-                  />
-                  <div className="core-body-metrics-unit-toggle">
-                    <button
-                      type="button"
-                      onClick={() => handleHipUnitChange('cm')}
-                      className={hipUnit === 'cm' ? 'active' : ''}
-                      title="Centimeters"
-                    >
-                      cm
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleHipUnitChange('in')}
-                      className={hipUnit === 'in' ? 'active' : ''}
-                      title="Inches"
-                    >
-                      in
-                    </button>
-                  </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input 
+                  type="number" 
+                  inputMode="numeric"
+                  name="hip_circumference" 
+                  value={formValues.hip_circumference} 
+                  onChange={handleChange} 
+                  placeholder={formValues.hip_circumference ? "" : (hipUnit === 'cm' ? "e.g. 95" : "e.g. 37.4")}
+                  step="0.1"
+                  min={hipUnit === 'cm' ? "40" : "15.7"}
+                  max={hipUnit === 'cm' ? "200" : "78.7"}
+                  style={{ flex: 1 }}
+                />
+                <div style={{ 
+                  display: 'flex', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => handleHipUnitChange('cm')}
+                    title="Centimeters"
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: hipUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                      color: hipUnit === 'cm' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      borderRight: '1px solid var(--border)',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (hipUnit !== 'cm') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (hipUnit !== 'cm') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    cm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleHipUnitChange('in')}
+                    title="Inches"
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: hipUnit === 'in' ? 'var(--primary)' : 'transparent',
+                      color: hipUnit === 'in' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (hipUnit !== 'in') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (hipUnit !== 'in') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    in
+                  </button>
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                  Range: {hipUnit === 'cm' ? '40-200 cm' : '15.7-78.7 in'}
-                </span>
               </div>
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                Range: {hipUnit === 'cm' ? '40-200 cm' : '15.7-78.7 in'}
+              </span>
             </div>
           </label>
 
@@ -4767,7 +4890,21 @@ const calculateAgeFromDOB = (dob) => {
                   <h3 style={{ marginTop: 0, marginBottom: 0 }}>Health Data Management</h3>
                   <button 
                     className="btn primary" 
-                    onClick={() => setIsHealthDataModalOpen(true)}
+                    onClick={() => {
+                      // Reset form to current datetime when opening for new record
+                      const now = new Date();
+                      const year = now.getFullYear();
+                      const month = String(now.getMonth() + 1).padStart(2, '0');
+                      const day = String(now.getDate()).padStart(2, '0');
+                      const hours = String(now.getHours()).padStart(2, '0');
+                      const minutes = String(now.getMinutes()).padStart(2, '0');
+                      setHealthData(prev => ({
+                        ...prev,
+                        date: `${year}-${month}-${day}T${hours}:${minutes}`
+                      }));
+                      setEditingRecord(null);
+                      setIsHealthDataModalOpen(true);
+                    }}
                     style={{ fontSize: '14px', padding: '8px 16px' }}
                   >
                     Add New Health Data
@@ -4860,6 +4997,17 @@ const calculateAgeFromDOB = (dob) => {
                     if (e.target === e.currentTarget) {
                       setIsHealthDataModalOpen(false);
                       setEditingRecord(null);
+                      // Reset form to current datetime when closing
+                      const now = new Date();
+                      const year = now.getFullYear();
+                      const month = String(now.getMonth() + 1).padStart(2, '0');
+                      const day = String(now.getDate()).padStart(2, '0');
+                      const hours = String(now.getHours()).padStart(2, '0');
+                      const minutes = String(now.getMinutes()).padStart(2, '0');
+                      setHealthData(prev => ({
+                        ...prev,
+                        date: `${year}-${month}-${day}T${hours}:${minutes}`
+                      }));
                     }
                   }}
                 >
@@ -4894,6 +5042,17 @@ const calculateAgeFromDOB = (dob) => {
                         onClick={() => {
                           setIsHealthDataModalOpen(false);
                           setEditingRecord(null);
+                          // Reset form to current datetime when closing
+                          const now = new Date();
+                          const year = now.getFullYear();
+                          const month = String(now.getMonth() + 1).padStart(2, '0');
+                          const day = String(now.getDate()).padStart(2, '0');
+                          const hours = String(now.getHours()).padStart(2, '0');
+                          const minutes = String(now.getMinutes()).padStart(2, '0');
+                          setHealthData(prev => ({
+                            ...prev,
+                            date: `${year}-${month}-${day}T${hours}:${minutes}`
+                          }));
                         }}
                         style={{ padding: '8px 12px' }}
                       >
@@ -4914,13 +5073,21 @@ const calculateAgeFromDOB = (dob) => {
                           
                           {/* Left Column - Grouped by Related Fields */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {/* Date */}
+                    {/* Date & Time */}
                     <label className="form-field">
-                      <span>Date</span>
-                      <DatePicker 
+                      <span>Date & Time</span>
+                      <DateTimePicker 
                         value={healthData.date || ''} 
                         onChange={(val) => handleHealthDataChange('date', val)}
-                        maxDate={new Date().toISOString().split('T')[0]}
+                        maxDate={(() => {
+                          const now = new Date();
+                          const year = now.getFullYear();
+                          const month = String(now.getMonth() + 1).padStart(2, '0');
+                          const day = String(now.getDate()).padStart(2, '0');
+                          const hours = String(now.getHours()).padStart(2, '0');
+                          const minutes = String(now.getMinutes()).padStart(2, '0');
+                          return `${year}-${month}-${day}T${hours}:${minutes}`;
+                        })()}
                       />
                     </label>
 
@@ -5630,22 +5797,35 @@ const calculateAgeFromDOB = (dob) => {
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
                           Date From
                         </label>
-                        <input
-                          type="date"
-                          value={filters.dateFrom}
-                          onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        <DatePicker
+                          value={filters.dateFrom || ''}
+                          onChange={(val) => {
+                            setFilters(prev => {
+                              const updated = { ...prev, dateFrom: val };
+                              // If dateTo exists and is before new dateFrom, clear it
+                              if (updated.dateTo && val && updated.dateTo < val) {
+                                updated.dateTo = '';
+                              }
+                              return updated;
+                            });
+                          }}
+                          maxDate={filters.dateTo || undefined}
+                          placeholder="MM/DD/YYYY"
+                          allowClear={true}
+                          style={{ width: '100%' }}
                         />
-                </div>
+                      </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>
                           Date To
                         </label>
-                        <input
-                          type="date"
-                          value={filters.dateTo}
-                          onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-                          style={{ width: '100%', padding: '6px', fontSize: '14px', borderRadius: '4px', border: '1px solid var(--border)' }}
+                        <DatePicker
+                          value={filters.dateTo || ''}
+                          onChange={(val) => setFilters(prev => ({ ...prev, dateTo: val || '' }))}
+                          minDate={filters.dateFrom || undefined}
+                          placeholder="MM/DD/YYYY"
+                          allowClear={true}
+                          style={{ width: '100%' }}
                         />
                       </div>
                       {/* Heart Rate Range */}

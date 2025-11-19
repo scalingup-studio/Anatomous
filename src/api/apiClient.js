@@ -27,6 +27,7 @@ function onRefreshed(authToken) {
 export const authRequest = async (url, options = {}, retry = true) => {
   const isFormData = options?.body instanceof FormData;
   const config = {
+    mode: 'cors',
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...options.headers,

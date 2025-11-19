@@ -1,7 +1,8 @@
 export const API_BASE = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:5PA_dIPO";
 export const API_BASE_AUTH = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:HBbbpjK5";
-export const API_BASE_SUBSCRIPTION = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:IqZoSRZI:feat_subscription";
-export const API_DOMEN_DEV = "https://xu6p-ejbd-2ew4.n7e.xano.io";
+export const API_BASE_SUBSCRIPTION = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:IqZoSRZI";
+export const API_BASE_PAYMENT = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:c4HYH1BF";
+export const API_DOMEN_DEV = "https://xu6p-ejbd-2ew4.n7e.xano.io/api";
 
 // CRUD helper
 function crud(table) {
@@ -113,13 +114,30 @@ export const CUSTOM_ENDPOINTS = {
     mySubscription: `${API_BASE_SUBSCRIPTION}/my_subscription`,
     userPlan: `${API_BASE_SUBSCRIPTION}/user/plan`,
     checkLimits: `${API_BASE_SUBSCRIPTION}/subscription/check-limits`,
-    updateUsage: `${API_BASE_SUBSCRIPTION}/subscription/update-usage`,
     plans: `${API_BASE_SUBSCRIPTION}/plans`,
-    familyMembers: `${API_BASE_SUBSCRIPTION}/subscription/family_members`,
-    addFamilyMember: `${API_BASE_SUBSCRIPTION}/subscription/add_family_member`,
-    removeFamilyMember: `${API_BASE_SUBSCRIPTION}/subscription/remove_family_member`,
+    // New family members endpoints
+    familyMembers: `${API_BASE_SUBSCRIPTION}/family/members`,
+    familyMemberById: (id) => `${API_BASE_SUBSCRIPTION}/family/members/${id}`,
+    switchFamilyMember: `${API_BASE_SUBSCRIPTION}/switch_family_member`,
+    // Legacy endpoints (for backward compatibility)
+    familyMembersLegacy: `${API_BASE_SUBSCRIPTION}/subscription/family_members`,
+    addFamilyMemberLegacy: `${API_BASE_SUBSCRIPTION}/subscription/add_family_member`,
+    removeFamilyMemberLegacy: `${API_BASE_SUBSCRIPTION}/subscription/remove_family_member`,
+    removeFamilyMember: `${API_BASE_SUBSCRIPTION}/remove_family_member`,
   },
   payments: {
-    upgradeSubscription: `${API_BASE}/payments/upgrade_subscription_post`,
+    upgradeSubscription: `${API_BASE_PAYMENT}/upgrade_subscription_POST`,
+    cancelSubscription: `${API_BASE_PAYMENT}/cancel_subscription_POST`,
+    createCheckoutSession: `${API_BASE_PAYMENT}/create-checkout-session`,
+    checkoutSuccess: `${API_BASE_PAYMENT}/checkout/success`,
+    checkoutCancel: `${API_BASE_PAYMENT}/checkout/cancel`,
+    createPaymentIntent: `${API_BASE_PAYMENT}/create-payment-intent`,
+    paymentStatus: `${API_BASE_PAYMENT}/payment/status`,
+    paymentHistory: `${API_BASE_PAYMENT}/payment_history_GET`,
+    subscriptionStatus: `${API_BASE_PAYMENT}/subscription_status_GET`,
+    updateUsage: `${API_BASE_PAYMENT}/subscription/update-usage`,
+    stripeWebhook: `${API_BASE_PAYMENT}/stripe-webhook`,
+    stripeWebhookMinimal: `${API_BASE_PAYMENT}/stripe_webhook_minimal_POST`,
+    webhookStripe: `${API_BASE_PAYMENT}/webhook/stripe`,
   },
 };

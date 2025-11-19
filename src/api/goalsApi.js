@@ -32,7 +32,22 @@ export const GoalsApi = {
   // POST /goals - create goal (alias)
   createGoal: (data) => authRequest(ENDPOINTS.goals.create, { method: "POST", body: data }),
   // GET goals list
-  listGoals: () => authRequest(CUSTOM_ENDPOINTS.goals.getGoals),
+  listGoals: (params = {}) => {
+    // Only include parameters that have values
+    const queryParams = {};
+    if (params.limit !== undefined && params.limit !== null) {
+      queryParams.limit = params.limit;
+    }
+    if (params.filter && params.filter.trim() !== "") {
+      queryParams.filter = params.filter;
+    }
+    
+    // Build query string - only include non-empty values
+    const q = new URLSearchParams(queryParams).toString();
+    const url = q ? `${CUSTOM_ENDPOINTS.goals.getGoals}?${q}` : CUSTOM_ENDPOINTS.goals.getGoals;
+    
+    return authRequest(url);
+  },
   // PATCH /goals/{goal_id}
   updateGoal: (goal_id, data) => authRequest(ENDPOINTS.goals.update(goal_id), { method: "PATCH", body: data }),
   // DELETE /goals/{goal_id}
@@ -47,9 +62,24 @@ export const GoalsApi = {
   deleteProgress: (goal_progress_id) => authRequest(CUSTOM_ENDPOINTS.goalProgress.remove(goal_progress_id), { method: "DELETE" }),
 
   // Goals History & Readd
-  getHistory: (params) => {
-    const q = new URLSearchParams(params).toString();
-    return authRequest(`${CUSTOM_ENDPOINTS.goals.getHistory}?${q}`);
+  getHistory: (params = {}) => {
+    // Only include parameters that have values
+    const queryParams = {};
+    if (params.start_date && params.start_date.trim() !== "") {
+      queryParams.start_date = params.start_date;
+    }
+    if (params.end_date && params.end_date.trim() !== "") {
+      queryParams.end_date = params.end_date;
+    }
+    if (params.status && params.status.trim() !== "") {
+      queryParams.status = params.status;
+    }
+    
+    // Build query string - only include non-empty values
+    const q = new URLSearchParams(queryParams).toString();
+    const url = q ? `${CUSTOM_ENDPOINTS.goals.getHistory}?${q}` : CUSTOM_ENDPOINTS.goals.getHistory;
+    
+    return authRequest(url);
   },
   readd: (goal_id) => authRequest(CUSTOM_ENDPOINTS.goals.readd, { method: "POST", body: { goal_id } }),
 

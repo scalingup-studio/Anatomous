@@ -2,8 +2,30 @@ import { authRequest } from "./apiClient.js";
 import { CUSTOM_ENDPOINTS } from "./apiConfig.js";
 
 export const NotesApi = {
-  async list() {
-    const res = await authRequest(CUSTOM_ENDPOINTS.notes.list, {
+  /**
+   * Get list of notes with optional filter parameters
+   * @param {Object} filterParams - Optional filter parameters
+   * @param {string} filterParams.start_date - Start date filter (YYYY-MM-DD)
+   * @param {string} filterParams.end_date - End date filter (YYYY-MM-DD)
+   * @param {string} filterParams.mood_tag - Filter by mood tag
+   * @param {string} filterParams.search - Keyword search for note text and mood tags
+   */
+  async list(filterParams = {}) {
+    // Build query string from filter parameters
+    const queryParams = new URLSearchParams();
+    
+    // Add filter parameters (only non-empty values)
+    if (filterParams.start_date) queryParams.append('start_date', filterParams.start_date);
+    if (filterParams.end_date) queryParams.append('end_date', filterParams.end_date);
+    if (filterParams.mood_tag) queryParams.append('mood_tag', filterParams.mood_tag);
+    if (filterParams.search) queryParams.append('search', filterParams.search);
+    
+    const queryString = queryParams.toString();
+    const url = queryString 
+      ? `${CUSTOM_ENDPOINTS.notes.list}?${queryString}`
+      : CUSTOM_ENDPOINTS.notes.list;
+    
+    const res = await authRequest(url, {
       method: "GET",
     });
     // expect { success: true, sorted_list: [...] }
