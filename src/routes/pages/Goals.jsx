@@ -395,7 +395,7 @@ function HistoryTab() {
   const [items, setItems] = React.useState([]);
   const [filters, setFilters] = React.useState({ 
     status: "all", // "all", "completed", "archived"
-    category: "", 
+    type: "", 
     start_date: "", 
     end_date: "" 
   });
@@ -407,15 +407,10 @@ function HistoryTab() {
       // Build params - only include parameters that have values
       const params = {};
       
-      // Map UI status values to API status values
-      // API expects: "complete" or "archived"
-      // UI uses: "completed" or "archived"
-      if (filters.status !== "all") {
-        const mapStatusToApi = (status) => {
-          if (status === "completed") return "complete";
-          return status; // "archived" stays the same
-        };
-        params.status = mapStatusToApi(filters.status);
+      // Status передається тільки якщо обраний (не "all")
+      // API accepts: "completed" or "archived"
+      if (filters.status && filters.status !== "all") {
+        params.status = filters.status; // "completed" or "archived" - передаємо напряму
       }
       
       if (filters.start_date && filters.start_date.trim() !== "") {
@@ -429,20 +424,20 @@ function HistoryTab() {
       const res = await GoalsApi.getHistory(params);
       let allItems = res?.result || res || [];
       
-      // Map status for items (API returns "complete", but we display as "completed")
+      // Normalize status values for display (handle case variations)
       allItems = allItems.map(g => {
         const status = String(g.status || "").toLowerCase();
-        // Map "complete" back to "completed" for UI consistency
-        const uiStatus = status === "complete" ? "completed" : status;
-        return { ...g, _status: uiStatus || g._status };
+        // API returns "completed" or "archived", normalize for UI consistency
+        const normalizedStatus = status === "complete" ? "completed" : status;
+        return { ...g, _status: normalizedStatus || g.status };
       });
       
-      // Apply category filter if set
-      if (filters.category) {
+      // Apply type filter if set
+      if (filters.type) {
         allItems = allItems.filter(g => {
           const goalType = String(g.type || "").toLowerCase();
-          const filterCategory = String(filters.category).toLowerCase();
-          return goalType === filterCategory;
+          const filterType = String(filters.type).toLowerCase();
+          return goalType === filterType;
         });
       }
       
@@ -464,14 +459,13 @@ function HistoryTab() {
     } catch (e) { addNotification(e.message, "error"); }
   };
 
-  // Get unique categories from all goals
-  const categories = React.useMemo(() => {
-    const cats = new Set();
-    items.forEach(g => {
-      if (g.type) cats.add(g.type);
-    });
-    return Array.from(cats).sort();
-  }, [items]);
+  // Use the same Type options as Active Goals
+  const typeOptions = [
+    "Fitness",
+    "Nutrition",
+    "Habit / Routine",
+    "Wellness / General Health"
+  ];
 
 
   const formatDate = (v) => {
@@ -547,18 +541,18 @@ function HistoryTab() {
             </button>
           </div>
 
-          {/* Category and Date Filters */}
+          {/* Type and Date Filters */}
           <div className="form-row" style={{ flexWrap: "wrap", gap: 12 }}>
             <div className="form-field" style={{ minWidth: 180, flex: 1 }}>
-              <label>Category</label>
+              <label>Type</label>
               <select 
-                value={filters.category} 
-                onChange={(e) => setFilters(v => ({ ...v, category: e.target.value }))}
+                value={filters.type} 
+                onChange={(e) => setFilters(v => ({ ...v, type: e.target.value }))}
                 style={{ width: "100%" }}
               >
-                <option value="">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                <option value="">Select Type</option>
+                {typeOptions.map(type => (
+                  <option key={type} value={type}>{type}</option>
                 ))}
               </select>
             </div>
