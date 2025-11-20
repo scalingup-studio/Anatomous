@@ -420,11 +420,17 @@ function HistoryTab() {
         params.end_date = filters.end_date;
       }
       
-      // Make single API call (without status if "all" is selected)
+      // Type передається в API як query параметр
+      if (filters.type && filters.type.trim() !== "") {
+        params.type = filters.type;
+      }
+      
+      // Make single API call with all filters
       const res = await GoalsApi.getHistory(params);
       let allItems = res?.result || res || [];
       
       // Normalize status values for display (handle case variations)
+      // Keep the order from API - don't sort
       allItems = allItems.map(g => {
         const status = String(g.status || "").toLowerCase();
         // API returns "completed" or "archived", normalize for UI consistency
@@ -432,15 +438,7 @@ function HistoryTab() {
         return { ...g, _status: normalizedStatus || g.status };
       });
       
-      // Apply type filter if set
-      if (filters.type) {
-        allItems = allItems.filter(g => {
-          const goalType = String(g.type || "").toLowerCase();
-          const filterType = String(filters.type).toLowerCase();
-          return goalType === filterType;
-        });
-      }
-      
+      // Display items in the order returned by API (no sorting)
       setItems(allItems);
     } catch (e) { 
       addNotification(e.message, "error"); 

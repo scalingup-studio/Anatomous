@@ -62,7 +62,9 @@ export default function NotesPage() {
       // Clear mood field
       setMoodInput('');
     } catch (e) {
-      showNotification(e.message || "Failed to add note", "error");
+      // Show error notification with message from API
+      const errorMessage = e.message || "Failed to add note";
+      showNotification(errorMessage, "error");
     }
   }, [note, setNote, setMood, showNotification, load]);
 

@@ -28,9 +28,25 @@ export const NotesApi = {
     const res = await authRequest(url, {
       method: "GET",
     });
-    // expect { success: true, sorted_list: [...] }
-    if (Array.isArray(res)) return res;
-    return res?.sorted_list || [];
+    console.log('📝 NotesApi.list response:', res);
+    
+    // Handle different response formats
+    // API might return: array, { result: [...] }, { sorted_list: [...] }, or { data: [...] }
+    if (Array.isArray(res)) {
+      return res;
+    }
+    if (res?.result && Array.isArray(res.result)) {
+      return res.result;
+    }
+    if (res?.sorted_list && Array.isArray(res.sorted_list)) {
+      return res.sorted_list;
+    }
+    if (res?.data && Array.isArray(res.data)) {
+      return res.data;
+    }
+    // Fallback: return empty array if no valid format found
+    console.warn('⚠️ NotesApi.list: Unexpected response format:', res);
+    return [];
   },
 
   async create({ text, mood_tag, date }) {
@@ -40,6 +56,18 @@ export const NotesApi = {
       body: JSON.stringify(payload),
       headers: { "Content-Type": "application/json" },
     });
+    
+    // Check if response contains error in payload
+    // API might return: { payload: { success: false, error: "...", message: "..." }, statement: "Throw Error" }
+    if (res?.payload) {
+      const payloadData = res.payload;
+      if (payloadData.success === false) {
+        // Extract error message from payload
+        const errorMessage = payloadData.message || payloadData.error || "Failed to create note";
+        throw new Error(errorMessage);
+      }
+    }
+    
     return res;
   },
 

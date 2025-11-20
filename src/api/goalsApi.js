@@ -74,6 +74,9 @@ export const GoalsApi = {
     if (params.status && params.status.trim() !== "") {
       queryParams.status = params.status;
     }
+    if (params.type && params.type.trim() !== "") {
+      queryParams.type = params.type;
+    }
     
     // Build query string - only include non-empty values
     const q = new URLSearchParams(queryParams).toString();

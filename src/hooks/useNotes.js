@@ -24,9 +24,15 @@ export function useNotes() {
         Object.entries(filters).filter(([_, v]) => v !== undefined && v !== null && String(v).trim() !== "")
       );
       const list = await NotesApi.list(cleaned);
-      setItems(list || []);
+      console.log('📝 useNotes.load - received items:', list);
+      // Ensure we always set an array
+      const itemsArray = Array.isArray(list) ? list : [];
+      setItems(itemsArray);
+      console.log('📝 useNotes.load - set items:', itemsArray.length, 'items');
     } catch (e) {
+      console.error('❌ useNotes.load error:', e);
       addNotification(e.message || "Failed to load notes", "error");
+      setItems([]); // Set empty array on error
     } finally { setLoading(false); }
   }, [filters, addNotification]);
 
@@ -41,7 +47,13 @@ export function useNotes() {
       setMood("");
       addNotification("Note added", "success");
       load();
-    } catch (e) { addNotification(e.message, "error"); } finally { setLoading(false); }
+    } catch (e) {
+      // Show error notification with message from API
+      const errorMessage = e.message || "Failed to create note";
+      addNotification(errorMessage, "error");
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const openNote = (n) => {
