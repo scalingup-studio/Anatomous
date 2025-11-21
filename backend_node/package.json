@@ -6,17 +6,26 @@
         "dev": "nodemon server.js"
     },
     "dependencies": {
-        "body-parser": "^1.20.2",
+        "body-parser": "^1.20.3",
+        "compromise": "^14.14.4",
         "cors": "^2.8.5",
         "ejs": "^3.1.10",
-        "express": "^4.18.2",
+        "express": "^4.21.2",
         "html-pdf": "^3.0.1",
         "multer": "^2.0.2",
+        "natural": "^8.1.0",
         "node-nlp": "^5.0.0-alpha.5",
         "pdf-lib": "^1.17.1",
-        "pdf-parse": "^2.4.5",
+        "pdf-parse": "^1.1.4",
+        "pdf-poppler": "^0.2.3",
+        "pdfjs-dist": "^5.4.394",
         "pdfkit": "^0.14.0",
-        "puppeteer": "^21.0.0"
+        "puppeteer": "^21.0.0",
+        "sharp": "^0.34.5",
+        "tesseract.js": "^6.0.1",
+        "tiktoken": "^1.0.22",
+        "wink-eng-lite-web-model": "^1.8.1",
+        "wink-nlp": "^2.4.0"
     },
     "devDependencies": {
         "nodemon": "^3.0.0"
