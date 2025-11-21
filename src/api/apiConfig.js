@@ -30,6 +30,7 @@ export const ENDPOINTS = {
   sensitivities: crud("sensitivities"),
   familyHistory: crud("family_history"),
   dentalHistory: crud("dental_history"),
+  coreBodyMetrics: crud("core_body_metrics"),
 };
 
 export const CUSTOM_ENDPOINTS = {

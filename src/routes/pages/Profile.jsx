@@ -13,6 +13,7 @@ import { HealthApi } from "../../api/healthApi.js";
 import { ENDPOINTS, CUSTOM_ENDPOINTS } from "../../api/apiConfig.js";
 import { HealthHistoryApi, HealthHistoryConsolidated } from "../../api/healthHistoryApi.js";
 import { OnboardingApi } from "../../api/onboardingApi.js";
+import { CoreBodyMetricsApi } from "../../api/coreBodyMetricsApi.js";
 import HealthHistoryCard from "../../components/HealthHistoryCard-TEST.jsx";
 import { ConfirmDeleteModal } from "../../components/ConfirmDeleteModal.jsx";
 
@@ -23,9 +24,11 @@ export default function DashboardProfile() {
   const { user, setUser } = useAuth();
   const { showSuccess, showError, showInfo } = useNotifications();
   const [profile, setProfile] = useState(null);
+  const [coreBodyMetrics, setCoreBodyMetrics] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingCoreBodyMetrics, setSavingCoreBodyMetrics] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState("");
   const [pendingPhotoFile, setPendingPhotoFile] = useState(null);
@@ -46,6 +49,7 @@ export default function DashboardProfile() {
     waist_circumference: "",
     hip_circumference: "",
   });
+  const [initialFormValues, setInitialFormValues] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (() => {
     const t = String(searchParams.get('tab') || '').toLowerCase();
@@ -1681,9 +1685,9 @@ const calculateAgeFromDOB = (dob) => {
         try {
           // First try to get profile by user_id
           profileData = await ProfilesApi.getById(user.id);
-          console.log('✅ Profile found by ID:', profileData);
+          console.log('✅ Profile found by user_id:', profileData);
         } catch (idError) {
-          console.log('⚠️ Profile not found by ID, trying to get all profiles:', idError.message);
+          console.log('⚠️ Profile not found by user_id, trying to get all profiles:', idError.message);
           // If not found by ID, try to get all profiles and filter by user_id
           const allProfilesResponse = await ProfilesApi.getAll();
           console.log('📋 All profiles response:', allProfilesResponse);
@@ -1693,12 +1697,53 @@ const calculateAgeFromDOB = (dob) => {
           console.log('📋 All profiles array:', allProfiles);
           
           if (Array.isArray(allProfiles)) {
-            profileData = allProfiles.find(p => p.user_id === user.id || p.id === user.id);
+            profileData = allProfiles.find(p => 
+              p.user_id === user.id || 
+              p.id === user.id ||
+              p.profiles_id === user.id ||
+              (p.user_id && String(p.user_id) === String(user.id)) ||
+              (p.id && String(p.id) === String(user.id))
+            );
             console.log('🔍 Found profile in list:', profileData);
-          } else if (allProfiles && (allProfiles.user_id === user.id || allProfiles.id === user.id)) {
+          } else if (allProfiles && (
+            allProfiles.user_id === user.id || 
+            allProfiles.id === user.id ||
+            allProfiles.profiles_id === user.id ||
+            (allProfiles.user_id && String(allProfiles.user_id) === String(user.id)) ||
+            (allProfiles.id && String(allProfiles.id) === String(user.id))
+          )) {
             profileData = allProfiles;
             console.log('🔍 Single profile found:', profileData);
           }
+        }
+        
+        // Log full profile data for debugging
+        if (profileData) {
+          console.log('📋 Full Profile API Response:', JSON.stringify(profileData, null, 2));
+          console.log('📋 Profile Fields Breakdown:', {
+            id: profileData?.id,
+            profiles_id: profileData?.profiles_id,
+            user_id: profileData?.user_id,
+            first_name: profileData?.first_name,
+            last_name: profileData?.last_name,
+            phone_number: profileData?.phone_number,
+            dob: profileData?.dob,
+            gender: profileData?.gender,
+            sex_of_birth: profileData?.sex_of_birth,
+            height_cm: profileData?.height_cm,
+            height_type: profileData?.height_type,
+            weight_kg: profileData?.weight_kg,
+            weight_type: profileData?.weight_type,
+            zip_code: profileData?.zip_code,
+            body_fat_percentage: profileData?.body_fat_percentage,
+            body_fat_method: profileData?.body_fat_method,
+            waist_circumference: profileData?.waist_circumference,
+            waist_circumference_unit: profileData?.waist_circumference_unit,
+            hip_circumference: profileData?.hip_circumference,
+            hip_circumference_unit: profileData?.hip_circumference_unit,
+          });
+        } else {
+          console.warn('⚠️ No profile data found for user:', user.id);
         }
         
         setProfile(profileData);
@@ -1711,11 +1756,63 @@ const calculateAgeFromDOB = (dob) => {
         );
         if (preview) setPhotoPreview(preview);
         
-        // Use profile data if available, otherwise fallback to user data
-        const dataToUse = profileData || user;
+        // Load core_body_metrics for user
+        let coreBodyMetricsData = null;
+        try {
+          const coreBodyMetricsResponse = await CoreBodyMetricsApi.getAll();
+          const coreBodyMetricsList = Array.isArray(coreBodyMetricsResponse) 
+            ? coreBodyMetricsResponse 
+            : (coreBodyMetricsResponse?.result || []);
+          
+          // Get the most recent record for this user (if multiple exist)
+          if (coreBodyMetricsList.length > 0) {
+            // Filter by user_id if available, otherwise take first
+            const userMetrics = coreBodyMetricsList.find(m => m.user_id === user.id) || coreBodyMetricsList[0];
+            coreBodyMetricsData = userMetrics;
+            setCoreBodyMetrics(coreBodyMetricsData);
+            console.log('✅ Core body metrics found:', coreBodyMetricsData);
+          } else {
+            console.log('ℹ️ No core body metrics records found');
+            setCoreBodyMetrics(null);
+          }
+        } catch (coreMetricsError) {
+          console.warn('⚠️ Failed to load core body metrics:', coreMetricsError.message);
+          setCoreBodyMetrics(null);
+        }
+        
+        // Use profile data for main fields, core_body_metrics only for specific fields
+        // Merge profile and core_body_metrics data, with profile taking precedence for main fields
+        const dataToUse = profileData 
+          ? { 
+              ...profileData, 
+              // Override with core_body_metrics data only for specific fields
+              ...(coreBodyMetricsData && {
+                body_fat: coreBodyMetricsData.body_fat,
+                body_fat_percentage: coreBodyMetricsData.body_fat_percentage,
+                body_fat_method: coreBodyMetricsData.body_fat_method,
+                body_fat_unit: coreBodyMetricsData.body_fat_unit,
+                waist_circumference: coreBodyMetricsData.waist_circumference,
+                waist_circumference_unit: coreBodyMetricsData.waist_circumference_unit,
+                hip_circumference: coreBodyMetricsData.hip_circumference,
+                hip_circumference_unit: coreBodyMetricsData.hip_circumference_unit,
+              })
+            }
+          : (coreBodyMetricsData || user);
+        
         console.log('📊 Data to use for form:', dataToUse);
-        console.log('📊 Profile data:', profileData);
-        console.log('📊 User data:', user);
+        console.log('📊 Profile data (source):', profileData);
+        console.log('📊 Core body metrics data (source):', coreBodyMetricsData);
+        console.log('📊 User data (fallback):', user);
+        console.log('📊 Merged dataToUse:', {
+          hasProfile: !!profileData,
+          hasCoreBodyMetrics: !!coreBodyMetricsData,
+          first_name: dataToUse?.first_name,
+          last_name: dataToUse?.last_name,
+          phone_number: dataToUse?.phone_number,
+          dob: dataToUse?.dob,
+          height_cm: dataToUse?.height_cm,
+          weight_kg: dataToUse?.weight_kg,
+        });
         
         // Try to get unit types from profile data first
         let apiHeightType = dataToUse?.height_type 
@@ -1798,20 +1895,14 @@ const calculateAgeFromDOB = (dob) => {
         setPersonalWaistUnit(validWaistUnit);
         setHipUnit(validHipUnit);
         
-        // Get waist and hip values (stored in cm in API, convert back if needed)
+        // Get waist and hip values (stored as-is in API, no conversion needed)
+        // Values are already in the correct units as specified by waist_circumference_unit/hip_circumference_unit
         let waistStored = (dataToUse?.waist_circumference ?? "") === 0 ? "" : (dataToUse?.waist_circumference ?? "");
         let hipStored = (dataToUse?.hip_circumference ?? "") === 0 ? "" : (dataToUse?.hip_circumference ?? "");
         
-        // Convert from cm to display unit if needed
+        // No conversion needed - values are already in the correct units
         let waistForDisplay = waistStored;
         let hipForDisplay = hipStored;
-        
-        if (waistStored && validWaistUnit === 'in') {
-          waistForDisplay = cmToIn(parseFloat(waistStored));
-        }
-        if (hipStored && validHipUnit === 'in') {
-          hipForDisplay = cmToIn(parseFloat(hipStored));
-        }
         
         const formData = {
           first_name: dataToUse?.first_name || dataToUse?.firstName || "",
@@ -1824,13 +1915,81 @@ const calculateAgeFromDOB = (dob) => {
           weight_kg: weightForDisplay === "" ? "" : weightForDisplay.toString(),
           zip_code: dataToUse?.zip_code ?? "",
           user_id: dataToUse?.user_id || user?.id || "",
-          body_fat_percentage: dataToUse?.body_fat_percentage ?? "",
-          body_fat_method: dataToUse?.body_fat_method || "",
-          waist_circumference: waistForDisplay === "" ? "" : waistForDisplay.toString(),
-          hip_circumference: hipForDisplay === "" ? "" : hipForDisplay.toString(),
+          body_fat_percentage: (() => {
+            const value = dataToUse?.body_fat ?? dataToUse?.body_fat_percentage ?? "";
+            if (value === 0 || value === null || value === "") return "";
+            // Round to integer for Core Body Metrics
+            return Math.round(parseFloat(value)).toString();
+          })(),
+          body_fat_method: dataToUse?.body_fat_unit || dataToUse?.body_fat_method || "",
+          waist_circumference: waistForDisplay === "" ? "" : (() => {
+            // Round to integer for Core Body Metrics
+            const num = parseFloat(waistForDisplay);
+            return isNaN(num) ? "" : Math.round(num).toString();
+          })(),
+          hip_circumference: hipForDisplay === "" ? "" : (() => {
+            // Round to integer for Core Body Metrics
+            const num = parseFloat(hipForDisplay);
+            return isNaN(num) ? "" : Math.round(num).toString();
+          })(),
         };
         
         console.log('📊 Form data to set:', formData);
+        console.log('📊 Form data mapping from API:', {
+          'first_name': {
+            from: 'dataToUse?.first_name || dataToUse?.firstName',
+            value: dataToUse?.first_name || dataToUse?.firstName,
+            result: formData.first_name
+          },
+          'last_name': {
+            from: 'dataToUse?.last_name || dataToUse?.lastName',
+            value: dataToUse?.last_name || dataToUse?.lastName,
+            result: formData.last_name
+          },
+          'phone_number': {
+            from: 'dataToUse?.phone_number || dataToUse?.phone',
+            value: dataToUse?.phone_number || dataToUse?.phone,
+            result: formData.phone_number
+          },
+          'dob': {
+            from: 'dataToUse?.dob || dataToUse?.date_of_birth',
+            value: dataToUse?.dob || dataToUse?.date_of_birth,
+            result: formData.dob
+          },
+          'height_cm': {
+            from: 'dataToUse?.height_cm',
+            stored: heightStored,
+            unit: validHeightUnit,
+            display: heightForDisplay,
+            result: formData.height_cm
+          },
+          'weight_kg': {
+            from: 'dataToUse?.weight_kg',
+            stored: weightStored,
+            unit: validWeightUnit,
+            display: weightForDisplay,
+            result: formData.weight_kg
+          },
+          'body_fat_percentage': {
+            from: 'dataToUse?.body_fat ?? dataToUse?.body_fat_percentage',
+            value: dataToUse?.body_fat ?? dataToUse?.body_fat_percentage,
+            result: formData.body_fat_percentage
+          },
+          'waist_circumference': {
+            from: 'dataToUse?.waist_circumference',
+            stored: waistStored,
+            unit: validWaistUnit,
+            display: waistForDisplay,
+            result: formData.waist_circumference
+          },
+          'hip_circumference': {
+            from: 'dataToUse?.hip_circumference',
+            stored: hipStored,
+            unit: validHipUnit,
+            display: hipForDisplay,
+            result: formData.hip_circumference
+          }
+        });
         console.log('📊 Conversion details:', {
           heightStored,
           heightForDisplay,
@@ -1839,11 +1998,20 @@ const calculateAgeFromDOB = (dob) => {
           weightForDisplay,
           weightUnit: validWeightUnit
         });
+        console.log('📝 Setting form values:', formData);
         setFormValues(formData);
+        // Save initial form values for cancel functionality
+        setInitialFormValues({
+          ...formData,
+          heightUnit: validHeightUnit,
+          weightUnit: validWeightUnit,
+        });
         setError(null);
         
         if (!profileData) {
           console.log('ℹ️ No profile found, using user data as fallback');
+        } else {
+          console.log('✅ Profile data loaded and form values set successfully');
         }
       } catch (err) {
         console.warn('❌ Failed to fetch profile from API, using user data:', err.message);
@@ -1927,19 +2095,14 @@ const calculateAgeFromDOB = (dob) => {
         setPersonalWaistUnit(fallbackValidWaistUnit);
         setHipUnit(fallbackValidHipUnit);
         
-        // Get waist and hip values (stored in cm in API, convert back if needed)
+        // Get waist and hip values (stored as-is in API, no conversion needed)
+        // Values are already in the correct units as specified by waist_circumference_unit/hip_circumference_unit
         let fallbackWaist = (profileData?.waist_circumference ?? "") === 0 ? "" : (profileData?.waist_circumference ?? "");
         let fallbackHip = (profileData?.hip_circumference ?? "") === 0 ? "" : (profileData?.hip_circumference ?? "");
         
-        // Convert from cm to display unit if needed
-        if (fallbackWaist && fallbackValidWaistUnit === 'in') {
-          fallbackWaist = cmToIn(parseFloat(fallbackWaist));
-        }
-        if (fallbackHip && fallbackValidHipUnit === 'in') {
-          fallbackHip = cmToIn(parseFloat(fallbackHip));
-        }
+        // No conversion needed - values are already in the correct units
         
-        setFormValues({
+        const fallbackFormData = {
           first_name: profileData?.first_name || profileData?.firstName || "",
           last_name: profileData?.last_name || profileData?.lastName || "",
           phone_number: profileData?.phone_number || profileData?.phone || "",
@@ -1950,10 +2113,30 @@ const calculateAgeFromDOB = (dob) => {
           weight_kg: fallbackWeight === "" ? "" : fallbackWeight.toString(),
           zip_code: profileData?.zip_code ?? "",
           user_id: profileData?.user_id || user?.id || "",
-          body_fat_percentage: profileData?.body_fat_percentage ?? "",
-          body_fat_method: profileData?.body_fat_method || "",
-          waist_circumference: fallbackWaist === "" ? "" : fallbackWaist.toString(),
-          hip_circumference: fallbackHip === "" ? "" : fallbackHip.toString(),
+          body_fat_percentage: (() => {
+            const value = profileData?.body_fat ?? profileData?.body_fat_percentage ?? "";
+            if (value === 0 || value === null || value === "") return "";
+            // Round to integer for Core Body Metrics
+            return Math.round(parseFloat(value)).toString();
+          })(),
+          body_fat_method: profileData?.body_fat_unit || profileData?.body_fat_method || "",
+          waist_circumference: fallbackWaist === "" ? "" : (() => {
+            // Round to integer for Core Body Metrics
+            const num = parseFloat(fallbackWaist);
+            return isNaN(num) ? "" : Math.round(num).toString();
+          })(),
+          hip_circumference: fallbackHip === "" ? "" : (() => {
+            // Round to integer for Core Body Metrics
+            const num = parseFloat(fallbackHip);
+            return isNaN(num) ? "" : Math.round(num).toString();
+          })(),
+        };
+        setFormValues(fallbackFormData);
+        // Save initial form values for cancel functionality
+        setInitialFormValues({
+          ...fallbackFormData,
+          heightUnit: fallbackHeightUnit,
+          weightUnit: fallbackWeightUnit,
         });
         console.log('📊 Fallback form data set:', {
           first_name: profileData?.first_name || profileData?.firstName || "",
@@ -2064,7 +2247,87 @@ const calculateAgeFromDOB = (dob) => {
 
   function handleChange(e) {
     const { name, value } = e.target;
-    setFormValues(prev => ({ ...prev, [name]: value }));
+    // For Core Body Metrics fields, round to integers
+    if (name === 'body_fat_percentage' || name === 'waist_circumference' || name === 'hip_circumference') {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && value !== '') {
+        setFormValues(prev => ({ ...prev, [name]: Math.round(numValue).toString() }));
+      } else {
+        setFormValues(prev => ({ ...prev, [name]: value }));
+      }
+    } else {
+      setFormValues(prev => ({ ...prev, [name]: value }));
+    }
+  }
+
+  // Save only Core Body Metrics (separate from profile)
+  async function handleSaveCoreBodyMetrics(e) {
+    e?.preventDefault?.();
+    if (!user?.id) return;
+    try {
+      setSavingCoreBodyMetrics(true);
+      setError(null);
+      
+      // Do NOT convert waist and hip circumference - send values as-is in the units specified
+      // If user entered in inches, send inches; if in cm, send cm
+      // Round to integers since inputs only accept whole numbers
+      const waistToSave = formValues.waist_circumference === "" ? null : Math.round(parseFloat(formValues.waist_circumference));
+      const hipToSave = formValues.hip_circumference === "" ? null : Math.round(parseFloat(formValues.hip_circumference));
+      
+      // Prepare core_body_metrics payload
+      // Round to integers since inputs only accept whole numbers
+      const bodyFatValue = formValues.body_fat_percentage === "" ? null : Math.round(parseFloat(formValues.body_fat_percentage));
+      const coreBodyMetricsPayload = {
+        user_id: user.id,
+        body_fat: bodyFatValue, // Value from Body Fat Percentage input
+        body_fat_percentage: bodyFatValue,
+        body_fat_method: formValues.body_fat_method || null,
+        body_fat_unit: formValues.body_fat_method || null, // Use method value as unit
+        waist_circumference: waistToSave,
+        waist_circumference_unit: personalWaistUnit || null,
+        hip_circumference: hipToSave,
+        hip_circumference_unit: hipUnit || null,
+      };
+      
+      console.log('💾 Saving core body metrics:', coreBodyMetricsPayload);
+      
+      // Save core_body_metrics
+      let updatedCoreBodyMetrics = null;
+      if (coreBodyMetrics && coreBodyMetrics.id) {
+        // Update existing core_body_metrics record
+        console.log('🔄 UPDATING existing core body metrics:');
+        console.log('📍 Endpoint:', `PATCH ${ENDPOINTS.coreBodyMetrics.update(coreBodyMetrics.id)}`);
+        console.log('📦 PATCH Request Body (JSON):', JSON.stringify(coreBodyMetricsPayload, null, 2));
+        console.log('📦 PATCH Request Body (object):', coreBodyMetricsPayload);
+        console.log('📦 PATCH Request Body (pretty):', {
+          method: 'PATCH',
+          url: ENDPOINTS.coreBodyMetrics.update(coreBodyMetrics.id),
+          body: coreBodyMetricsPayload
+        });
+        
+        updatedCoreBodyMetrics = await CoreBodyMetricsApi.update(coreBodyMetrics.id, coreBodyMetricsPayload);
+        console.log('✅ Core body metrics updated successfully:', updatedCoreBodyMetrics);
+        setCoreBodyMetrics(updatedCoreBodyMetrics);
+      } else {
+        // Create new core_body_metrics record
+        console.log('🆕 CREATING new core body metrics:');
+        console.log('📍 Endpoint:', `POST ${ENDPOINTS.coreBodyMetrics.create}`);
+        console.log('📦 Request Body:', JSON.stringify(coreBodyMetricsPayload, null, 2));
+        
+        updatedCoreBodyMetrics = await CoreBodyMetricsApi.create(coreBodyMetricsPayload);
+        console.log('✅ Core body metrics created successfully:', updatedCoreBodyMetrics);
+        setCoreBodyMetrics(updatedCoreBodyMetrics);
+      }
+      
+      showSuccess("Core body metrics saved successfully!");
+    } catch (coreMetricsError) {
+      console.error('❌ Failed to save core body metrics:', coreMetricsError);
+      const errorMsg = coreMetricsError?.message || 'Unknown error';
+      setError(`Failed to save core body metrics: ${errorMsg}`);
+      showError(`Failed to save core body metrics: ${errorMsg}`);
+    } finally {
+      setSavingCoreBodyMetrics(false);
+    }
   }
 
   async function handleSave(e) {
@@ -2128,19 +2391,7 @@ const calculateAgeFromDOB = (dob) => {
       const heightToSave = formValues.height_cm === "" ? 0 : Number(formValues.height_cm);
       const weightToSave = formValues.weight_kg === "" ? 0 : Number(formValues.weight_kg);
       
-      // Convert waist and hip circumference to cm for API (similar to height/weight pattern)
-      // Store the unit type so we can convert back when loading
-      let waistToSave = formValues.waist_circumference === "" ? 0 : Number(formValues.waist_circumference);
-      if (waistToSave > 0 && personalWaistUnit === 'in') {
-        waistToSave = inToCm(waistToSave);
-      }
-      
-      let hipToSave = formValues.hip_circumference === "" ? 0 : Number(formValues.hip_circumference);
-      if (hipToSave > 0 && hipUnit === 'in') {
-        hipToSave = inToCm(hipToSave);
-      }
-      
-      // Prepare profile data payload (excluding photo - photo is handled separately)
+      // Prepare profile data payload (excluding core_body_metrics fields and photo)
       const basePayload = {
         first_name: formValues.first_name?.trim(),
         last_name: formValues.last_name?.trim(),
@@ -2153,12 +2404,7 @@ const calculateAgeFromDOB = (dob) => {
         weight_kg: weightToSave,
         weight_type: weightUnit || "",
         zip_code: formValues.zip_code?.trim() || "",
-        body_fat_percentage: formValues.body_fat_percentage === "" ? null : Number(formValues.body_fat_percentage),
-        body_fat_method: formValues.body_fat_method || "",
-        waist_circumference: waistToSave === 0 ? null : waistToSave,
-        waist_circumference_unit: personalWaistUnit || "",
-        hip_circumference: hipToSave === 0 ? null : hipToSave,
-        hip_circumference_unit: hipUnit || "",
+        // Note: core_body_metrics fields (body_fat_percentage, body_fat_method, waist_circumference, hip_circumference) are now saved separately
         // Note: profile_photo is handled separately via photo upload API
       };
 
@@ -2177,6 +2423,7 @@ const calculateAgeFromDOB = (dob) => {
         existingPhoto: profile?.profile_photo ? 'Preserved in UI' : 'No existing photo'
       });
       
+      // Save profile (without core_body_metrics fields)
       let updated;
       if (profile && profile.id) {
         // Update existing profile using user_id
@@ -2199,6 +2446,12 @@ const calculateAgeFromDOB = (dob) => {
       }
       
       setProfile(updated);
+      // Update initial form values after successful save
+      setInitialFormValues({
+        ...formValues,
+        heightUnit: heightUnit,
+        weightUnit: weightUnit,
+      });
       // Immediately reflect avatar URL from server in the UI after save
       try {
         const newPreview = (
@@ -3193,7 +3446,7 @@ const calculateAgeFromDOB = (dob) => {
             color: #fff;
           }
         `}</style>
-        <form onSubmit={handleSave} className="form core-body-metrics-form">
+        <form onSubmit={handleSaveCoreBodyMetrics} className="form core-body-metrics-form">
           {/* Body Fat % */}
           <label className="form-field core-body-metrics-field" style={{ display: "flex", flexDirection: "column", gap: 8, width: '100%' }}>
             <div>
@@ -3208,8 +3461,8 @@ const calculateAgeFromDOB = (dob) => {
                   name="body_fat_percentage" 
                   value={formValues.body_fat_percentage} 
                   onChange={handleChange} 
-                  placeholder={formValues.body_fat_percentage ? "" : "e.g. 15.5"}
-                  step="0.1"
+                  placeholder={formValues.body_fat_percentage ? "" : "e.g. 15"}
+                  step="1"
                   min="0"
                   max="100"
                 />
@@ -3252,10 +3505,10 @@ const calculateAgeFromDOB = (dob) => {
                   name="waist_circumference" 
                   value={formValues.waist_circumference} 
                   onChange={handleChange} 
-                  placeholder={formValues.waist_circumference ? "" : (personalWaistUnit === 'cm' ? "e.g. 80" : "e.g. 31.5")}
-                  step="0.1"
-                  min={personalWaistUnit === 'cm' ? "40" : "15.7"}
-                  max={personalWaistUnit === 'cm' ? "200" : "78.7"}
+                  placeholder={formValues.waist_circumference ? "" : (personalWaistUnit === 'cm' ? "e.g. 80" : "e.g. 32")}
+                  step="1"
+                  min={personalWaistUnit === 'cm' ? "40" : "16"}
+                  max={personalWaistUnit === 'cm' ? "200" : "79"}
                   style={{ flex: 1 }}
                 />
                 <div style={{ 
@@ -3327,7 +3580,7 @@ const calculateAgeFromDOB = (dob) => {
                 </div>
               </div>
               <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                Range: {personalWaistUnit === 'cm' ? '40-200 cm' : '15.7-78.7 in'}
+                Range: {personalWaistUnit === 'cm' ? '40-200 cm' : '16-79 in'}
               </span>
             </div>
           </label>
@@ -3348,10 +3601,10 @@ const calculateAgeFromDOB = (dob) => {
                   name="hip_circumference" 
                   value={formValues.hip_circumference} 
                   onChange={handleChange} 
-                  placeholder={formValues.hip_circumference ? "" : (hipUnit === 'cm' ? "e.g. 95" : "e.g. 37.4")}
-                  step="0.1"
-                  min={hipUnit === 'cm' ? "40" : "15.7"}
-                  max={hipUnit === 'cm' ? "200" : "78.7"}
+                  placeholder={formValues.hip_circumference ? "" : (hipUnit === 'cm' ? "e.g. 95" : "e.g. 37")}
+                  step="1"
+                  min={hipUnit === 'cm' ? "40" : "16"}
+                  max={hipUnit === 'cm' ? "200" : "79"}
                   style={{ flex: 1 }}
                 />
                 <div style={{ 
@@ -3423,14 +3676,14 @@ const calculateAgeFromDOB = (dob) => {
                 </div>
               </div>
               <span style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                Range: {hipUnit === 'cm' ? '40-200 cm' : '15.7-78.7 in'}
+                Range: {hipUnit === 'cm' ? '40-200 cm' : '16-79 in'}
               </span>
             </div>
           </label>
 
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, marginTop: 8, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-            <button type="submit" className="btn primary full" disabled={saving} style={{ minHeight: '44px' }}>
-              {saving ? "Saving…" : "Save changes"}
+            <button type="submit" className="btn primary full" disabled={savingCoreBodyMetrics} style={{ minHeight: '44px' }}>
+              {savingCoreBodyMetrics ? "Saving…" : "Save changes"}
             </button>
           </div>
         </form>
