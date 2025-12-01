@@ -3,6 +3,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { InsightApi } from '../api/insightApi';
 import { CheckQueryApi } from '../api/checkQueryApi';
 import { useAuth } from '../api/AuthContext';
+import { useNotifications } from '../api/NotificationContext';
 
 const useOpenAI = () => {
   const [loading, setLoading] = useState(false);
@@ -12,6 +13,7 @@ const useOpenAI = () => {
   const [previousChats, setPreviousChats] = useState([]);
   const conversationRef = useRef([]);
   const { user } = useAuth();
+  const { showError: showNotificationError } = useNotifications();
 
   // Emergency keywords detection
   const EMERGENCY_KEYWORDS = [
@@ -163,6 +165,17 @@ const useOpenAI = () => {
         
         console.log('✅ generate-insight response:', response);
         
+        // Check if API returned success: false with subscription_limit_reached error
+        if (response && response.success === false && response.error === 'subscription_limit_reached') {
+          const errorMessage = response.message || 'Subscription limit reached. Please upgrade your plan to continue using AI Health Assistant.';
+          showNotificationError(errorMessage);
+          const limitReachedResponse = errorMessage;
+          setConversation(prev => [...prev, { role: 'assistant', content: limitReachedResponse }]);
+          setError('Subscription limit reached');
+          setLoading(false);
+          return limitReachedResponse;
+        }
+        
         // If response contains chat_id, update currentChatId
         // Check multiple possible locations for chat_id
         const newChatId = response?.chat_id !== undefined && response?.chat_id !== null
@@ -181,6 +194,18 @@ const useOpenAI = () => {
         }
       } catch (apiError) {
         console.error('API Error:', apiError);
+        
+        // Check if it's an ApiError with success: false and error field
+        if (apiError.data && apiError.data.success === false && apiError.data.error) {
+          const errorMessage = apiError.data.message || apiError.message || apiError.data.error || 'An error occurred';
+          showNotificationError(errorMessage);
+          const errorResponse = errorMessage;
+          setConversation(prev => [...prev, { role: 'assistant', content: errorResponse }]);
+          setError(errorMessage);
+          setLoading(false);
+          return errorResponse;
+        }
+        
         // If it's a 401 even after refresh, show auth error
         if (apiError.status === 401) {
           const authError = "Unable to authenticate. Please try logging in again.";
@@ -190,6 +215,17 @@ const useOpenAI = () => {
           return authError;
         }
         throw apiError;
+      }
+
+      // Check for subscription limit error in response.result as well
+      if (response && response.result && response.result.success === false && response.result.error === 'subscription_limit_reached') {
+        const errorMessage = response.result.message || response.message || 'Subscription limit reached. Please upgrade your plan to continue using AI Health Assistant.';
+        showNotificationError(errorMessage);
+        const limitReachedResponse = errorMessage;
+        setConversation(prev => [...prev, { role: 'assistant', content: limitReachedResponse }]);
+        setError('Subscription limit reached');
+        setLoading(false);
+        return limitReachedResponse;
       }
 
       if (response && response.result) {

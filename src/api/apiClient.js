@@ -1,10 +1,11 @@
 import { AuthApi } from "./authApi";
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(message, status, data) {
     super(message);
     this.status = status;
     this.data = data;
+    this.name = 'ApiError';
   }
 }
 
@@ -155,6 +156,52 @@ export const authRequest = async (url, options = {}, retry = true) => {
       data = { message: "Failed to parse response" };
     }
 
+    // Check for success: false with error field (even if response.ok is true)
+    // Check both top level and nested structures (e.g., guard_info.check_result)
+    const checkForError = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      
+      // Check top level
+      if (obj.success === false && obj.error) {
+        return {
+          message: obj.message || obj.error || 'An error occurred',
+          data: obj
+        };
+      }
+      
+      // Check nested structures like guard_info.check_result
+      if (obj.guard_info && obj.guard_info.check_result) {
+        const checkResult = obj.guard_info.check_result;
+        if (checkResult.success === false && checkResult.error) {
+          console.log('🔴 Found error in guard_info.check_result:', checkResult);
+          return {
+            message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
+            data: obj
+          };
+        }
+      }
+      
+      // Also check for blocked responses with guard_info
+      if (obj.blocked === true && obj.guard_info && obj.guard_info.check_result) {
+        const checkResult = obj.guard_info.check_result;
+        if (checkResult.success === false && checkResult.error) {
+          console.log('🔴 Found blocked response with error:', checkResult);
+          return {
+            message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
+            data: obj
+          };
+        }
+      }
+      
+      return null;
+    };
+    
+    const errorInfo = checkForError(data);
+    if (errorInfo) {
+      console.log('🔴 Throwing ApiError:', errorInfo.message, errorInfo.data);
+      throw new ApiError(errorInfo.message, response.status || 400, errorInfo.data);
+    }
+
     if (!response.ok) {
       // Спеціальна обробка для 401 помилок після refresh
       if (response.status === 401 && !retry) {
@@ -215,6 +262,52 @@ export const request = async (url, options = {}) => {
     } catch (parseError) {
       console.warn("Failed to parse response:", parseError);
       data = { message: "Failed to parse response" };
+    }
+
+    // Check for success: false with error field (even if response.ok is true)
+    // Check both top level and nested structures (e.g., guard_info.check_result)
+    const checkForError = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      
+      // Check top level
+      if (obj.success === false && obj.error) {
+        return {
+          message: obj.message || obj.error || 'An error occurred',
+          data: obj
+        };
+      }
+      
+      // Check nested structures like guard_info.check_result
+      if (obj.guard_info && obj.guard_info.check_result) {
+        const checkResult = obj.guard_info.check_result;
+        if (checkResult.success === false && checkResult.error) {
+          console.log('🔴 Found error in guard_info.check_result:', checkResult);
+          return {
+            message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
+            data: obj
+          };
+        }
+      }
+      
+      // Also check for blocked responses with guard_info
+      if (obj.blocked === true && obj.guard_info && obj.guard_info.check_result) {
+        const checkResult = obj.guard_info.check_result;
+        if (checkResult.success === false && checkResult.error) {
+          console.log('🔴 Found blocked response with error:', checkResult);
+          return {
+            message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
+            data: obj
+          };
+        }
+      }
+      
+      return null;
+    };
+    
+    const errorInfo = checkForError(data);
+    if (errorInfo) {
+      console.log('🔴 Throwing ApiError:', errorInfo.message, errorInfo.data);
+      throw new ApiError(errorInfo.message, response.status || 400, errorInfo.data);
     }
 
     if (!response.ok) {

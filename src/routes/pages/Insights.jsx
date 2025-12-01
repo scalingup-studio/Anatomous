@@ -1729,6 +1729,18 @@ function AlertsTab() {
     try {
       setLoading(true);
       const response = await ComprehensiveAlertsApi.fetchComprehensiveAlerts(user.id);
+      
+      // Check for blocked/error response with guard_info.check_result
+      if (response && response.blocked && response.guard_info && response.guard_info.check_result) {
+        const checkResult = response.guard_info.check_result;
+        if (checkResult.success === false && checkResult.error) {
+          const errorMessage = checkResult.message || response.message || 'Access blocked by subscription plan';
+          showNotification(errorMessage, "error");
+          setAlerts([]);
+          return;
+        }
+      }
+      
       setAlerts(response.result || response || []);
       
       if (response.result && response.result.length > 0) {
@@ -1736,7 +1748,36 @@ function AlertsTab() {
       }
     } catch (error) {
       console.error('Error loading alerts:', error);
-      showNotification("Failed to load alerts", "error");
+      console.log('Error details:', {
+        message: error.message,
+        data: error.data,
+        isApiError: error instanceof Error && error.data
+      });
+      
+      // Check if it's an ApiError with subscription_limit_reached
+      if (error.data) {
+        // Check top level
+        if (error.data.success === false && error.data.error === 'subscription_limit_reached') {
+          const errorMessage = error.data.message || error.message || 'Subscription limit reached';
+          showNotification(errorMessage, "error");
+          setAlerts([]);
+          return;
+        }
+        // Check nested guard_info.check_result
+        if (error.data.guard_info && error.data.guard_info.check_result) {
+          const checkResult = error.data.guard_info.check_result;
+          if (checkResult.success === false && checkResult.error === 'subscription_limit_reached') {
+            const errorMessage = checkResult.message || error.data.message || error.message || 'Subscription limit reached';
+            showNotification(errorMessage, "error");
+            setAlerts([]);
+            return;
+          }
+        }
+      }
+      
+      // Error notification will be shown by global error handler if it's an ApiError
+      // Only show generic error if it's not already handled
+      showNotification(error.message || "Failed to load alerts", "error");
     } finally {
       setLoading(false);
     }

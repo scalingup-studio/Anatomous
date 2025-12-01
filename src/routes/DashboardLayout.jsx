@@ -12,7 +12,7 @@ export default function DashboardLayout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const { logout } = useAuth();
-  const { notifications, removeNotification } = useNotifications();
+  const { notifications, removeNotification, showError } = useNotifications();
   const dashContentRef = React.useRef(null);
 
   const handleLogOut = async () => {
@@ -54,6 +54,60 @@ export default function DashboardLayout() {
       document.body.style.overflow = '';
     };
   }, [menuOpen]);
+
+  // Global error handler for API errors with success: false
+  React.useEffect(() => {
+    const handleUnhandledRejection = (event) => {
+      const error = event.reason;
+      if (!error) return;
+      
+      console.log('🔴 Global error handler triggered:', error);
+      
+      // Check if it's an ApiError with success: false and error field
+      // Check both top level and nested structures (e.g., guard_info.check_result)
+      let errorMessage = null;
+      
+      if (error.data) {
+        console.log('🔴 Error data:', error.data);
+        // Check top level
+        if (error.data.success === false && error.data.error) {
+          errorMessage = error.data.message || error.message || error.data.error || 'An error occurred';
+          console.log('🔴 Found top level error:', errorMessage);
+        }
+        // Check nested structures like guard_info.check_result
+        else if (error.data.guard_info && error.data.guard_info.check_result) {
+          const checkResult = error.data.guard_info.check_result;
+          if (checkResult.success === false && checkResult.error) {
+            errorMessage = checkResult.message || checkResult.error || error.data.message || error.message || 'An error occurred';
+            console.log('🔴 Found nested error:', errorMessage);
+          }
+        }
+        // Also check for blocked responses
+        else if (error.data.blocked === true && error.data.guard_info && error.data.guard_info.check_result) {
+          const checkResult = error.data.guard_info.check_result;
+          if (checkResult.success === false && checkResult.error) {
+            errorMessage = checkResult.message || checkResult.error || error.data.message || error.message || 'An error occurred';
+            console.log('🔴 Found blocked error:', errorMessage);
+          }
+        }
+      }
+      
+      if (errorMessage) {
+        console.log('🔴 Showing error notification:', errorMessage);
+        showError(errorMessage);
+        // Prevent default browser error handling
+        event.preventDefault();
+      } else {
+        console.log('🔴 No error message found, error:', error);
+      }
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, [showError]);
   return (
     <div className={`dash-layout ${menuOpen ? "menu-open" : ""}`}>
       <header className="dash-header">
