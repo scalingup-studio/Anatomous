@@ -19,6 +19,8 @@ export { VaccinationsApi } from "./vaccinationsApi";
 export { FamilyHistoryApi } from "./familyHistoryApi";
 export { SubscriptionApi } from "./subscriptionApi";
 export { PaymentApi } from "./paymentApi";
+export { NotificationsApi } from "./notificationsApi";
+export { AccountApi } from "./accountApi";
 
 // Utilities and helpers
 export { createCrudApi } from "./helpers";
@@ -44,4 +46,6 @@ export const Api = {
   FamilyHistory: FamilyHistoryApi,
   Subscription: SubscriptionApi,
   Payment: PaymentApi,
+  Notifications: NotificationsApi,
+  Account: AccountApi,
 };

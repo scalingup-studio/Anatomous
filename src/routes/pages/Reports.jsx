@@ -1,19 +1,42 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import DatePicker from "../../components/DatePicker.jsx";
 import { ReportsApi } from "../../api/reportsApi";
+import { SubscriptionApi } from "../../api/subscriptionApi.js";
 import { useAuth } from "../../api/AuthContext.jsx";
 import { hasFeatureAccess } from "../../utils/subscriptionUtils.js";
 import { UpgradePrompt } from "../../components/UpgradePrompt.jsx";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 
 export default function DashboardReports() {
-  const [activeTab, setActiveTab] = React.useState("download");
+  const [searchParams, setSearchParams] = useSearchParams();
 
+  const tabFromUrl = searchParams.get("tab");
   const tabs = [
     { id: "download", label: "Download Reports" },
     { id: "share", label: "Share with Provider" },
     { id: "export", label: "Export Settings" },
   ];
+  const tabIds = tabs.map(t => t.id);
+  const initialTab = tabFromUrl && tabIds.includes(tabFromUrl) ? tabFromUrl : "download";
+
+  const [activeTab, setActiveTab] = React.useState(initialTab);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", newTab);
+    setSearchParams(next, { replace: true });
+  };
+
+  // Sync state when tab in URL changes externally (e.g. deep link, back/forward)
+  React.useEffect(() => {
+    const tabFromUrl = searchParams.get("tab");
+    if (tabFromUrl && tabIds.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -62,7 +85,7 @@ export default function DashboardReports() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
             style={{
               padding: "8px 16px",
               border: "none",
@@ -624,17 +647,57 @@ function ExportSettingsTab() {
   }, [title, format]);
 
   const handleGenerate = async () => {
-    // Check if user has access to PDF Reports
-    if (!hasFeatureAccess(user, 'reportsPdf')) {
-      setUpgradeFeature('reportsPdf');
-      setUpgradePromptOpen(true);
-      return;
-    }
-    
     try {
       setMessage("");
       setLoading(true);
-      await ReportsApi.generate({
+
+      // 1) Check feature access based on live subscription from backend
+      let hasPdfAccess = false;
+      try {
+        const subData = await SubscriptionApi.getMySubscription();
+        const root = subData?.result || subData || {};
+        const subscription = root.subscription || root;
+        const planFeatures = root.plan_features || {};
+        const usage = root.usage || {};
+
+        hasPdfAccess =
+          planFeatures.pdf_reports === true ||
+          usage?.pdf_reports?.enabled === true ||
+          hasFeatureAccess(user, "reportsPdf");
+
+        try {
+          console.log(
+            "🔎 [ExportSettingsTab] PDF access check:",
+            JSON.stringify(
+              {
+                plan_tier: subscription?.plan_tier,
+                plan_name: subscription?.plan_name,
+                backend_plan_pdf_feature: planFeatures.pdf_reports,
+                backend_usage_pdf_enabled: usage?.pdf_reports?.enabled,
+                final_has_access: hasPdfAccess,
+              },
+              null,
+              2
+            )
+          );
+        } catch {}
+      } catch (e) {
+        console.log(
+          "⚠️ [ExportSettingsTab] Failed to load subscription, falling back to plan-only access:",
+          e?.message
+        );
+        hasPdfAccess = hasFeatureAccess(user, "reportsPdf");
+      }
+
+      if (!hasPdfAccess) {
+        setUpgradeFeature("reportsPdf");
+        setUpgradePromptOpen(true);
+        setLoading(false);
+        return;
+      }
+
+      // 2) Generate report
+      const payload = {
         report_title: title,
         filename: computedFilename,
         auto_generate: autoGenerate,
@@ -647,7 +710,16 @@ function ExportSettingsTab() {
         labs: !!sections.labs,
         goals: !!sections.goals,
         output_format: format,
-      });
+      };
+
+      try {
+        console.log(
+          "📤 [ExportSettingsTab] Sending generate report payload:",
+          JSON.stringify(payload, null, 2)
+        );
+      } catch {}
+
+      await ReportsApi.generate(payload);
       // Optional: could reload list in Download tab, but keeping local here
       setMessage('Report generation started successfully. You will see it in the list shortly.');
     } catch (e) {
@@ -741,41 +813,50 @@ function ExportSettingsTab() {
                       <line x1="12" y1="16" x2="12" y2="12"></line>
                       <line x1="12" y1="8" x2="12.01" y2="8"></line>
                     </svg>
-                    <div className="tooltip" style={{
-                      display: "none",
-                      visibility: "hidden",
-                      opacity: 0,
-                      position: "absolute",
-                      bottom: "calc(100% + 8px)",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      padding: "8px 12px",
-                      background: "rgba(17, 17, 17, 0.98)",
-                      color: "var(--text)",
-                      fontSize: 12,
-                      lineHeight: 1.4,
-                      borderRadius: 6,
-                      maxWidth: "200px",
-                      width: "max-content",
-                      zIndex: 10000,
-                      border: "1px solid var(--border)",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
-                      pointerEvents: "none",
-                      transition: "opacity 0.2s ease",
-                      textAlign: "center"
-                    }}>
-                      Overview report with key insights and summaries
-                      <div style={{
+                    <div
+                      className="tooltip"
+                      style={{
+                        display: "none",
+                        visibility: "hidden",
+                        opacity: 0,
                         position: "absolute",
-                        top: "100%",
+                        bottom: "calc(100% + 8px)",
                         left: "50%",
                         transform: "translateX(-50%)",
-                        width: 0,
-                        height: 0,
-                        borderLeft: "6px solid transparent",
-                        borderRight: "6px solid transparent",
-                        borderTop: "6px solid rgba(17, 17, 17, 0.98)"
-                      }}></div>
+                        padding: "8px 12px",
+                        background: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(17, 17, 17, 0.98)",
+                        color: isLight ? "#0f172a" : "var(--text)",
+                        fontSize: 12,
+                        lineHeight: 1.4,
+                        borderRadius: 6,
+                        maxWidth: "240px",
+                        width: "max-content",
+                        zIndex: 10000,
+                        border: isLight ? "1px solid rgba(15, 23, 42, 0.12)" : "1px solid var(--border)",
+                        boxShadow: isLight
+                          ? "0 8px 24px rgba(15, 23, 42, 0.15)"
+                          : "0 4px 12px rgba(0, 0, 0, 0.4)",
+                        pointerEvents: "none",
+                        transition: "opacity 0.2s ease",
+                        textAlign: "center"
+                      }}
+                    >
+                      Overview report with key insights and summaries
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          width: 0,
+                          height: 0,
+                          borderLeft: "6px solid transparent",
+                          borderRight: "6px solid transparent",
+                          borderTop: isLight
+                            ? "6px solid rgba(255, 255, 255, 0.98)"
+                            : "6px solid rgba(17, 17, 17, 0.98)"
+                        }}
+                      ></div>
                     </div>
                   </div>
                 </button>
@@ -845,41 +926,50 @@ function ExportSettingsTab() {
                       <line x1="12" y1="16" x2="12" y2="12"></line>
                       <line x1="12" y1="8" x2="12.01" y2="8"></line>
                     </svg>
-                    <div className="tooltip" style={{
-                      display: "none",
-                      visibility: "hidden",
-                      opacity: 0,
-                      position: "absolute",
-                      bottom: "calc(100% + 8px)",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      padding: "8px 12px",
-                      background: "rgba(17, 17, 17, 0.98)",
-                      color: "var(--text)",
-                      fontSize: 12,
-                      lineHeight: 1.4,
-                      borderRadius: 6,
-                      maxWidth: "200px",
-                      width: "max-content",
-                      zIndex: 10000,
-                      border: "1px solid var(--border)",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
-                      pointerEvents: "none",
-                      transition: "opacity 0.2s ease",
-                      textAlign: "center"
-                    }}>
-                      Full analytics report including comparisons, metrics, and AI-generated commentary
-                      <div style={{
+                    <div
+                      className="tooltip"
+                      style={{
+                        display: "none",
+                        visibility: "hidden",
+                        opacity: 0,
                         position: "absolute",
-                        top: "100%",
+                        bottom: "calc(100% + 8px)",
                         left: "50%",
                         transform: "translateX(-50%)",
-                        width: 0,
-                        height: 0,
-                        borderLeft: "6px solid transparent",
-                        borderRight: "6px solid transparent",
-                        borderTop: "6px solid rgba(17, 17, 17, 0.98)"
-                      }}></div>
+                        padding: "8px 12px",
+                        background: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(17, 17, 17, 0.98)",
+                        color: isLight ? "#0f172a" : "var(--text)",
+                        fontSize: 12,
+                        lineHeight: 1.4,
+                        borderRadius: 6,
+                        maxWidth: "240px",
+                        width: "max-content",
+                        zIndex: 10000,
+                        border: isLight ? "1px solid rgba(15, 23, 42, 0.12)" : "1px solid var(--border)",
+                        boxShadow: isLight
+                          ? "0 8px 24px rgba(15, 23, 42, 0.15)"
+                          : "0 4px 12px rgba(0, 0, 0, 0.4)",
+                        pointerEvents: "none",
+                        transition: "opacity 0.2s ease",
+                        textAlign: "center"
+                      }}
+                    >
+                      Full analytics report including comparisons, metrics, and AI-generated commentary
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                          width: 0,
+                          height: 0,
+                          borderLeft: "6px solid transparent",
+                          borderRight: "6px solid transparent",
+                          borderTop: isLight
+                            ? "6px solid rgba(255, 255, 255, 0.98)"
+                            : "6px solid rgba(17, 17, 17, 0.98)"
+                        }}
+                      ></div>
                     </div>
                   </div>
                 </button>

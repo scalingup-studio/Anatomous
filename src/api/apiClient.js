@@ -157,7 +157,7 @@ export const authRequest = async (url, options = {}, retry = true) => {
     }
 
     // Check for success: false with error field (even if response.ok is true)
-    // Check both top level and nested structures (e.g., guard_info.check_result)
+    // Check both top level and nested structures (e.g., guard_info.check_result, payload)
     const checkForError = (obj) => {
       if (!obj || typeof obj !== 'object') return null;
       
@@ -167,6 +167,17 @@ export const authRequest = async (url, options = {}, retry = true) => {
           message: obj.message || obj.error || 'An error occurred',
           data: obj
         };
+      }
+
+      // Check Xano "Throw Error" payload wrapper
+      if (obj.payload && typeof obj.payload === 'object') {
+        const p = obj.payload;
+        if (p.success === false && p.error) {
+          return {
+            message: p.message || p.error || obj.message || 'An error occurred',
+            data: obj,
+          };
+        }
       }
       
       // Check nested structures like guard_info.check_result
@@ -265,7 +276,7 @@ export const request = async (url, options = {}) => {
     }
 
     // Check for success: false with error field (even if response.ok is true)
-    // Check both top level and nested structures (e.g., guard_info.check_result)
+    // Check both top level and nested structures (e.g., guard_info.check_result, payload)
     const checkForError = (obj) => {
       if (!obj || typeof obj !== 'object') return null;
       
@@ -275,6 +286,17 @@ export const request = async (url, options = {}) => {
           message: obj.message || obj.error || 'An error occurred',
           data: obj
         };
+      }
+
+      // Check Xano "Throw Error" payload wrapper
+      if (obj.payload && typeof obj.payload === 'object') {
+        const p = obj.payload;
+        if (p.success === false && p.error) {
+          return {
+            message: p.message || p.error || obj.message || 'An error occurred',
+            data: obj,
+          };
+        }
       }
       
       // Check nested structures like guard_info.check_result

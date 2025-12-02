@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { AuthApi } from "./authApi.js";
+import { AccountApi } from "./accountApi.js";
 
 const AuthContext = createContext(null);
 
@@ -10,37 +11,42 @@ export function AuthProvider({ children }) {
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false); // Track if this is a new user (signup)
 
+  // Debug: log current user state whenever it changes
+  useEffect(() => {
+    try {
+      console.log("👤 [AuthContext] user updated:", user);
+    } catch {}
+  }, [user]);
+
   // ✅ We move refreshAuth to useCallback for link stability
   const refreshAuth = useCallback(async () => {
     if (refreshLoading) return null;
 
     setRefreshLoading(true);
     try {
-      // console.log('🔄 Manually refreshing auth token...');
       const refreshRes = await AuthApi.refreshToken();
-      // console.log('🔄 Manually refreshing auth token... completed, token = ', JSON.stringify(refreshRes))
-      if (refreshRes?.authToken) {
-        // console.log('✅ Manual refresh successful');
-        setAuthToken(refreshRes.authToken);
-        setUser(refreshRes.user ?? null);
-        try {
-          localStorage.setItem('authToken', refreshRes.authToken);
-          if (refreshRes.user) localStorage.setItem('user', JSON.stringify(refreshRes.user));
-        } catch {}
-        setIsNewUser(false); // Manual refresh means existing user
-        return refreshRes.authToken;
+      if (!refreshRes?.authToken) {
+        console.log("❌ Refresh returned no token");
+        return null;
       }
 
-      console.log('❌ Refresh returned no token');
-      return null;
+      setAuthToken(refreshRes.authToken);
+      setUser(refreshRes.user ?? null);
+      try {
+        localStorage.setItem("authToken", refreshRes.authToken);
+        if (refreshRes.user) localStorage.setItem("user", JSON.stringify(refreshRes.user));
+      } catch {}
+      setIsNewUser(false); // Manual refresh means existing user
+
+      return refreshRes.authToken;
     } catch (error) {
       console.error("❌ Manual refresh failed:", error);
       // On failed refresh, clear auth state
       setAuthToken(null);
       setUser(null);
       try {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
       } catch {}
       return null;
     } finally {
@@ -118,7 +124,7 @@ export function AuthProvider({ children }) {
     }
 
     initAuth();
-  }, []);
+  }, [refreshAuth]);
 
   // ✅ Function to automatically renew the token before expiration
   useEffect(() => {
@@ -194,7 +200,24 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     try {
       const res = await AuthApi.login({ email, password });
-      setAuthToken(res.authToken);
+      // MFA flow: backend can respond with mfa_required inside result wrapper
+      const base = res?.result || res || {};
+      if (base?.mfa_required) {
+        console.log("🔐 MFA required for login, waiting for code verification...", base);
+        return {
+          success: false,
+          mfaRequired: true,
+          message: base.message || "MFA code sent to your email.",
+        };
+      }
+
+      const authToken = res?.authToken;
+
+      if (!authToken) {
+        throw new Error(base?.message || "Login failed: no auth token received.");
+      }
+
+      setAuthToken(authToken);
       setUser(res.user ?? null);
       try {
         localStorage.setItem('authToken', res.authToken);
@@ -218,7 +241,7 @@ export function AuthProvider({ children }) {
       return { success: true };
     } catch (error) {
       console.error("Login error:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: error.message, mfaRequired: false };
     }
   }
 
@@ -261,6 +284,44 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error("Signup error:", error);
       return { success: false, error: error.message };
+    }
+  }
+
+  // Verify MFA code after login responded with mfa_required=true
+  async function verifyMfa(email, code) {
+    try {
+      console.log("🔐 Verifying MFA code for:", email);
+      const res = await AccountApi.verifyMfaCode({ email, code });
+
+      const data = res?.result || res || {};
+      const authToken =
+        data.authToken ||
+        data.token ||
+        data.auth_token ||
+        data.jwt ||
+        null;
+      const user = data.user || data.me || data.profile || null;
+
+      if (!authToken) {
+        throw new Error(
+          data.message || "MFA verification failed: no auth token received."
+        );
+      }
+
+      setAuthToken(authToken);
+      setUser(user ?? null);
+
+      try {
+        localStorage.setItem("authToken", authToken);
+        if (user) localStorage.setItem("user", JSON.stringify(user));
+      } catch {}
+
+      setIsNewUser(false);
+      console.log("✅ MFA verification successful, user authenticated");
+      return { success: true };
+    } catch (error) {
+      console.error("❌ MFA verification failed:", error);
+      return { success: false, error: error.message || "MFA verification failed." };
     }
   }
 
@@ -444,6 +505,7 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
+    verifyMfa,
     refreshAuth,
     isAuthenticated,
     completeOnboarding,

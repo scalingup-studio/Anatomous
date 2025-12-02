@@ -109,13 +109,17 @@ function Badge({ children, tone = "secondary" }) {
 }
 
 function CurrentPlan() {
-  const { user } = useAuth();
+  const { user, refreshAuth, setUser } = useAuth();
   const { showNotification } = useNotifications();
   const [subscription, setSubscription] = React.useState(null);
   const [allPlans, setAllPlans] = React.useState([]); // Store all plans from API
   const [loading, setLoading] = React.useState(true);
   const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
   const [upgradeFeature, setUpgradeFeature] = React.useState(null);
+  const [cancelModalOpen, setCancelModalOpen] = React.useState(false);
+  const [cancelImmediate, setCancelImmediate] = React.useState(true);
+  const [cancelReason, setCancelReason] = React.useState("");
+  const [cancelLoading, setCancelLoading] = React.useState(false);
 
   const loadSubscription = React.useCallback(async () => {
     try {
@@ -146,8 +150,28 @@ function CurrentPlan() {
       console.log('🔍 subscription_plan_id:', subscriptionData?.subscription_plan_id);
       console.log('🔍 plan_name:', subscriptionData?.plan_name);
       console.log('🔍 plan_tier:', subscriptionData?.plan_tier);
-      
+
       setSubscription(subscriptionData);
+
+      // Синхронізуємо актуальний план у AuthContext.user,
+      // щоб feature‑gating (hasFeatureAccess) одразу бачив Core/Complete/Family.
+      if (subscriptionData && typeof setUser === "function") {
+        setUser((prev) => {
+          const nextPlan =
+            subscriptionData.plan_tier ||
+            subscriptionData.plan_name ||
+            subscriptionData.subscription_plan ||
+            prev?.subscription_plan;
+
+          return {
+            ...prev,
+            subscription_plan: nextPlan,
+            plan_tier: subscriptionData.plan_tier || prev?.plan_tier,
+            plan_name: subscriptionData.plan_name || prev?.plan_name,
+            subscription_status: subscriptionData.status || prev?.subscription_status,
+          };
+        });
+      }
     } catch (error) {
       console.error("Failed to load subscription:", error);
       
@@ -214,6 +238,8 @@ function CurrentPlan() {
         name: "Free",
         tier: "Active",
         renewal: null,
+        status: "free",
+        willCancelAt: null,
         limits: { 
           familyUsed: 0, 
           familyMax: 0, 
@@ -471,17 +497,40 @@ function CurrentPlan() {
                         subscription.subscription?.next_billing_date ||
                         subscription.billing_date;
 
+    // Дата запланованого скасування (якщо підписка буде скасована в кінці періоду)
+    const willCancelAtRaw = subscription.will_cancel_at ||
+                            subscription.cancel_at ||
+                            subscription.cancel_at_period_end_date ||
+                            subscription.cancel_at_period_end ||
+                            null;
+
+    const willCancelAt = willCancelAtRaw ? new Date(willCancelAtRaw).toLocaleDateString() : null;
+
     // Отримуємо family members дані, якщо є
     const familyData = subscription.family_members || subscription.family || {};
     const familyUsed = familyData.used || familyData.active_count || 0;
     const familyMax = familyData.limit || familyData.max || 0;
 
+    // Людське відображення статусу
+    let tierLabel;
+    if (status === "cancelled") {
+      tierLabel = "Cancelled";
+    } else if (willCancelAt) {
+      tierLabel = "Pending Cancellation";
+    } else if (status === "active") {
+      tierLabel = "Active";
+    } else {
+      tierLabel = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+
     return {
       name: planName,
-      tier: status === "active" ? "Active" : status.charAt(0).toUpperCase() + status.slice(1),
-      renewal: nextBilling 
+      tier: tierLabel,
+      status,
+      renewal: !willCancelAt && nextBilling 
         ? new Date(nextBilling).toLocaleDateString()
         : null,
+      willCancelAt,
             limits: {
               familyUsed: familyUsed,
               familyMax: familyMax,
@@ -501,6 +550,117 @@ function CurrentPlan() {
     };
   }, [subscription, allPlans]);
 
+  const canCancelSubscription = React.useMemo(() => {
+    // Можна скасувати тільки якщо є активна платна підписка без запланованого скасування
+    if (!subscription) return false;
+    if (active.status === "cancelled") return false;
+    if (active.willCancelAt) return false;
+    // Free план (fallback коли немає subscription) вже відфільтрований вище
+    return true;
+  }, [subscription, active.status, active.willCancelAt]);
+
+  const handleCancelSubscription = React.useCallback(async () => {
+    try {
+      setCancelLoading(true);
+
+      const payload = {
+        immediate: !!cancelImmediate,
+        reason: cancelReason.trim() ? cancelReason.trim() : null,
+      };
+
+      console.log("🧾 Sending cancel subscription request with payload:", payload);
+
+      const response = await PaymentApi.cancelSubscription(payload);
+      console.log("✅ Cancel subscription response:", response);
+
+      const success = response?.success !== false;
+      const backendMessage =
+        response?.message ||
+        (success ? "Subscription cancelled successfully." : "Failed to cancel subscription.");
+
+      if (!success) {
+        const backendError =
+          response?.error ||
+          response?.detail ||
+          response?.message ||
+          "Failed to cancel subscription.";
+        throw new Error(backendError);
+      }
+
+      // Показуємо повідомлення від бекенду
+      showNotification(backendMessage, "success");
+
+      // Оновлений об'єкт підписки може прийти в різних полях
+      const updatedSubscription =
+        response?.subscription ||
+        response?.result?.subscription ||
+        response?.result ||
+        null;
+
+      // Якщо користувач обрав негайне скасування — одразу перемикаємо на Free план
+      if (payload.immediate) {
+        setSubscription(null);
+        // Оновлюємо план у AuthContext.user → Starter / Free
+        if (typeof setUser === "function") {
+          setUser((prev) => ({
+            ...prev,
+            subscription_plan: "starter",
+            plan_tier: "starter",
+            plan_name: "Free",
+            subscription_status: "cancelled",
+          }));
+        }
+      } else if (updatedSubscription) {
+        // Якщо скасування в кінці періоду — оновлюємо локальні дані підписки,
+        // щоб показати статус "Очікує скасування" та дату will_cancel_at
+        setSubscription(updatedSubscription);
+
+        // Для скасування в кінці періоду залишаємо поточний платний план,
+        // але оновлюємо статус / will_cancel_at якщо потрібно.
+        if (typeof setUser === "function") {
+          setUser((prev) => ({
+            ...prev,
+            subscription_plan:
+              updatedSubscription.plan_tier ||
+              updatedSubscription.plan_name ||
+              updatedSubscription.subscription_plan ||
+              prev?.subscription_plan,
+            plan_tier: updatedSubscription.plan_tier || prev?.plan_tier,
+            plan_name: updatedSubscription.plan_name || prev?.plan_name,
+            subscription_status: updatedSubscription.status || prev?.subscription_status,
+          }));
+        }
+      } else {
+        // Fallback: якщо бекенд не повернув підписку — просто перезавантажуємо
+        await loadSubscription();
+      }
+
+      // Оновлюємо дані користувача (план, фічі) якщо доступно
+      if (typeof refreshAuth === "function") {
+        try {
+          await refreshAuth();
+        } catch (err) {
+          console.error("Failed to refresh auth after cancellation:", err);
+        }
+      }
+
+      setCancelModalOpen(false);
+      setCancelReason("");
+    } catch (error) {
+      console.error("Cancel subscription failed:", error);
+      // Відображаємо текст помилки від бекенду (включно з:
+      // "User does not have an active subscription to cancel."
+      // "Stripe subscription cancellation error: <message>")
+      showNotification(
+        error?.message ||
+          "Failed to cancel subscription. Please try again or contact support.",
+        "error"
+      );
+    } finally {
+      setCancelLoading(false);
+    }
+  }, [cancelImmediate, cancelReason, loadSubscription, refreshAuth, showNotification]);
+
   if (loading) {
     return (
       <div className="card" style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
@@ -514,7 +674,17 @@ function CurrentPlan() {
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <div>
           <div style={{ fontSize:18, fontWeight:700 }}>{active.name}</div>
-          {active.renewal && (
+          {active.status === "cancelled" && (
+            <div style={{ color:'var(--muted)', fontSize:12 }}>
+              Your subscription has been cancelled. You are now on the Free plan.
+            </div>
+          )}
+          {active.willCancelAt && active.status !== "cancelled" && (
+            <div style={{ color:'var(--muted)', fontSize:12 }}>
+              Subscription will be cancelled on {active.willCancelAt}
+            </div>
+          )}
+          {!active.willCancelAt && active.renewal && active.status !== "cancelled" && (
             <div style={{ color:'var(--muted)', fontSize:12 }}>Renews on {active.renewal}</div>
           )}
         </div>
@@ -669,6 +839,15 @@ function CurrentPlan() {
       </div>
 
       <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center' }}>
+        {canCancelSubscription && (
+          <button
+            className="btn outline"
+            onClick={() => setCancelModalOpen(true)}
+            style={{ fontSize: 12, padding: '6px 12px', marginRight: 'auto' }}
+          >
+            Cancel subscription
+          </button>
+        )}
         <button 
           className="btn ghost" 
           onClick={loadSubscription}
@@ -688,6 +867,137 @@ function CurrentPlan() {
         }}>Upgrade</button>
       </div>
       
+      {/* Cancel subscription modal */}
+      <Modal
+        open={cancelModalOpen}
+        title="Cancel Subscription"
+        onClose={() => {
+          if (!cancelLoading) {
+            setCancelModalOpen(false);
+          }
+        }}
+      >
+        <div style={{ display:'grid', gap:16 }}>
+          <p style={{ fontSize:13, color:'var(--muted)', marginBottom:0 }}>
+            Choose when to cancel your subscription. You can also tell us why you are cancelling (optional).
+          </p>
+
+          <div style={{ display:'grid', gap:8 }}>
+            <label
+              style={{
+                display:'flex',
+                alignItems:'flex-start',
+                gap:8,
+                cursor:'pointer',
+                padding:8,
+                borderRadius:8,
+                border: cancelImmediate ? '1px solid var(--primary)' : '1px solid var(--border)',
+                background: cancelImmediate ? 'rgba(0, 186, 206, 0.06)' : 'transparent',
+              }}
+            >
+              <input
+                type="radio"
+                name="cancel-timing"
+                checked={cancelImmediate}
+                onChange={() => setCancelImmediate(true)}
+                style={{ 
+                  marginTop: 4,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  aspectRatio: '1 / 1',
+                  cursor: 'pointer',
+                }}
+              />
+              <div>
+                <div style={{ fontWeight:600, fontSize:13 }}>Cancel immediately</div>
+                <div style={{ fontSize:12, color:'var(--muted)' }}>
+                  Access to premium features will stop right away and your account will switch to the Free plan.
+                </div>
+              </div>
+            </label>
+
+            <label
+              style={{
+                display:'flex',
+                alignItems:'flex-start',
+                gap:8,
+                cursor:'pointer',
+                padding:8,
+                borderRadius:8,
+                border: !cancelImmediate ? '1px solid var(--primary)' : '1px solid var(--border)',
+                background: !cancelImmediate ? 'rgba(0, 186, 206, 0.06)' : 'transparent',
+              }}
+            >
+              <input
+                type="radio"
+                name="cancel-timing"
+                checked={!cancelImmediate}
+                onChange={() => setCancelImmediate(false)}
+                style={{ 
+                  marginTop: 4,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  aspectRatio: '1 / 1',
+                  cursor: 'pointer',
+                }}
+              />
+              <div>
+                <div style={{ fontWeight:600, fontSize:13 }}>Cancel at end of current period</div>
+                <div style={{ fontSize:12, color:'var(--muted)' }}>
+                  You keep premium access until the end of your current billing period. After that, your plan will be cancelled.
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <div style={{ display:'grid', gap:6 }}>
+            <label style={{ fontSize:13, fontWeight:600 }}>
+              Cancellation reason <span style={{ fontWeight:400, color:'var(--muted)' }}>(optional)</span>
+            </label>
+            <textarea
+              rows={4}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Why are you cancelling? This helps us improve."
+              style={{
+                width:'100%',
+                resize:'vertical',
+                padding:8,
+                borderRadius:8,
+                border:'1px solid var(--border)',
+                background:'transparent',
+                color:'var(--text)',
+                fontSize:13,
+                fontFamily:'inherit',
+              }}
+            />
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:8 }}>
+            <button
+              className="btn secondary"
+              onClick={() => {
+                if (!cancelLoading) {
+                  setCancelModalOpen(false);
+                }
+              }}
+              disabled={cancelLoading}
+            >
+              Keep subscription
+            </button>
+            <button
+              className="btn primary"
+              onClick={handleCancelSubscription}
+              disabled={cancelLoading}
+            >
+              {cancelLoading ? 'Cancelling...' : 'Confirm cancellation'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Feature Gating Examples */}
       <div className="card" style={{ maxWidth: 920, marginTop: 16 }}>
         <h3 style={{ marginTop: 0, marginBottom: 12 }}>Feature Access Examples</h3>

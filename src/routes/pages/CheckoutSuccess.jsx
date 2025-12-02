@@ -1,22 +1,21 @@
 import React from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PaymentApi } from "../../api/paymentApi.js";
-import { SubscriptionApi } from "../../api/subscriptionApi.js";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 import { useAuth } from "../../api/AuthContext.jsx";
 
 /**
  * Checkout Success Page
  * Handles successful return from Stripe Checkout
- * Verifies the session and updates subscription status
+ * Verifies the session and displays payment/subscription details
  */
 export default function CheckoutSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showNotification } = useNotifications();
   const { refreshAuth } = useAuth();
-  const [status, setStatus] = React.useState("verifying");
-  const [subscription, setSubscription] = React.useState(null);
+  const [status, setStatus] = React.useState("verifying"); // verifying | success | no-session | error
+  const [result, setResult] = React.useState(null);
   
   // Захист від повторних викликів API
   const hasVerifiedRef = React.useRef(false);
@@ -24,20 +23,21 @@ export default function CheckoutSuccess() {
 
   React.useEffect(() => {
     const sessionId = searchParams.get("session_id");
-    
+
     // Якщо sessionId не змінився і вже був виклик - не викликаємо знову
     if (hasVerifiedRef.current && sessionIdRef.current === sessionId) {
-      console.log('⚠️ CheckoutSuccess: Already verified this session, skipping duplicate call');
+      console.log("⚠️ CheckoutSuccess: Already handled this session, skipping duplicate call");
       return;
     }
-    
-    // Якщо немає sessionId - обробляємо помилку тільки один раз
+
+    // Якщо немає sessionId — показуємо сторінку без виклику бекенду
     if (!sessionId) {
-      if (hasVerifiedRef.current) return; // Вже обробили
+      if (hasVerifiedRef.current) return;
       hasVerifiedRef.current = true;
-      setStatus("error");
-      showNotification("No session ID found", "error");
-      setTimeout(() => navigate("/dashboard/subscriptions"), 3000);
+      sessionIdRef.current = null;
+      setResult(null);
+      setStatus("no-session");
+      showNotification("We could not find a payment session. Your payment is not completed.", "warning");
       return;
     }
 
@@ -48,63 +48,41 @@ export default function CheckoutSuccess() {
     const verifySession = async () => {
       try {
         setStatus("verifying");
-        
-        console.log('🔍 CheckoutSuccess: Verifying session:', sessionId);
-        
-        // Verify the session with backend
+
+        console.log("🔍 CheckoutSuccess: Verifying payment session:", sessionId);
+
+        // Verify the session with backend (GET /checkout/success?session_id=...)
         const sessionResult = await PaymentApi.checkoutSuccess(sessionId);
-        
-        console.log('✅ CheckoutSuccess: Session verified:', sessionResult);
-        
-        if (sessionResult && sessionResult.success !== false) {
-          // Get updated subscription info
+
+        console.log("✅ CheckoutSuccess: Backend response:", sessionResult);
+
+        setResult(sessionResult || {});
+
+        const isSuccess = sessionResult?.success === true;
+        const message = isSuccess
+          ? "Payment processed successfully! Your subscription is now active."
+          : "Payment was not completed.";
+
+        showNotification(message, isSuccess ? "success" : "warning");
+
+        // Оновлюємо auth/юзера, щоб підписка відобразилась коректно
+        if (isSuccess && typeof refreshAuth === "function") {
           try {
-            const subscriptionData = await SubscriptionApi.getMySubscription();
-            console.log('📊 CheckoutSuccess: Subscription data (raw):', subscriptionData);
-            
-            // Нова структура API: { result: { subscription: {...}, usage: {...}, plan_features: {...} } }
-            const subscription = subscriptionData?.result?.subscription || 
-                                 subscriptionData?.result || 
-                                 subscriptionData?.subscription ||
-                                 subscriptionData;
-            
-            console.log('📊 CheckoutSuccess: Subscription (extracted):', subscription);
-            setSubscription(subscription);
-            
-            // Refresh user data to get updated plan
-            if (refreshAuth) {
-              await refreshAuth();
-            }
-            
-            setStatus("success");
-            showNotification("Subscription activated successfully! 🎉", "success");
-            
-            // Redirect to subscriptions page after 3 seconds
-            setTimeout(() => {
-              navigate("/dashboard/subscriptions");
-            }, 3000);
-          } catch (subError) {
-            console.error("Failed to load subscription:", subError);
-            // Still show success if session was verified
-            setStatus("success");
-            showNotification("Payment successful! Updating subscription...", "success");
-            setTimeout(() => {
-              navigate("/dashboard/subscriptions");
-            }, 3000);
+            await refreshAuth();
+          } catch (err) {
+            console.error("Failed to refresh auth after successful payment:", err);
           }
-        } else {
-          throw new Error(sessionResult?.error || "Session verification failed");
         }
+
+        setStatus("success");
       } catch (error) {
         console.error("Checkout verification failed:", error);
         setStatus("error");
         showNotification(
-          error.message || "Failed to verify payment. Please contact support if payment was processed.",
+          error?.message ||
+            "Failed to verify payment. If you were charged, please contact support.",
           "error"
         );
-        setTimeout(() => {
-          navigate("/dashboard/subscriptions");
-        }, 5000);
       }
     };
 
@@ -112,47 +90,47 @@ export default function CheckoutSuccess() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Використовуємо тільки searchParams як залежність
 
-  if (status === "verifying") {
-    return (
-      <div className="card" style={{ 
-        maxWidth: 600, 
-        margin: "40px auto", 
-        padding: 40,
-        textAlign: "center" 
-      }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-        <h2 style={{ marginBottom: 12 }}>Verifying Payment...</h2>
-        <p style={{ color: "var(--muted)" }}>
-          Please wait while we confirm your subscription.
-        </p>
-      </div>
-    );
-  }
+  const isBackendSuccess = result?.success === true;
+  const paymentStatus = result?.payment_status;
+  const subscriptionDetails =
+    result?.subscription_details ||
+    result?.subscription ||
+    result?.session_details ||
+    result?.result?.subscription_details ||
+    null;
+  const nextSteps = result?.next_steps || [];
+  const displayNextSteps = React.useMemo(() => {
+    if (isBackendSuccess) {
+      return [
+        "Your subscription has been activated.",
+        "You now have access to all features included in your plan.",
+        "Visit the Subscriptions page at any time to review or change your plan.",
+      ];
+    }
+    if (nextSteps && nextSteps.length > 0) {
+      return nextSteps;
+    }
+    if (status === "error") {
+      return [
+        "Check your email or bank statement to confirm whether the payment was processed.",
+        "If you were charged but do not see your subscription, contact support.",
+      ];
+    }
+    return [];
+  }, [isBackendSuccess, nextSteps, status]);
 
-  if (status === "error") {
-    return (
-      <div className="card" style={{ 
-        maxWidth: 600, 
-        margin: "40px auto", 
-        padding: 40,
-        textAlign: "center" 
-      }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
-        <h2 style={{ marginBottom: 12 }}>Verification Failed</h2>
-        <p style={{ color: "var(--muted)", marginBottom: 24 }}>
-          We couldn't verify your payment. If you were charged, please contact support.
-        </p>
-        <button 
-          className="btn primary" 
-          onClick={() => navigate("/dashboard/subscriptions")}
-        >
-          Go to Subscriptions
-        </button>
-      </div>
-    );
-  }
+  const handleGoToSubscription = () => {
+    navigate("/dashboard/subscriptions");
+  };
 
-  // Success state
+  const handleReturnToPlans = () => {
+    navigate("/dashboard/subscriptions?tab=upgrade");
+  };
+
+  const handleSupport = () => {
+    navigate("/dashboard/help-center");
+  };
+
   return (
     <div className="card" style={{ 
       maxWidth: 600, 
@@ -160,66 +138,139 @@ export default function CheckoutSuccess() {
       padding: 40,
       textAlign: "center" 
     }}>
-      <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
-      <h2 style={{ marginBottom: 12 }}>Payment Successful!</h2>
-      <p style={{ color: "var(--muted)", marginBottom: 24 }}>
-        Your subscription has been activated. You now have access to all premium features.
+      <div style={{ fontSize: 64, marginBottom: 16 }}>
+        {status === "verifying" ? "⏳" : isBackendSuccess ? "✅" : "⚠️"}
+      </div>
+
+      <h2 style={{ marginBottom: 12 }}>
+        {status === "verifying"
+          ? "Verifying Payment..."
+          : isBackendSuccess
+          ? "Payment processed successfully!"
+          : status === "no-session"
+          ? "Payment not completed"
+          : "Payment status unclear"}
+      </h2>
+
+      {/* Основне повідомлення */}
+      <p style={{ color: "var(--muted)", marginBottom: 16 }}>
+        {(() => {
+          if (status === "verifying") {
+            return "Please wait while we confirm your payment with the provider.";
+          }
+
+          if (status === "no-session") {
+            return "We could not find a payment session in the URL. Your payment has not been completed.";
+          }
+
+          if (status === "error") {
+            return "We couldn't verify your payment. If you were charged, please contact support.";
+          }
+
+          if (isBackendSuccess) {
+            return "Your payment was successful and your subscription is now active.";
+          }
+
+          return "Your payment was not completed.";
+        })()}
       </p>
-      
-      {subscription && (() => {
-        // Отримуємо назву плану з різних можливих місць в response
-        const planName = subscription.plan_name?.charAt(0).toUpperCase() + subscription.plan_name?.slice(1) ||
-                         subscription.plan_tier?.charAt(0).toUpperCase() + subscription.plan_tier?.slice(1) ||
-                         subscription.subscription_details?.plan_name ||
-                         subscription.current_plan?.charAt(0).toUpperCase() + subscription.current_plan?.slice(1) ||
-                         subscription.plan?.name ||
-                         "Premium";
-        
-        // Отримуємо дату наступного платежу
-        const nextBilling = subscription.next_billing_date ||
-                            subscription.next_billing ||
-                            subscription.subscription?.next_billing_date ||
-                            subscription.billing_date;
-        
-        return (
-          <div style={{ 
-            padding: 16, 
-            background: "rgba(0, 186, 206, 0.1)", 
-            borderRadius: 8,
+
+      {/* Деталі підписки / платежу, якщо є */}
+      {subscriptionDetails && (
+        <div
+          style={{
+            textAlign: "left",
+            marginTop: 16,
             marginBottom: 24,
-            textAlign: "left"
-          }}>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>Your Plan:</div>
-            <div style={{ fontSize: 18, color: "var(--primary)", fontWeight: 600 }}>
-              {planName}
-            </div>
-            {nextBilling && (
-              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                Next billing: {new Date(nextBilling).toLocaleDateString()}
+            padding: 16,
+            borderRadius: 8,
+            background:
+              "linear-gradient(135deg, rgba(0,186,206,0.12), rgba(0,186,206,0.04))",
+            border: "1px solid rgba(0,186,206,0.3)",
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>
+            Subscription details
+          </div>
+          <div style={{ fontSize: 13, color: "var(--text)" }}>
+            {subscriptionDetails.plan_name && (
+              <div style={{ marginBottom: 4 }}>
+                <strong>Plan:</strong> {subscriptionDetails.plan_name}
+              </div>
+            )}
+            {(subscriptionDetails.amount || subscriptionDetails.amount_total) && (
+              <div style={{ marginBottom: 4 }}>
+                <strong>Amount:</strong>{" "}
+                {(() => {
+                  const amount =
+                    subscriptionDetails.amount ??
+                    subscriptionDetails.amount_total;
+                  const currency =
+                    (subscriptionDetails.currency || "usd").toUpperCase();
+                  const normalized =
+                    typeof amount === "number"
+                      ? (amount / 100).toFixed(2)
+                      : amount;
+                  return `${normalized} ${currency}`;
+                })()}
+              </div>
+            )}
+            {subscriptionDetails.payment_type && (
+              <div style={{ marginBottom: 4 }}>
+                <strong>Payment type:</strong>{" "}
+                {subscriptionDetails.payment_type}
+              </div>
+            )}
+            {(subscriptionDetails.status || paymentStatus) && (
+              <div style={{ marginBottom: 4 }}>
+                <strong>Status:</strong>{" "}
+                {subscriptionDetails.status || paymentStatus}
               </div>
             )}
           </div>
-        );
-      })()}
-      
+        </div>
+      )}
+
+      {/* Next steps */}
+      {displayNextSteps.length > 0 && (
+        <div
+          style={{
+            textAlign: "left",
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>
+            Next steps
+          </div>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 20,
+              display: "grid",
+              gap: 4,
+              fontSize: 13,
+              color: "var(--muted)",
+            }}
+          >
+            {displayNextSteps.map((step, idx) => (
+              <li key={idx}>{step}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Кнопки дій */}
       <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <button 
-          className="btn outline" 
-          onClick={() => navigate("/dashboard")}
-        >
-          Go to Dashboard
+        <button className="btn primary" onClick={handleGoToSubscription}>
+          Go to my subscription
         </button>
-        <button 
-          className="btn primary" 
-          onClick={() => navigate("/dashboard/subscriptions")}
-        >
-          View Subscription
+        <button className="btn outline" onClick={handleReturnToPlans}>
+          Return to plans
+        </button>
+        <button className="btn ghost" onClick={handleSupport}>
+          Support
         </button>
       </div>
-      
-      <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 24 }}>
-        Redirecting to subscriptions page in a few seconds...
-      </p>
     </div>
   );
 }

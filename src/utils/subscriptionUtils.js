@@ -22,7 +22,16 @@ export const PLAN_ORDER = {
  */
 export const getUserPlan = (user) => {
   if (!user) return PLAN_TIERS.STARTER;
-  return user.subscription_tier || user.plan || user.tier || PLAN_TIERS.STARTER;
+  // Normalize possible fields from different auth / user responses
+  return (
+    user.subscription_tier ||       // explicit tier
+    user.subscription_plan ||       // field from auth OpenAPI (core/family/complete/starter)
+    user.plan_tier ||               // sometimes plan_tier
+    user.plan_name ||               // or plan_name
+    user.plan ||                    // generic plan
+    user.tier ||                    // generic tier
+    PLAN_TIERS.STARTER
+  );
 };
 
 /**

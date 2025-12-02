@@ -31,4 +31,25 @@ export const UserSettingsApi = {
     method: "POST",
     body: data,
   }),
+
+  // 🔔 AI / privacy preferences (Update user settings: privacy #42)
+  // POST /update_settings with { ai_preferences: { ... } }
+  updateAiPreferences: (preferences) => authRequest(CUSTOM_ENDPOINTS.accountSettings.updateSettings, {
+    method: "POST",
+    body: (() => {
+      const payload = { ai_preferences: preferences };
+      try {
+        console.log(
+          "🛡️ [UserSettingsApi.updateAiPreferences] payload:",
+          JSON.stringify(payload, null, 2)
+        );
+      } catch {}
+      return payload;
+    })(),
+  }),
+
+  // GET /get_ai_preferences
+  getAiPreferences: () => authRequest(CUSTOM_ENDPOINTS.accountSettings.getAiPreferences, {
+    method: "GET",
+  }),
 };

@@ -2,6 +2,12 @@ export const API_BASE = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:5PA_dIPO";
 export const API_BASE_AUTH = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:HBbbpjK5";
 export const API_BASE_SUBSCRIPTION = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:IqZoSRZI";
 export const API_BASE_PAYMENT = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:c4HYH1BF";
+// Notifications service (separate Xano API group)
+export const API_BASE_NOTIFICATIONS = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:V6Md0ZUL";
+// Account & security services (non-dev base)
+export const API_BASE_ACCOUNT = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:nZuNxVVd";
+// Account settings & AI preferences (separate API group, NON-dev)
+export const API_BASE_ACCOUNT_SETTINGS = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:nZuNxVVd";
 export const API_DOMEN_DEV = "https://xu6p-ejbd-2ew4.n7e.xano.io/api";
 
 // CRUD helper
@@ -45,6 +51,30 @@ export const CUSTOM_ENDPOINTS = {
     googleCallback: `${API_BASE_AUTH}/auth/callback/google`,
     googleSuccess: `${API_BASE_AUTH}/auth/success`,
     checkAuth: `${API_BASE_AUTH}/auth/check-auth`,
+  },
+  account: {
+    // Revoke a specific refresh token / session
+    revokeToken: `${API_BASE_AUTH}/refresh_tokens/revoke`,
+    // Update email / password / MFA settings
+    // Should use main auth API base (without :dev suffix)
+    updateCredentials: `${API_BASE_AUTH}/update_credentials`,
+    // Verify MFA code after login step that required MFA
+    // According to auth OpenAPI spec this is /auth/verify_mfa on the main auth API base
+    verifyMfaCode: `${API_BASE_AUTH}/auth/verify_mfa`,
+  },
+  accountSecurity: {
+    // Deactivate (temporarily) the current account
+    deactivateAccount: `${API_BASE_ACCOUNT}/deactivate_account`,
+    // Permanently delete the account and all data
+    deleteAccount: `${API_BASE_ACCOUNT}/delete_account`,
+    // Delete all user data but keep the account (GDPR-style)
+    deleteUserData: `${API_BASE_ACCOUNT}/delete_user_data`,
+  },
+  accountSettings: {
+    // Update AI/privacy-related user settings
+    updateSettings: `${API_BASE_ACCOUNT_SETTINGS}/update_settings`,
+    // Get AI preferences for current user
+    getAiPreferences: `${API_BASE_ACCOUNT_SETTINGS}/get_ai_preferences`,
   },
   reports: {
     generate: `${API_BASE}/report/generate`, // backward compatibility
@@ -100,6 +130,16 @@ export const CUSTOM_ENDPOINTS = {
     getHistory: `${API_BASE}/goals/get/history`,
     readd: `${API_BASE}/goals/readd`,
   },
+  notifications: {
+    // Notification preferences (API:V6Md0ZUL)
+    getPreferences: `${API_BASE_NOTIFICATIONS}/get_notification_preferences`,
+    updatePreferences: `${API_BASE_NOTIFICATIONS}/update_notification_preferences`,
+    // Notification send functions (for admin/test tools)
+    sendAiInsight: `${API_BASE_NOTIFICATIONS}/send_ai_insight`,
+    sendHealthAlert: `${API_BASE_NOTIFICATIONS}/send_health_alert`,
+    sendProductUpdate: `${API_BASE_NOTIFICATIONS}/send_product_update`,
+    sendUniversal: `${API_BASE_NOTIFICATIONS}/send_notifications`,
+  },
   goalProgress: {
     create: `${API_BASE}/goal/progress`,
     getProgress: `${API_BASE}/goal/get/progress`,
@@ -128,7 +168,9 @@ export const CUSTOM_ENDPOINTS = {
   },
   payments: {
     upgradeSubscription: `${API_BASE_PAYMENT}/upgrade_subscription_POST`,
-    cancelSubscription: `${API_BASE_PAYMENT}/cancel_subscription_POST`,
+				 // Cancel subscription (Stripe + local)
+				 // Uses the unified /cancel_subscription endpoint as per backend spec
+				 cancelSubscription: `${API_BASE_PAYMENT}/cancel_subscription`,
     createCheckoutSession: `${API_BASE_PAYMENT}/create-checkout-session`,
     checkoutSuccess: `${API_BASE_PAYMENT}/checkout/success`,
     checkoutCancel: `${API_BASE_PAYMENT}/checkout/cancel`,

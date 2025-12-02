@@ -74,13 +74,13 @@ function getUserIdFromToken() {
 }
 
 export const AuthApi = {
-  async login(data) {
+  async login(payload) {
     try {
-      console.log('🔐 Attempting login for:', data.email);
+      console.log('🔐 Attempting login for:', payload.email);
       
       const requestData = {
-        email: data.email,
-        password: data.password,
+        email: payload.email,
+        password: payload.password,
         user_agent: navigator.userAgent,
         ip_address: await getIPAddress()
       };
@@ -96,10 +96,13 @@ export const AuthApi = {
         body: requestData,
         credentials: "include"
       });
+      
+      // 🔁 Xano can wrap real data inside `result`, so normalize first
+      const data = response?.result || response || {};
 
       // Normalize token & user fields from backend
-      const authToken = response.authToken || response.token || response.auth_token || response?.auth?.token || null;
-      const user = response.user || response.me || response.profile || null;
+      const authToken = data.authToken || data.token || data.auth_token || data?.auth?.token || null;
+      const user = data.user || data.me || data.profile || null;
 
       console.log('✅ Login successful, user:', (user && (user.email || user.id)) || 'unknown');
       return { ...response, authToken, user };
@@ -142,10 +145,13 @@ export const AuthApi = {
         body: requestData,
         credentials: "include"
       });
+      
+      // 🔁 Normalize possible Xano `result` wrapper here too
+      const data = response?.result || response || {};
 
       // Normalize token & user fields from backend
-      const authToken = response.authToken || response.token || response.auth_token || response?.auth?.token || null;
-      const user = response.user || response.me || response.profile || null;
+      const authToken = data.authToken || data.token || data.auth_token || data?.auth?.token || null;
+      const user = data.user || data.me || data.profile || null;
 
       console.log('✅ Token refresh successful');
       return { ...response, authToken, user };

@@ -1,13 +1,41 @@
 import React from "react";
+import { useSearchParams } from "react-router-dom";
 import { Modal } from "../../components/Modal.jsx";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 import useOpenAI from "../../hooks/useOpenAI.js";
 import { ThemeToggle } from "../../components/ThemeToggle.jsx";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
+import { NotificationsApi } from "../../api/notificationsApi.js";
+import { useAuth } from "../../api/AuthContext.jsx";
+import { AccountApi } from "../../api/accountApi.js";
+import { UserSettingsApi } from "../../api/userSettingsApi.js";
 
 export default function DashboardSettings(){
-  const [activeTab, setActiveTab] = React.useState("notifications");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const tabFromUrl = searchParams.get("tab");
+  const validTabs = ["notifications", "privacy", "account"];
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "notifications";
+
+  const [activeTab, setActiveTab] = React.useState(initialTab);
   const { showSuccess } = useNotifications();
+
+  // Синхронізація таба з URL при зміні
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("tab", newTab);
+    setSearchParams(newSearchParams, { replace: true });
+  };
+
+  // Оновлення локального стану, якщо tab змінено зовні через URL
+  React.useEffect(() => {
+    const tabFromUrl = searchParams.get("tab");
+    if (tabFromUrl && validTabs.includes(tabFromUrl) && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
@@ -25,7 +53,7 @@ export default function DashboardSettings(){
         ].map((t) => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => handleTabChange(t.id)}
             role="tab"
             aria-selected={activeTab === t.id}
             style={{
@@ -45,25 +73,224 @@ export default function DashboardSettings(){
         ))}
       </div>
 
-      {activeTab === 'notifications' && <NotificationsTab onSaved={()=>showSuccess('Notification settings saved')} />}
-      {activeTab === 'privacy' && <PrivacyTab onSaved={()=>showSuccess('Privacy preferences updated')} onAction={(msg)=>showSuccess(msg)} />}
-      {activeTab === 'account' && <AccountTab onSaved={()=>showSuccess('Account settings saved')} onAction={(msg)=>showSuccess(msg)} />}
+      {activeTab === 'notifications' && <NotificationsTab />}
+      {activeTab === 'privacy' && <PrivacyTab />}
+      {activeTab === 'account' && <AccountTab />}
     </div>
   );
 }
 
-function NotificationsTab({ onSaved }){
+function NotificationsTab(){
+  const { user } = useAuth();
+  const { showNotification, showError, showSuccess } = useNotifications();
   const [summary, setSummary] = React.useState('weekly');
   const [alerts, setAlerts] = React.useState(true);
   const [insights, setInsights] = React.useState(true);
-  const [product, setProduct] = React.useState(false);
+  const [product, setProduct] = React.useState(true);
   const [snooze, setSnooze] = React.useState('off');
   const [channels, setChannels] = React.useState({ email:true, sms:false, inapp:true });
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [testing, setTesting] = React.useState(false);
+
+  // Map backend summary_email_frequency -> local value
+  const mapSummaryFromApi = (freq) => {
+    if (!freq || freq === 'none') return 'off';
+    if (['daily','weekly','monthly'].includes(freq)) return freq;
+    return 'weekly';
+  };
+
+  // Map local value -> backend summary_email_frequency
+  const mapSummaryToApi = (value) => {
+    if (!value || value === 'off') return 'none';
+    return value;
+  };
+
+  // Map muted_until -> snooze value
+  const mapSnoozeFromApi = (muted_until) => {
+    if (!muted_until) return 'off';
+    const mutedAt = new Date(muted_until);
+    if (Number.isNaN(mutedAt.getTime())) return 'off';
+    const diffMs = mutedAt.getTime() - Date.now();
+    if (diffMs <= 0) return 'off';
+    const oneHour = 60 * 60 * 1000;
+    const oneDay = 24 * oneHour;
+    if (diffMs <= oneHour + 5 * 60 * 1000) return '1h';
+    if (diffMs <= oneDay + 30 * 60 * 1000) return '24h';
+    return '7d';
+  };
+
+  const computeMutedUntilFromSnooze = (value) => {
+    if (!value || value === 'off') return null;
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000;
+    const oneDay = 24 * oneHour;
+    let delta = 0;
+    if (value === '1h') delta = oneHour;
+    else if (value === '24h') delta = oneDay;
+    else if (value === '7d') delta = 7 * oneDay;
+    if (!delta) return null;
+    // Backend expects numeric timestamptz (ms since epoch)
+    return now + delta;
+  };
+
+  // Load preferences on mount
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadPreferences = async () => {
+      try {
+        setLoading(true);
+        const prefs = await NotificationsApi.getPreferences();
+        console.log("🔔 Loaded notification preferences:", prefs);
+
+        if (!prefs || prefs.error) {
+          // If no preferences exist yet, keep defaults
+          if (prefs?.error) {
+            console.warn("Notification preferences not found:", prefs.error);
+          }
+          return;
+        }
+
+        if (!isMounted) return;
+
+        setSummary(mapSummaryFromApi(prefs.summary_email_frequency));
+        setAlerts(prefs.health_alerts_enabled !== false);
+        setInsights(prefs.ai_insight_enabled !== false);
+        setProduct(prefs.product_updates_enabled !== false);
+        setSnooze(mapSnoozeFromApi(prefs.muted_until));
+        setChannels({
+          // API returns channel_email (bool) for email channel
+          email: prefs.channel_email !== false,
+          // SMS / in-app channels можуть конфігуруватися окремо, залишаємо локально
+          sms: false,
+          inapp: true,
+        });
+      } catch (error) {
+        console.error("Failed to load notification preferences:", error);
+        showNotification(
+          error?.message || "Failed to load notification preferences. Using defaults.",
+          "error"
+        );
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadPreferences();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showNotification]);
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+
+      const payload = {
+        summary_email_frequency: mapSummaryToApi(summary),
+        health_alerts_enabled: !!alerts,
+        ai_insight_enabled: !!insights,
+        product_updates_enabled: !!product,
+        muted_until: computeMutedUntilFromSnooze(snooze),
+        // API очікує email_enabled (bool) для каналу email
+        email_enabled: !!channels.email,
+      };
+
+      console.log("🔔 Updating notification preferences with payload:", payload);
+
+      const updated = await NotificationsApi.updatePreferences(payload);
+      console.log("✅ Notification preferences updated:", updated);
+
+      showSuccess("Notification settings saved");
+    } catch (error) {
+      console.error("Failed to update notification preferences:", error);
+      showError(
+        error?.message || "Failed to save notification settings. Please try again.",
+        6000
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendTestInsight = async () => {
+    if (!user?.id) {
+      showError("User ID is required to send a test notification.");
+      return;
+    }
+    try {
+      setTesting(true);
+      await NotificationsApi.sendAiInsightNotification({
+        user_id: user.id,
+        subject: "Test AI Insight",
+        message: "This is a test AI Insight notification from your settings page.",
+      });
+      showSuccess("Test AI Insight notification sent (if enabled in your preferences).");
+    } catch (error) {
+      console.error("Failed to send test AI Insight notification:", error);
+      showError(error?.message || "Failed to send test AI Insight notification.");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSendTestHealthAlert = async () => {
+    if (!user?.id) {
+      showError("User ID is required to send a test notification.");
+      return;
+    }
+    try {
+      setTesting(true);
+      await NotificationsApi.sendHealthAlertNotification({
+        user_id: user.id,
+        subject: "Test Health Alert",
+        message: "This is a test Health Alert notification from your settings page.",
+      });
+      showSuccess("Test health alert notification sent (if enabled in your preferences).");
+    } catch (error) {
+      console.error("Failed to send test health alert notification:", error);
+      showError(error?.message || "Failed to send test health alert notification.");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSendTestProductUpdate = async () => {
+    if (!user?.id) {
+      showError("User ID is required to send a test notification.");
+      return;
+    }
+    try {
+      setTesting(true);
+      await NotificationsApi.sendProductUpdateNotification({
+        user_id: user.id,
+        subject: "Test Product Update",
+        message: "This is a test Product Update notification from your settings page.",
+      });
+      showSuccess("Test product update notification sent (if enabled in your preferences).");
+    } catch (error) {
+      console.error("Failed to send test product update notification:", error);
+      showError(error?.message || "Failed to send test product update notification.");
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <div className="card" style={{ maxWidth: 720 }}>
       <h3 style={{ marginTop:0 }}>Notifications</h3>
-      <p style={{ marginTop:4, color:'var(--muted)', fontSize:12 }}>Choose how and when we contact you.</p>
+      <p style={{ marginTop:4, color:'var(--muted)', fontSize:12 }}>
+        Choose how and when we contact you. These settings control summary emails and alerts.
+      </p>
+
+      {loading && (
+        <div style={{ fontSize:12, color:'var(--muted)', marginBottom:8 }}>
+          Loading your notification preferences...
+        </div>
+      )}
+
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <div className="form-field">
           <label>Summary emails</label>
@@ -83,31 +310,92 @@ function NotificationsTab({ onSaved }){
             <option value="7d">7 days</option>
           </select>
         </div>
-        <label className="checkbox"><input type="checkbox" checked={alerts} onChange={(e)=>setAlerts(e.target.checked)} /> <span>Health alert notifications</span></label>
-        <label className="checkbox"><input type="checkbox" checked={insights} onChange={(e)=>setInsights(e.target.checked)} /> <span>New AI insight availability</span></label>
-        <label className="checkbox"><input type="checkbox" checked={product} onChange={(e)=>setProduct(e.target.checked)} /> <span>Product updates & announcements</span></label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={alerts}
+            onChange={(e)=>setAlerts(e.target.checked)}
+          />{" "}
+          <span>Health alert notifications</span>
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={insights}
+            onChange={(e)=>setInsights(e.target.checked)}
+          />{" "}
+          <span>New AI insight availability</span>
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={product}
+            onChange={(e)=>setProduct(e.target.checked)}
+          />{" "}
+          <span>Product updates &amp; announcements</span>
+        </label>
       </div>
+
       <div style={{ height:12 }} />
-      <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+
+      <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
         <div style={{ fontSize:12, color:'var(--muted)' }}>Channels:</div>
-        <label className="checkbox"><input type="checkbox" checked={channels.email} onChange={(e)=>setChannels(s=>({...s,email:e.target.checked}))} /> <span>Email</span></label>
-        <label className="checkbox"><input type="checkbox" checked={channels.sms} onChange={(e)=>setChannels(s=>({...s,sms:e.target.checked}))} /> <span>SMS</span></label>
-        <label className="checkbox"><input type="checkbox" checked={channels.inapp} onChange={(e)=>setChannels(s=>({...s,inapp:e.target.checked}))} /> <span>In‑app</span></label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={channels.email}
+            onChange={(e)=>setChannels(s=>({...s,email:e.target.checked}))}
+          />{" "}
+          <span>Email</span>
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={channels.sms}
+            onChange={(e)=>setChannels(s=>({...s,sms:e.target.checked}))}
+          />{" "}
+          <span>SMS</span>
+        </label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={channels.inapp}
+            onChange={(e)=>setChannels(s=>({...s,inapp:e.target.checked}))}
+          />{" "}
+          <span>In‑app</span>
+        </label>
       </div>
+
       <div style={{ height:16 }} />
-      <button className="btn primary" style={{ width:160 }} onClick={()=>onSaved && onSaved()}>Save changes</button>
+
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+        <button
+          className="btn primary"
+          style={{ width:160 }}
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : "Save changes"}
+        </button>
+
+     
+      </div>
     </div>
   );
 }
 
-function PrivacyTab({ onSaved, onAction }){
+function PrivacyTab(){
   const { isLight } = useTheme();
-  const [dataVisibility, setDataVisibility] = React.useState('default');
+  const { user } = useAuth();
+  const { showSuccess, showError } = useNotifications();
+  const [dataVisibility, setDataVisibility] = React.useState('show_all');
   const [aiOptIn, setAiOptIn] = React.useState(true);
   const [retention, setRetention] = React.useState('12m');
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirmType, setConfirmType] = React.useState('download');
   const [deleteConfirmText, setDeleteConfirmText] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   
   // AI processing preferences
   const [aiHealthHistory, setAiHealthHistory] = React.useState(true);
@@ -115,6 +403,146 @@ function PrivacyTab({ onSaved, onAction }){
   const [aiMedicalRecords, setAiMedicalRecords] = React.useState(true);
   const [aiNotes, setAiNotes] = React.useState(true);
   const [aiGoals, setAiGoals] = React.useState(true);
+  // Останні сирі налаштування з /get_ai_preferences (для мерджа при update_settings)
+  const [lastApiPrefs, setLastApiPrefs] = React.useState(null);
+
+  // Map API data_visibility -> local
+  const mapVisibilityFromApi = (value) => {
+    if (value === 'hide_some') return 'hide_some';
+    if (value === 'show_min') return 'show_min';
+    return 'show_all';
+  };
+
+  const mapVisibilityToApi = (value) => {
+    if (value === 'hide_some') return 'hide_some';
+    if (value === 'show_min') return 'show_min';
+    return 'show_all';
+  };
+
+  const mapRetentionFromApi = (value) => {
+    if (['6m', '24m', 'none'].includes(value)) return value;
+    return '12m';
+  };
+
+  const mapRetentionToApi = (value) => {
+    if (['6m', '12m', '24m', 'none'].includes(value)) return value;
+    return '12m';
+  };
+
+  // Helper to apply preferences from API response to local state
+  const applyAiPreferences = (raw) => {
+    if (!raw || typeof raw !== "object") return;
+
+    const prefs = raw.ai_preferences || raw.result?.ai_preferences || raw.result || raw;
+    if (!prefs || typeof prefs !== "object") return;
+
+    // Зберігаємо останні prefs для подальших мерджів при оновленні
+    setLastApiPrefs(prefs);
+
+    setDataVisibility(mapVisibilityFromApi(prefs.data_visibility));
+    setRetention(mapRetentionFromApi(prefs.data_retention));
+
+    const hh = prefs.health_history_enabled !== false;
+    const vm = prefs.vital_metrics_enabled !== false;
+    const mr = prefs.medical_record_uploads_enabled !== false;
+    const nt = prefs.notes_enabled !== false;
+    const gl = prefs.goals_enabled !== false;
+
+    setAiHealthHistory(hh);
+    setAiHealthData(vm);
+    setAiMedicalRecords(mr);
+    setAiNotes(nt);
+    setAiGoals(gl);
+
+    // aiOptIn вважаємо true, якщо хоча б один тип даних дозволений
+    setAiOptIn(hh || vm || mr || nt || gl);
+  };
+
+  // Load AI preferences on mount
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadPreferences = async () => {
+      try {
+        setLoading(true);
+        const res = await UserSettingsApi.getAiPreferences();
+        console.log("🛡️ Loaded AI preferences:", res);
+        if (!isMounted) return;
+        applyAiPreferences(res);
+      } catch (error) {
+        console.error("Failed to load AI preferences:", error);
+        showError(error?.message || "Failed to load privacy preferences.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    // Only attempt to load if we have a user
+    if (user?.id) {
+      loadPreferences();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, showError]);
+
+  const handleSavePrivacy = async () => {
+    try {
+      setSaving(true);
+
+      const baseEnabled = !!aiOptIn;
+
+      // Починаємо з останніх prefs з бекенда, щоб не втрачати поля,
+      // які наразі не редагуються на фронті
+      const merged = {
+        ...(lastApiPrefs || {}),
+      };
+
+      // Перезаписуємо значення на основі поточного стану UI
+      merged.health_history_enabled = baseEnabled && aiHealthHistory;
+      merged.vital_metrics_enabled = baseEnabled && aiHealthData;
+      merged.medical_record_uploads_enabled = baseEnabled && aiMedicalRecords;
+      merged.notes_enabled = baseEnabled && aiNotes;
+      merged.goals_enabled = baseEnabled && aiGoals;
+      merged.data_visibility = mapVisibilityToApi(dataVisibility);
+      merged.data_retention = mapRetentionToApi(retention);
+
+      const prefs = merged;
+
+      console.log("🛡️ Updating AI preferences with payload:", prefs);
+      const res = await UserSettingsApi.updateAiPreferences(prefs);
+      console.log("✅ AI preferences updated:", res);
+      // Локально оновлюємо lastApiPrefs, не перезавантажуючи з бекенда
+      setLastApiPrefs(prefs);
+      showSuccess("Privacy preferences updated");
+    } catch (error) {
+      console.error("Failed to update AI preferences:", error);
+      showError(error?.message || "Failed to save privacy preferences.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveVisibilityOnly = async () => {
+    try {
+      // Мерджимо тільки visibility/retention в останні prefs
+      const merged = {
+        ...(lastApiPrefs || {}),
+      };
+      merged.data_visibility = mapVisibilityToApi(dataVisibility);
+      merged.data_retention = mapRetentionToApi(retention);
+
+      console.log("🛡️ Updating visibility/retention only with merged payload:", merged);
+      await UserSettingsApi.updateAiPreferences(merged);
+      // Локально оновлюємо lastApiPrefs
+      setLastApiPrefs(merged);
+      showSuccess("Visibility preferences updated");
+    } catch (error) {
+      console.error("Failed to update visibility preferences:", error);
+      showError(error?.message || "Failed to save visibility preferences.");
+    }
+  };
 
   return (
     <div style={{ display:'grid', gap:16 }}>
@@ -140,9 +568,9 @@ function PrivacyTab({ onSaved, onAction }){
           <div className="form-field">
             <label>Data visibility</label>
             <select value={dataVisibility} onChange={(e)=>setDataVisibility(e.target.value)}>
-              <option value="default">Show all in app</option>
-              <option value="hide_vitals">Hide sensitive vitals</option>
-              <option value="minimal">Minimal display</option>
+              <option value="show_all">Show all in app</option>
+              <option value="hide_some">Hide sensitive vitals</option>
+              <option value="show_min">Minimal display</option>
             </select>
           </div>
 
@@ -152,11 +580,20 @@ function PrivacyTab({ onSaved, onAction }){
               <option value="6m">6 months</option>
               <option value="12m">12 months</option>
               <option value="24m">24 months</option>
-              <option value="forever">Keep until I delete</option>
+              <option value="none">Keep until I delete</option>
             </select>
           </div>
 
           <label className="checkbox" style={{ gridColumn:'1 / -1' }}><input type="checkbox" checked={aiOptIn} onChange={(e)=>setAiOptIn(e.target.checked)} /> <span>Allow AI processing for insights</span></label>
+        </div>
+        <div style={{ display:"flex", justifyContent:"flex-end", marginTop:12 }}>
+          <button
+            className="btn outline"
+            type="button"
+            onClick={handleSaveVisibilityOnly}
+          >
+            Save visibility
+          </button>
         </div>
       </div>
 
@@ -208,7 +645,14 @@ function PrivacyTab({ onSaved, onAction }){
             <span>Goals & progress entries</span>
           </label>
         </div>
-        <button className="btn primary" style={{ width:180 , marginTop:16 }} onClick={()=>onSaved && onSaved()}>Save preferences</button>
+        <button
+          className="btn primary"
+          style={{ width:180 , marginTop:16 }}
+          onClick={handleSavePrivacy}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : "Save preferences"}
+        </button>
       </div>
       {/* Data management block */}
       <div className="card" style={{ maxWidth: 720 }}>
@@ -265,10 +709,17 @@ function PrivacyTab({ onSaved, onAction }){
               <button 
                 className="btn danger" 
                 disabled={deleteConfirmText.toLowerCase() !== 'delete'}
-                onClick={()=>{ 
-                  setConfirmOpen(false); 
-                  setDeleteConfirmText('');
-                  onAction && onAction('Data deletion requested'); 
+                onClick={async ()=>{ 
+                  try {
+                    await AccountApi.deleteUserData();
+                    showSuccess('All user data deleted permanently');
+                  } catch (error) {
+                    console.error("Failed to delete user data:", error);
+                    showError('Failed to delete data. Please try again.');
+                  } finally {
+                    setConfirmOpen(false); 
+                    setDeleteConfirmText('');
+                  }
                 }}
                 style={{
                   opacity: deleteConfirmText.toLowerCase() !== 'delete' ? 0.5 : 1,
@@ -294,15 +745,110 @@ function PrivacyTab({ onSaved, onAction }){
 
 function AccountTab({ onSaved, onAction }){
   const { isLight } = useTheme();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [mfa, setMfa] = React.useState(false);
+  const { user, setUser, logout } = useAuth();
+  const { showSuccess, showError } = useNotifications();
+  const [email, setEmail] = React.useState(user?.email || "");
+  const [newPassword, setNewPassword] = React.useState("");
+  const [currentPassword, setCurrentPassword] = React.useState("");
+  const [mfa, setMfa] = React.useState(!!user?.mfa_enabled);
+  const [saving, setSaving] = React.useState(false);
   const [devices] = React.useState([
-    { id:'d1', name:'Chrome on macOS', last:'Just now' },
-    { id:'d2', name:'iPhone', last:'Last week' },
+    // TODO: replace with real sessions list when backend endpoint is available
+    { id:"current", name:"Current device", last:"Just now" },
   ]);
   const [dangerOpen, setDangerOpen] = React.useState(false);
   const [dangerType, setDangerType] = React.useState('deactivate');
+  const [dangerLoading, setDangerLoading] = React.useState(false);
+
+  const handleUpdateCredentials = async () => {
+    if (!currentPassword || currentPassword.length < 1) {
+      showError("Please enter your current password to update account settings.");
+      return;
+    }
+
+    if (newPassword && newPassword.length < 8) {
+      showError("New password must be at least 8 characters long.");
+      return;
+    }
+
+    // Backend очікує поля new_email / new_password навіть, якщо вони не змінюються (null)
+    const payload = {
+      new_email: email && email !== user?.email ? email : null,
+      new_password: newPassword ? newPassword : null,
+      current_password: currentPassword,
+      mfa_enabled: !!mfa,
+    };
+
+    try {
+      setSaving(true);
+      const res = await AccountApi.updateCredentials(payload);
+      console.log("✅ update_credentials response:", res);
+
+      const success = res?.success !== false;
+      const message =
+        res?.message || (success ? "Credentials updated successfully." : "Failed to update credentials.");
+
+      if (!success) {
+        throw new Error(message);
+      }
+
+      // Update user in AuthContext if email or MFA changed
+      setUser((prev) => ({
+        ...prev,
+        email: email || prev?.email,
+        mfa_enabled: mfa,
+      }));
+
+      showSuccess(message);
+      onSaved && onSaved();
+      // Clear password fields
+      setCurrentPassword("");
+      setNewPassword("");
+    } catch (error) {
+      console.error("Failed to update credentials:", error);
+      showError(error?.message || "Failed to update credentials. Please check your current password.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevokeSession = async (device) => {
+    try {
+      // In this UI we don't have real token IDs yet, so we call revoke without payload.
+      console.log("🔐 Revoking session for device:", device);
+      await AccountApi.revokeToken({});
+      showSuccess("Session revoked. You may need to log in again on that device.");
+      onAction && onAction("Session revoked");
+    } catch (error) {
+      console.error("Failed to revoke session:", error);
+      showError(error?.message || "Failed to revoke session.");
+    }
+  };
+
+  const handleDangerAction = async () => {
+    try {
+      setDangerLoading(true);
+      if (dangerType === "delete") {
+        const res = await AccountApi.deleteAccount();
+        console.log("🗑️ delete_account response:", res);
+        showSuccess(res?.message || "Account deleted permanently.");
+        onAction && onAction("Account deletion requested");
+        await logout();
+      } else {
+        const res = await AccountApi.deactivateAccount();
+        console.log("🛑 deactivate_account response:", res);
+        showSuccess(res?.message || "Account deactivated temporarily.");
+        onAction && onAction("Account deactivation requested");
+        await logout();
+      }
+      setDangerOpen(false);
+    } catch (error) {
+      console.error("Danger zone action failed:", error);
+      showError(error?.message || "Failed to complete account action.");
+    } finally {
+      setDangerLoading(false);
+    }
+  };
 
   return (
     <div style={{ display:'grid', gap:16 }}>
@@ -312,17 +858,49 @@ function AccountTab({ onSaved, onAction }){
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
           <div className="form-field">
             <label>Email</label>
-            <input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="you@example.com" />
+            <input
+              type="email"
+              value={email}
+              onChange={(e)=>setEmail(e.target.value)}
+              placeholder="you@example.com"
+            />
           </div>
           <div className="form-field">
-            <label>Password</label>
-            <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="••••••••" />
+            <label>New password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e)=>setNewPassword(e.target.value)}
+              placeholder="Leave blank to keep current password"
+            />
           </div>
         </div>
+        <div className="form-field" style={{ marginTop:8 }}>
+          <label>Current password<span style={{ color:'var(--danger)' }}> *</span></label>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(e)=>setCurrentPassword(e.target.value)}
+            placeholder="Required to update email or password"
+          />
+        </div>
         <div style={{ height:8 }} />
-        <label className="checkbox"><input type="checkbox" checked={mfa} onChange={(e)=>setMfa(e.target.checked)} /> <span>Enable multi‑factor authentication (MFA)</span></label>
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={mfa}
+            onChange={(e)=>setMfa(e.target.checked)}
+          />{" "}
+          <span>Enable multi‑factor authentication (MFA)</span>
+        </label>
         <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
-          <button className="btn primary" onClick={()=>onSaved && onSaved()}>Save changes</button>
+          <button
+            className="btn primary"
+            onClick={handleUpdateCredentials}
+            disabled={saving}
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </button>
         </div>
      </div>
 
@@ -341,7 +919,12 @@ function AccountTab({ onSaved, onAction }){
             <div>{d.name}</div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
               <span style={{ fontSize:12, color:'var(--muted)' }}>{d.last}</span>
-              <button className="btn ghost small" onClick={()=>onAction && onAction('Session revoked')}>Revoke</button>
+              <button
+                className="btn ghost small"
+                onClick={()=>handleRevokeSession(d)}
+              >
+                Revoke
+              </button>
             </div>
           </div>
         ))}
@@ -380,7 +963,13 @@ function AccountTab({ onSaved, onAction }){
             <input placeholder="Type DELETE" style={{ width:'100%', padding:'8px 12px', marginTop:8 }} />
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:12 }}>
               <button className="btn ghost" onClick={()=>setDangerOpen(false)}>Cancel</button>
-              <button className="btn danger" onClick={()=>{ setDangerOpen(false); onAction && onAction('Account deletion requested'); }}>Delete permanently</button>
+              <button
+                className="btn danger"
+                disabled={dangerLoading}
+                onClick={handleDangerAction}
+              >
+                {dangerLoading ? "Processing..." : "Delete permanently"}
+              </button>
             </div>
           </div>
         ) : (
@@ -388,7 +977,13 @@ function AccountTab({ onSaved, onAction }){
             <p>Your account will be temporarily deactivated. You can reactivate anytime by logging in.</p>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button className="btn ghost" onClick={()=>setDangerOpen(false)}>Cancel</button>
-              <button className="btn outline" onClick={()=>{ setDangerOpen(false); onAction && onAction('Account deactivation requested'); }}>Deactivate</button>
+              <button
+                className="btn outline"
+                disabled={dangerLoading}
+                onClick={handleDangerAction}
+              >
+                {dangerLoading ? "Processing..." : "Deactivate"}
+              </button>
             </div>
           </div>
         )}

@@ -400,6 +400,8 @@ function HistoryTab() {
     end_date: "" 
   });
   const [loading, setLoading] = React.useState(false);
+  // Захист від подвійного виклику useEffect в React StrictMode
+  const hasLoadedRef = React.useRef(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -447,7 +449,11 @@ function HistoryTab() {
     }
   }, [filters, addNotification]);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+    load();
+  }, [load]);
 
   const readd = async (goal) => {
     try {

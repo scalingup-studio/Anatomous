@@ -12,6 +12,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Logo } from "../components/Logo.jsx";
 import { SignupPage } from "./Signup.jsx";
 import { ForgotPasswordModal } from "../components/ForgotPasswordModal.jsx";
+import { Modal } from "../components/Modal.jsx";
 import { useAuth } from "../api/AuthContext";
 import { useNotifications } from "../api/NotificationContext.jsx";
 import NotificationSystem from "../components/NotificationSystem.jsx";
@@ -30,9 +31,14 @@ export function LoginPage({ onOpenSignup }) {
   const [passwordHint, setPasswordHint] = React.useState("");
   const [forgotOpen, setForgotOpen] = React.useState(false);
   const [signupOpen, setSignupOpen] = React.useState(false);
+  const [mfaOpen, setMfaOpen] = React.useState(false);
+  const [mfaCode, setMfaCode] = React.useState("");
+  const [mfaLoading, setMfaLoading] = React.useState(false);
+  const [mfaMessage, setMfaMessage] = React.useState("");
+  const [pendingEmail, setPendingEmail] = React.useState("");
 
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, verifyMfa } = useAuth();
   const { notifications, removeNotification, showSuccess, showError } = useNotifications();
 
   function validate() {
@@ -61,8 +67,18 @@ export function LoginPage({ onOpenSignup }) {
       setLoading(true);
       console.log('🔐 Attempting login...');
 
-      // Use login from AuthContext - it handles token storage via tokenManager
+      // Use login from AuthContext - it handles token storage & MFA flow
       const result = await login(email, password);
+
+      if (result.mfaRequired) {
+        // MFA step required: show MFA dialog and do NOT navigate yet
+        setPendingEmail(email);
+        setMfaCode("");
+        setMfaMessage(result.message || "MFA code sent to your email.");
+        setMfaOpen(true);
+        showSuccess(result.message || "MFA code sent to your email.");
+        return;
+      }
 
       if (!result.success) {
         throw new Error(result.error || "Login failed");
@@ -79,6 +95,34 @@ export function LoginPage({ onOpenSignup }) {
       showError(err.message || "Login failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onSubmitMfa(e) {
+    e.preventDefault();
+    if (!pendingEmail || !mfaCode.trim()) {
+      setError("Please enter the MFA code from your email.");
+      return;
+    }
+    try {
+      setMfaLoading(true);
+      setError("");
+      console.log("🔐 Submitting MFA code...");
+      const res = await verifyMfa(pendingEmail, mfaCode.trim());
+      if (!res.success) {
+        throw new Error(res.error || "Invalid MFA code.");
+      }
+      showSuccess("MFA verified successfully. You are now logged in.");
+      setMfaOpen(false);
+      setMfaCode("");
+      setPendingEmail("");
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error("❌ MFA verification error:", err);
+      setError(err.message || "MFA verification failed.");
+      showError(err.message || "MFA verification failed.");
+    } finally {
+      setMfaLoading(false);
     }
   }
 
@@ -262,6 +306,64 @@ export function LoginPage({ onOpenSignup }) {
         {signupOpen && (
           <SignupPage onClose={() => setSignupOpen(false)} />
         )}
+
+        {/* MFA Code Modal (user-friendly) */}
+        <Modal
+          open={mfaOpen}
+          title="Enter MFA Code"
+          onClose={() => {
+            if (mfaLoading) return;
+            setMfaOpen(false);
+            setMfaCode("");
+          }}
+        >
+          <form onSubmit={onSubmitMfa} style={{ display:"grid", gap:16 }}>
+            <p style={{ fontSize:13, color:"var(--muted)", margin:0 }}>
+              {mfaMessage ||
+                "For your security, we’ve emailed a one-time 6‑digit code to your account email. Enter it below to finish signing in."}
+            </p>
+            <div className="form-field">
+              <label htmlFor="mfa-code">MFA Code</label>
+              <input
+                id="mfa-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="Enter 6-digit code"
+                value={mfaCode}
+                onChange={(e)=>setMfaCode(e.target.value.replace(/\D/g, ""))}
+                disabled={mfaLoading}
+                autoFocus
+                style={{ textAlign:"center", letterSpacing:"0.3em" }}
+              />
+              <p style={{ fontSize:11, color:"var(--muted)", marginTop:4 }}>
+                Didn’t receive a code? Check your spam folder or wait a few seconds, then request a new login.
+              </p>
+            </div>
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:4 }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  if (mfaLoading) return;
+                  setMfaOpen(false);
+                  setMfaCode("");
+                }}
+                disabled={mfaLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn primary"
+                disabled={mfaLoading || mfaCode.trim().length !== 6}
+              >
+                {mfaLoading ? "Verifying..." : "Verify code"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       </section>
 
       <aside className="artwork">
