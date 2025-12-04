@@ -76,72 +76,6 @@ export default function NotesPage() {
 
       <div style={{ display: "grid", gap: 16 }}>
         <div className="card" style={{ display: "grid", gap: 12 }}>
-          <div className="form-row">
-            <div className="form-field" style={{ flex: 1, minWidth: 200, position: 'relative' }}>
-              <label>Search</label>
-              <div style={{ position: 'relative', width: '100%' }}>
-                <input 
-                  type="text"
-                  value={filters.search || ''} 
-                  onChange={(e) => setFilters(v => ({ ...v, search: e.target.value }))}
-                  placeholder="Search notes by text, mood, or keywords..."
-                  style={{ width: '100%', paddingRight: filters.search ? '32px' : '8px' }}
-                />
-                {filters.search && (
-                  <button
-                    type="button"
-                    onClick={() => setFilters(v => ({ ...v, search: '' }))}
-                    style={{
-                      position: 'absolute',
-                      right: '8px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--muted)',
-                      fontSize: '16px'
-                    }}
-                    title="Clear search"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="form-field" style={{ width: 180 }}>
-              <label>Start date</label>
-              <DatePicker 
-                value={filters.start_date} 
-                onChange={(val) => {
-                  setFilters(v => {
-                    const updated = { ...v, start_date: val };
-                    // If end_date is before new start_date, clear it
-                    if (updated.end_date && val && updated.end_date < val) {
-                      updated.end_date = '';
-                    }
-                    return updated;
-                  });
-                }}
-                maxDate={filters.end_date || undefined}
-              />
-            </div>
-            <div className="form-field" style={{ width: 180 }}>
-              <label>End date</label>
-              <DatePicker 
-                value={filters.end_date} 
-                onChange={(val) => setFilters(v => ({ ...v, end_date: val }))}
-                minDate={filters.start_date || undefined}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="card" style={{ display: "grid", gap: 12 }}>
           <div className="form-field">
             <label>Write a note</label>
             <textarea 
@@ -266,6 +200,72 @@ export default function NotesPage() {
             >
               Save
             </button>
+          </div>
+        </div>
+
+        <div className="card" style={{ display: "grid", gap: 12 }}>
+          <div className="form-row">
+            <div className="form-field" style={{ flex: 1, minWidth: 200, position: 'relative' }}>
+              <label>Search</label>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input 
+                  type="text"
+                  value={filters.search || ''} 
+                  onChange={(e) => setFilters(v => ({ ...v, search: e.target.value }))}
+                  placeholder="Search notes by text, mood, or keywords..."
+                  style={{ width: '100%', paddingRight: filters.search ? '32px' : '8px' }}
+                />
+                {filters.search && (
+                  <button
+                    type="button"
+                    onClick={() => setFilters(v => ({ ...v, search: '' }))}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--muted)',
+                      fontSize: '16px'
+                    }}
+                    title="Clear search"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="form-field" style={{ width: 180 }}>
+              <label>Start date</label>
+              <DatePicker 
+                value={filters.start_date} 
+                onChange={(val) => {
+                  setFilters(v => {
+                    const updated = { ...v, start_date: val };
+                    // If end_date is before new start_date, clear it
+                    if (updated.end_date && val && updated.end_date < val) {
+                      updated.end_date = '';
+                    }
+                    return updated;
+                  });
+                }}
+                maxDate={filters.end_date || undefined}
+              />
+            </div>
+            <div className="form-field" style={{ width: 180 }}>
+              <label>End date</label>
+              <DatePicker 
+                value={filters.end_date} 
+                onChange={(val) => setFilters(v => ({ ...v, end_date: val }))}
+                minDate={filters.start_date || undefined}
+              />
+            </div>
           </div>
         </div>
 

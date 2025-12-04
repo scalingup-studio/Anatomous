@@ -6587,13 +6587,26 @@ const calculateAgeFromDOB = (dob) => {
                                   className="btn outline"
                                   onClick={() => handleEditHealthData(record)}
                                   style={{ 
-                                    padding: '4px 8px', 
-                                    fontSize: '12px',
-                                    minWidth: 'auto'
+                                  padding: '4px 8px', 
+                                  fontSize: '12px',
+                                  minWidth: 'auto'
                                   }}
-                                  title="Edit record"
+                                  title="View / Edit record"
                                 >
-                                  ✏️
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ opacity: 0.9 }}
+                                  >
+                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </svg>
                                 </button>
                                 <button
                                   className="btn outline"
@@ -7078,7 +7091,7 @@ function HealthSection({ title, description, options = [], values, lastUpdated, 
                         }
                       }}
                       role="button"
-                      title="Edit record"
+                      title="View / Edit record"
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

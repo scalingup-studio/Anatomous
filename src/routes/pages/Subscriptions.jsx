@@ -90,7 +90,7 @@ export default function SubscriptionsPage() {
 
       {/* Helpful banner */}
       <div className="card" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-        <div style={{ color:'var(--muted)', fontSize:13 }}>Manage your plan, view what's included, and upgrade any time. You can switch between monthly and annual billing on the Upgrade tab.</div>
+        <div style={{ color:'var(--muted)', fontSize:13 }}>Manage your current plan, see what’s included, and upgrade at any time. You can also switch between monthly and annual billing in the Upgrade tab.</div>
         <a className="btn ghost" href="/privacy" target="_blank" rel="noreferrer">Billing FAQ</a>
       </div>
 
