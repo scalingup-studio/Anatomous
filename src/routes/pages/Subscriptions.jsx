@@ -1853,7 +1853,9 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
       setConfirmUpgrade({ open: false, plan: null });
 
       // Build success and cancel URLs (for HashRouter)
-      const baseUrl = window.location.origin;
+      // In production we are hosted under /Anatomous on GitHub Pages
+      const baseOrigin = window.location.origin;
+      const baseUrl = `${baseOrigin}/Anatomous`;
       const successUrl = `${baseUrl}/#/dashboard/subscriptions/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${baseUrl}/#/dashboard/subscriptions/checkout/cancel`;
 
