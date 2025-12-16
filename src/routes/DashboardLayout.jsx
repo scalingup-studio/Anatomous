@@ -5,6 +5,8 @@ import { useAuth } from "../api/AuthContext";
 import NotificationSystem from "../components/NotificationSystem.jsx";
 import { useNotifications } from "../api/NotificationContext.jsx";
 import { ProfilesApi } from "../api/profilesApi.js";
+import { SubscriptionApi } from "../api/subscriptionApi.js";
+import { hasFeatureAccess } from "../utils/subscriptionUtils.js";
 import { ThemeToggle } from "../components/ThemeToggle.jsx";
 
 export default function DashboardLayout() {
@@ -35,11 +37,47 @@ export default function DashboardLayout() {
     }
   };
 
+  // Викликаємо /family/members один раз при завантаженні сторінки (для ініціалізації бекенду)
+  React.useEffect(() => {
+    (async () => {
+      try {
+        await SubscriptionApi.getFamilyMembers({
+          status: "active",
+          include_profiles: true,
+          per_page: 20,
+        });
+        try {
+          console.log("👨‍👩‍👧 [DashboardLayout] Initial family/members call done");
+        } catch {}
+      } catch (err) {
+        console.error("Failed initial family/members call:", err);
+      }
+    })();
+  }, []);
+
   React.useEffect(() => { 
     setMenuOpen(false);
     // Scroll to top when route changes
     scrollToTop();
   }, [location.pathname]);
+
+  // Виклик family/members при завантаженні сторінки (один раз)
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await SubscriptionApi.getFamilyMembers({
+          status: "active",
+          include_profiles: true,
+          per_page: 20,
+        });
+        try {
+          console.log("👨‍👩‍👧 [DashboardLayout] initial family members fetch on mount:", res);
+        } catch {}
+      } catch (err) {
+        console.error("Failed initial family members fetch:", err);
+      }
+    })();
+  }, []);
 
   // Lock body scroll when sidebar is open
   React.useEffect(() => {
@@ -175,6 +213,10 @@ function UserSummaryAndLogout({ onLogout }) {
   const initials = (user?.first_name || user?.name || '?')[0]?.toUpperCase() + (user?.last_name?.[0]?.toUpperCase() || '');
   const [avatarUrl, setAvatarUrl] = React.useState('');
   const [profileData, setProfileData] = React.useState(null);
+  const [familyMembers, setFamilyMembers] = React.useState([]);
+  const [familyLoading, setFamilyLoading] = React.useState(false);
+  const [activeFamilyId, setActiveFamilyId] = React.useState(null);
+  const [primaryFamilyId, setPrimaryFamilyId] = React.useState(null);
 
   // Helper to extract a usable URL from various shapes
   const getPhotoUrl = (obj) => {
@@ -209,6 +251,112 @@ function UserSummaryAndLogout({ onLogout }) {
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  const hasFamilySharing = React.useMemo(() => {
+    return hasFeatureAccess(user, "familySharing");
+  }, [user]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function loadFamilyMembers() {
+      if (!user?.id) {
+        try {
+          console.log("👨‍👩‍👧 [DashboardLayout] Skip family members load: no user id");
+        } catch {}
+        return;
+      }
+      if (!hasFamilySharing) {
+        // Якщо підписка більше не сімейна — очищаємо локальний стан і не показуємо блок
+        setFamilyMembers([]);
+        setPrimaryFamilyId(null);
+        setActiveFamilyId(null);
+        return;
+      }
+      try {
+        setFamilyLoading(true);
+        const res = await SubscriptionApi.getFamilyMembers({ status: "active", include_profiles: true, per_page: 20 });
+        const base = res?.result || res || {};
+        const items = base.items || base;
+        try {
+          console.log("👨‍👩‍👧 [DashboardLayout] family members response:", res);
+        } catch {}
+        if (cancelled) return;
+        const list = Array.isArray(items) ? items : [];
+        setFamilyMembers(list);
+        const primary =
+          list.find((m) => m.role === "Owner" || m.profile_type === "primary") ||
+          null;
+        if (primary?.id) {
+          setPrimaryFamilyId(primary.id);
+          setActiveFamilyId(primary.id);
+        }
+      } catch (err) {
+        console.error("Failed to load family members:", err);
+      } finally {
+        if (!cancelled) setFamilyLoading(false);
+      }
+    }
+
+    loadFamilyMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, hasFamilySharing]);
+
+  const handleSwitchMember = async (memberId) => {
+    try {
+      if (!primaryFamilyId && !memberId) return;
+      setFamilyLoading(true);
+      const idToSend = memberId || primaryFamilyId;
+      try {
+        console.log("🔁 [DashboardLayout] Switching profile, idToSend:", idToSend);
+      } catch {}
+      await SubscriptionApi.switchFamilyMember(idToSend);
+      setActiveFamilyId(memberId || primaryFamilyId || null);
+      try {
+        localStorage.setItem("active_family_member_id", memberId ? String(memberId) : "");
+      } catch {}
+      // Після успішного перемикання повністю перезавантажуємо сторінку,
+      // щоб усі дані/контексти оновилися під новий профіль
+      try {
+        window.location.reload();
+      } catch {}
+    } catch (err) {
+      console.error("Failed to switch family member:", err);
+    } finally {
+      setFamilyLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem("active_family_member_id");
+      if (stored) {
+        setActiveFamilyId(stored);
+      }
+    } catch {}
+  }, []);
+
+  const activeProfileLabel = React.useMemo(() => {
+    if (!hasFamilySharing) return null;
+    if (!familyMembers || familyMembers.length === 0) return null;
+    if (!activeFamilyId || activeFamilyId === String(primaryFamilyId)) {
+      return "You (primary)";
+    }
+    const m = familyMembers.find((member) => {
+      const switchId =
+        member.family_member_id ||
+        member.profile_id ||
+        member.id;
+      return String(switchId) === String(activeFamilyId);
+    });
+    if (!m) return "You (primary)";
+    return (
+      m.family_member_name ||
+      [m.first_name, m.last_name].filter(Boolean).join(" ") ||
+      "Family member"
+    );
+  }, [hasFamilySharing, activeFamilyId, primaryFamilyId, familyMembers]);
   return (
     <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border, #ececec)' }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
@@ -237,6 +385,75 @@ function UserSummaryAndLogout({ onLogout }) {
           </div>
         </div>
       </div>
+      {hasFamilySharing && familyMembers && familyMembers.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize:11, color:'#777', marginBottom:2 }}>Family profiles</div>
+          {activeProfileLabel && (
+            <div style={{ fontSize:11, color:'#999', marginBottom:4 }}>
+              Active: <span style={{ fontWeight:600 }}>{activeProfileLabel}</span>
+            </div>
+          )}
+          <div style={{ display:"grid", gap:4 }}>
+            <button
+              type="button"
+              className={`btn outline small ${!activeFamilyId || activeFamilyId === String(primaryFamilyId) ? "active" : ""}`}
+              onClick={() => handleSwitchMember(null)}
+              disabled={familyLoading}
+              style={{
+                justifyContent: "space-between",
+                display: "flex",
+                background:
+                  !activeFamilyId || activeFamilyId === String(primaryFamilyId)
+                    ? "rgba(0, 186, 206, 0.08)"
+                    : "transparent",
+                borderColor:
+                  !activeFamilyId || activeFamilyId === String(primaryFamilyId)
+                    ? "var(--primary)"
+                    : "var(--border, #ececec)",
+              }}
+            >
+              <span>You (primary)</span>
+            </button>
+            {familyMembers.map((member) => {
+              const name =
+                member.family_member_name ||
+                [member.first_name, member.last_name].filter(Boolean).join(" ") ||
+                "Family member";
+              const switchId =
+                member.family_member_id ||
+                member.profile_id ||
+                member.id;
+              if (switchId === primaryFamilyId) return null;
+              return (
+                <button
+                  key={member.id || switchId}
+                  type="button"
+                  className={`btn outline small ${activeFamilyId === String(switchId) ? "active" : ""}`}
+                  onClick={() => handleSwitchMember(switchId)}
+                  disabled={familyLoading}
+                  style={{
+                    justifyContent: "space-between",
+                    display: "flex",
+                    background:
+                      activeFamilyId === String(switchId)
+                        ? "rgba(0, 186, 206, 0.08)"
+                        : "transparent",
+                    borderColor:
+                      activeFamilyId === String(switchId)
+                        ? "var(--primary)"
+                        : "var(--border, #ececec)",
+                  }}
+                >
+                  <span>{name}</span>
+                </button>
+              );
+            })}
+            {familyLoading && (
+              <div style={{ fontSize:11, color:"#777" }}>Loading family profiles...</div>
+            )}
+          </div>
+        </div>
+      )}
       <button className="btn outline" style={{ width:'100%' }} onClick={onLogout}>Log out</button>
     </div>
   );

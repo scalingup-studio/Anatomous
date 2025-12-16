@@ -130,14 +130,18 @@ export const SubscriptionApi = {
   },
 
   /**
-   * POST /switch_family_member
-   * Перемикає активного члена сім'ї для введення та перегляду даних
-   * @param {number} familyMemberId - ID члена сім'ї для перемикання (або ID основного акаунту)
+   * POST /profile/switch
+   * Перемикає активний профіль (primary або family) для введення та перегляду даних
+   * @param {string|number} familyMemberId - ID члена сім'ї / профілю, який очікує бекенд (family_member_id)
    */
   switchFamilyMember: async (familyMemberId) => {
+    const body = { family_member_id: familyMemberId };
+    try {
+      console.log("🔁 [SubscriptionApi.switchFamilyMember] Request body:", body);
+    } catch {}
     return authRequest(CUSTOM_ENDPOINTS.subscription.switchFamilyMember, {
       method: "POST",
-      body: { family_member_id: familyMemberId },
+      body,
     });
   },
 

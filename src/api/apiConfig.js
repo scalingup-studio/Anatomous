@@ -159,7 +159,7 @@ export const CUSTOM_ENDPOINTS = {
     // New family members endpoints
     familyMembers: `${API_BASE_SUBSCRIPTION}/family/members`,
     familyMemberById: (id) => `${API_BASE_SUBSCRIPTION}/family/members/${id}`,
-    switchFamilyMember: `${API_BASE_SUBSCRIPTION}/switch_family_member`,
+    switchFamilyMember: `${API_BASE_SUBSCRIPTION}/profile/switch`,
     // Legacy endpoints (for backward compatibility)
     familyMembersLegacy: `${API_BASE_SUBSCRIPTION}/subscription/family_members`,
     addFamilyMemberLegacy: `${API_BASE_SUBSCRIPTION}/subscription/add_family_member`,

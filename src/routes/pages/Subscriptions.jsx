@@ -6,6 +6,7 @@ import { useAuth } from "../../api/AuthContext.jsx";
 import { SubscriptionApi } from "../../api/subscriptionApi.js";
 import { PaymentApi } from "../../api/paymentApi.js";
 import { useNotifications } from "../../api/NotificationContext.jsx";
+import { PLAN_TIERS, getUserPlan } from "../../utils/subscriptionUtils.js";
 
 function Tabs({ value, onChange }) {
   const items = [
@@ -120,6 +121,19 @@ function CurrentPlan() {
   const [cancelImmediate, setCancelImmediate] = React.useState(true);
   const [cancelReason, setCancelReason] = React.useState("");
   const [cancelLoading, setCancelLoading] = React.useState(false);
+  const [familyModalOpen, setFamilyModalOpen] = React.useState(false);
+  const [familySaving, setFamilySaving] = React.useState(false);
+  const [familyForm, setFamilyForm] = React.useState({
+    family_member_name: "",
+    first_name: "",
+    last_name: "",
+    dob: "",
+    sex_of_birth: "",
+    height_cm: 0,
+    weight_kg: 0,
+    role: "member",
+    access_level: "full",
+  });
 
   const loadSubscription = React.useCallback(async () => {
     try {
@@ -559,6 +573,70 @@ function CurrentPlan() {
     return true;
   }, [subscription, active.status, active.willCancelAt]);
 
+  const isFamilyPlan = React.useMemo(() => {
+    const plan = getUserPlan(user);
+    return plan === PLAN_TIERS.FAMILY;
+  }, [user]);
+
+  const handleFamilyInputChange = (field, value) => {
+    setFamilyForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleCreateFamilyMember = async (e) => {
+    e?.preventDefault?.();
+    if (!familyForm.family_member_name && !familyForm.first_name) {
+      showNotification("Please enter at least a name or nickname for the family member.", "error");
+      return;
+    }
+
+    try {
+      setFamilySaving(true);
+
+      const payload = {
+        family_member_name: familyForm.family_member_name || `${familyForm.first_name} ${familyForm.last_name}`.trim(),
+        first_name: familyForm.first_name || null,
+        last_name: familyForm.last_name || null,
+        dob: familyForm.dob || null,
+        sex_of_birth: familyForm.sex_of_birth || null,
+        height_cm: Number(familyForm.height_cm) || 0,
+        weight_kg: Number(familyForm.weight_kg) || 0,
+        role: familyForm.role || "member",
+        access_level: familyForm.access_level || "full",
+      };
+
+      const res = await SubscriptionApi.addFamilyMember(payload);
+      console.log("👨‍👩‍👧 Family member created:", res);
+      showNotification("Family member profile created.", "success");
+
+      // Refresh subscription limits (familyUsed/familyMax, etc.)
+      await loadSubscription();
+
+      setFamilyModalOpen(false);
+      setFamilyForm({
+        family_member_name: "",
+        first_name: "",
+        last_name: "",
+        dob: "",
+        sex_of_birth: "",
+        height_cm: 0,
+        weight_kg: 0,
+        role: "member",
+        access_level: "full",
+      });
+    } catch (error) {
+      console.error("Failed to create family member:", error);
+      showNotification(
+        error?.message || "Failed to create family member profile. Please try again.",
+        "error"
+      );
+    } finally {
+      setFamilySaving(false);
+    }
+  };
+
   const handleCancelSubscription = React.useCallback(async () => {
     try {
       setCancelLoading(true);
@@ -838,12 +916,21 @@ function CurrentPlan() {
         </div>
       </div>
 
-      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center' }}>
+      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center', flexWrap:'wrap' }}>
+        {isFamilyPlan && (
+          <button
+            className="btn secondary"
+            onClick={() => setFamilyModalOpen(true)}
+            style={{ fontSize: 12, padding: '6px 12px', marginRight: 'auto', whiteSpace:'nowrap' }}
+          >
+            Add family profile
+          </button>
+        )}
         {canCancelSubscription && (
           <button
             className="btn outline"
             onClick={() => setCancelModalOpen(true)}
-            style={{ fontSize: 12, padding: '6px 12px', marginRight: 'auto' }}
+            style={{ fontSize: 12, padding: '6px 12px', marginRight: isFamilyPlan ? 0 : 'auto' }}
           >
             Cancel subscription
           </button>
@@ -866,6 +953,182 @@ function CurrentPlan() {
           }
         }}>Upgrade</button>
       </div>
+
+      {/* Add family member modal (Family plan only) */}
+      <Modal
+        open={familyModalOpen}
+        title="Add Family Member Profile"
+        onClose={() => {
+          if (!familySaving) {
+            setFamilyModalOpen(false);
+          }
+        }}
+      >
+        <form onSubmit={handleCreateFamilyMember} style={{ display: "grid", gap: 12 }}>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>
+            Create a second profile under your Family plan. You can update details later from their profile.
+          </p>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <label style={{ fontSize: 13, fontWeight: 600 }}>Nickname / display name</label>
+            <input
+              type="text"
+              value={familyForm.family_member_name}
+              onChange={(e) => handleFamilyInputChange("family_member_name", e.target.value)}
+              placeholder="e.g. Emma, Dad, Child"
+              style={{
+                width: "100%",
+                padding: 8,
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text)",
+                fontSize: 13,
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>First name</label>
+              <input
+                type="text"
+                value={familyForm.first_name}
+                onChange={(e) => handleFamilyInputChange("first_name", e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              />
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Last name</label>
+              <input
+                type="text"
+                value={familyForm.last_name}
+                onChange={(e) => handleFamilyInputChange("last_name", e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Date of birth</label>
+              <input
+                type="date"
+                value={familyForm.dob}
+                onChange={(e) => handleFamilyInputChange("dob", e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              />
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Sex at birth</label>
+              <select
+                value={familyForm.sex_of_birth}
+                onChange={(e) => handleFamilyInputChange("sex_of_birth", e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              >
+                <option value="">Select</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Height (cm)</label>
+              <input
+                type="number"
+                min="0"
+                value={familyForm.height_cm}
+                onChange={(e) => handleFamilyInputChange("height_cm", e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              />
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Weight (kg)</label>
+              <input
+                type="number"
+                min="0"
+                value={familyForm.weight_kg}
+                onChange={(e) => handleFamilyInputChange("weight_kg", e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text)",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => {
+                if (!familySaving) setFamilyModalOpen(false);
+              }}
+              disabled={familySaving}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn primary" disabled={familySaving}>
+              {familySaving ? "Saving..." : "Create profile"}
+            </button>
+          </div>
+        </form>
+      </Modal>
       
       {/* Cancel subscription modal */}
       <Modal
