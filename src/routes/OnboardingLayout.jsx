@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../api/AuthContext.jsx';
 import { useNotifications } from '../api/NotificationContext.jsx';
 import { OnboardingApi } from '../api/onboardingApi.js';
@@ -10,6 +10,7 @@ import './OnboardingLayout.css';
 
 const OnboardingLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, completeOnboarding, setIsNewUser } = useAuth();
   const { showSuccess, showError } = useNotifications();
 
@@ -22,6 +23,17 @@ const OnboardingLayout = () => {
   const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
   const [bmiTooltipPosition, setBmiTooltipPosition] = useState({ x: 0, y: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Read ?plan= from URL so after onboarding we can redirect to Subscriptions if needed
+  const selectedPlan = React.useMemo(() => {
+    try {
+      const params = new URLSearchParams(location.search || '');
+      const plan = (params.get('plan') || '').trim();
+      return plan || '';
+    } catch {
+      return '';
+    }
+  }, [location.search]);
 
   // Lock body scroll when sidebar is open
   useEffect(() => {
@@ -778,12 +790,24 @@ const OnboardingLayout = () => {
       localStorage.removeItem('onboarding-completed');
       
       showSuccess('Welcome to Anatomous! Your profile has been set up successfully.');
-      // Redirect to dashboard (Overview/Home) after successful completion
-      console.log('🚀 Navigating to dashboard (Overview) after completing onboarding...');
-      try {
-        navigate('/dashboard', { replace: true });
-      } catch (error) {
-        console.error('❌ Error navigating to dashboard:', error);
+      // Redirect after successful completion:
+      // - if a plan was preselected (?plan=...), go directly to Subscriptions
+      // - otherwise go to dashboard overview
+      if (selectedPlan) {
+        const target = `/dashboard/subscriptions?plan=${encodeURIComponent(selectedPlan)}`;
+        console.log('🚀 Navigating to', target, 'after completing onboarding with selected plan');
+        try {
+          navigate(target, { replace: true });
+        } catch (error) {
+          console.error('❌ Error navigating to subscriptions:', error);
+        }
+      } else {
+        console.log('🚀 Navigating to /dashboard (Overview) after completing onboarding...');
+        try {
+          navigate('/dashboard', { replace: true });
+        } catch (error) {
+          console.error('❌ Error navigating to dashboard:', error);
+        }
       }
     } catch (error) {
       console.error('❌ Error completing onboarding:', error);

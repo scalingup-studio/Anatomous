@@ -8,7 +8,7 @@
  */
 
 import React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Logo } from "../components/Logo.jsx";
 import { SignupPage } from "./Signup.jsx";
 import { ForgotPasswordModal } from "../components/ForgotPasswordModal.jsx";
@@ -38,8 +38,41 @@ export function LoginPage({ onOpenSignup }) {
   const [pendingEmail, setPendingEmail] = React.useState("");
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, verifyMfa } = useAuth();
   const { notifications, removeNotification, showSuccess, showError } = useNotifications();
+
+  // Read ?plan= from URL (e.g. #/login?plan=family) and auto-open signup if present
+  const { planValue, hasPlanParam } = React.useMemo(() => {
+    try {
+      // With HashRouter the query string lives in the hash, e.g. "#/login?plan=family"
+      const hash = window.location.hash || "";
+      const idx = hash.indexOf("?");
+      if (idx === -1) {
+        return { planValue: "", hasPlanParam: false };
+      }
+      const query = hash.slice(idx + 1); // part after "?"
+      const params = new URLSearchParams(query);
+      const raw = params.get("plan");
+      const value = (raw || "").trim();
+      return {
+        planValue: value,
+        hasPlanParam: params.has("plan"),
+      };
+    } catch {
+      return { planValue: "", hasPlanParam: false };
+    }
+  }, [location.hash]);
+
+  React.useEffect(() => {
+    if (hasPlanParam) {
+      // Automatically open signup modal when ?plan= is present (even if empty)
+      try {
+        console.log("🔗 [LoginPage] Detected plan param in URL:", planValue);
+      } catch {}
+      setSignupOpen(true);
+    }
+  }, [hasPlanParam, planValue]);
 
   function validate() {
     let ok = true;
@@ -304,7 +337,10 @@ export function LoginPage({ onOpenSignup }) {
         />
 
         {signupOpen && (
-          <SignupPage onClose={() => setSignupOpen(false)} />
+          <SignupPage
+            onClose={() => setSignupOpen(false)}
+            initialPlan={planValue}
+          />
         )}
 
         {/* MFA Code Modal (user-friendly) */}

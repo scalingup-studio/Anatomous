@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../api/AuthContext.jsx";
 import { useNotifications } from "../api/NotificationContext.jsx";
 import { Modal } from "../components/Modal.jsx";
@@ -7,7 +7,7 @@ import { Logo } from "../components/Logo.jsx";
 import { AuthApi } from "../api/authApi";
 import { ProfilesApi } from "../api/profilesApi.js";
 
-export function SignupPage({ onClose }) {
+export function SignupPage({ onClose, initialPlan }) {
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -17,8 +17,21 @@ export function SignupPage({ onClose }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const navigate = useNavigate?.() || (()=>{});
+  const location = useLocation?.() || { search: "" };
   const { signup } = useAuth?.() || {};
   const { showSuccess, showError } = useNotifications();
+
+  // Prefer explicit initialPlan prop, but also allow reading from current URL if missing
+  const planFromUrl = React.useMemo(() => {
+    if (initialPlan) return initialPlan;
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const plan = (params.get("plan") || "").trim();
+      return plan || "";
+    } catch {
+      return "";
+    }
+  }, [initialPlan, location.search]);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -67,15 +80,20 @@ export function SignupPage({ onClose }) {
       // Backend already creates profile on signup (new_profile),
       // so we skip duplicate profile creation here.
       
-      // Redirect new users to onboarding to complete their profile setup
-      console.log('🎯 Attempting to navigate to /onboarding...');
-      navigate("/onboarding", { replace: true });
+      // Redirect new users to onboarding to complete their profile setup.
+      // Preserve selected plan in query (?plan=...) so we can route to Subscriptions after onboarding.
+      const planQuery = planFromUrl ? `?plan=${encodeURIComponent(planFromUrl)}` : "";
+      const onboardingPath = `/onboarding${planQuery}`;
+
+      console.log('🎯 Attempting to navigate to', onboardingPath, 'after signup...');
+      navigate(onboardingPath, { replace: true });
       
-      // Fallback: if navigate doesn't work, try window.location
+      // Fallback: if navigate doesn't work, try window.location with hash
       setTimeout(() => {
-        if (window.location.hash !== '#/onboarding') {
-          console.log('🔄 Navigate failed, using window.location fallback');
-          window.location.href = '#/onboarding';
+        const expectedHash = `#/onboarding${planQuery}`;
+        if (window.location.hash !== expectedHash) {
+          console.log('🔄 Navigate failed, using window.location fallback to', expectedHash);
+          window.location.href = expectedHash;
         }
       }, 100);
       
