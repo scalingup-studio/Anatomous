@@ -1859,15 +1859,25 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
       const successUrl = `${baseUrl}/#/dashboard/subscriptions/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${baseUrl}/#/dashboard/subscriptions/checkout/cancel`;
 
-      // Create Stripe Checkout Session
-      // According to API spec: required fields are plan_id, success_url, cancel_url
-      // payment_type is optional with default "subscription"
-      const sessionResult = await PaymentApi.createCheckoutSession({
+      // Prepare request body for upgrade / checkout session
+      const checkoutPayload = {
         plan_id: planId,
         success_url: successUrl,
         cancel_url: cancelUrl,
-        payment_type: 'subscription'
-      });
+        payment_type: 'subscription',
+        // New: explicitly pass billing period to backend ("monthly" | "annual")
+        billing_period: monthly ? "monthly" : "annual",
+      };
+
+      // Log body of API call for debugging
+      try {
+        console.log('📤 [Subscriptions] createCheckoutSession payload:', checkoutPayload);
+      } catch {}
+
+      // Create Stripe Checkout Session
+      // According to API spec: required fields are plan_id, success_url, cancel_url
+      // payment_type is optional with default "subscription"
+      const sessionResult = await PaymentApi.createCheckoutSession(checkoutPayload);
 
       // Log response for debugging
       console.log('🔍 createCheckoutSession response:', sessionResult);
