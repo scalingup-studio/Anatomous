@@ -145,6 +145,32 @@ export const SubscriptionApi = {
     });
   },
 
+  /**
+   * GET /payment_history
+   * Отримує історію платежів з фільтрацією
+   * @param {object} options - Параметри запиту
+   * @param {number} options.page - Номер сторінки (за замовчуванням 1)
+   * @param {number} options.per_page - Кількість записів на сторінці (за замовчуванням 20)
+   * @param {string} options.subscription_status - Фільтр статусу (active, past_due, canceled, trialing, unpaid, incomplete, incomplete_expired, paused)
+   * @param {string} options.start_date - Початкова дата (YYYY-MM-DD)
+   * @param {string} options.end_date - Кінцева дата (YYYY-MM-DD)
+   * @param {string} options.payment_type - Тип платежу
+   */
+  getPaymentHistory: async (options = {}) => {
+    const body = {
+      page: options.page || 1,
+      per_page: options.per_page || 20,
+      subscription_status: options.subscription_status || "",
+      start_date: options.start_date || null,
+      end_date: options.end_date || null,
+      payment_type: options.payment_type || "",
+    };
+    return authRequest(CUSTOM_ENDPOINTS.payments.paymentHistory, {
+      method: "GET",
+      body,
+    });
+  },
+
 };
 
 export default SubscriptionApi;

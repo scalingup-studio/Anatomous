@@ -12,6 +12,7 @@ function Tabs({ value, onChange }) {
   const items = [
     { key: "current", label: "Current Plan" },
     { key: "upgrade", label: "Upgrade Options" },
+    { key: "history", label: "Payment History" },
   ];
   return (
     <div role="tablist" aria-label="Subscriptions navigation" style={{ display: "flex", gap: 8, borderBottom: "1px solid var(--border)", paddingBottom: 8, marginBottom: 16 }}>
@@ -45,7 +46,7 @@ export default function SubscriptionsPage() {
   
   // Читаємо таб з URL, якщо є, інакше "current" за замовчуванням
   const tabFromUrl = searchParams.get("tab");
-  const validTabs = ["current", "upgrade"];
+  const validTabs = ["current", "upgrade", "history"];
   const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "current";
   
   const [tab, setTab] = React.useState(initialTab);
@@ -99,6 +100,7 @@ export default function SubscriptionsPage() {
 
       {tab === "current" && <CurrentPlan key={refreshKey} />}
       {tab === "upgrade" && <UpgradeOptions onUpgradeSuccess={handleUpgradeSuccess} onSubscriptionUpdate={handleSubscriptionUpdate} />}
+      {tab === "history" && <PaymentHistory />}
     </div>
   );
 }
@@ -2697,6 +2699,302 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+// ===== PAYMENT HISTORY TAB =====
+const SUBSCRIPTION_STATUSES = [
+  { value: "", label: "All statuses" },
+  { value: "active", label: "Active" },
+  { value: "past_due", label: "Past Due" },
+  { value: "canceled", label: "Canceled" },
+  { value: "trialing", label: "Trialing" },
+  { value: "unpaid", label: "Unpaid" },
+  { value: "incomplete", label: "Incomplete" },
+  { value: "incomplete_expired", label: "Incomplete Expired" },
+  { value: "paused", label: "Paused" },
+];
+
+function PaymentHistory() {
+  const [payments, setPayments] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [page, setPage] = React.useState(1);
+  const [hasMore, setHasMore] = React.useState(false);
+  const [filters, setFilters] = React.useState({
+    subscription_status: "",
+    start_date: "",
+    end_date: "",
+    payment_type: "",
+  });
+
+  const PER_PAGE = 20;
+
+  const loadPayments = React.useCallback(async (pageNum = 1, append = false) => {
+    try {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      const result = await SubscriptionApi.getPaymentHistory({
+        page: pageNum,
+        per_page: PER_PAGE,
+        subscription_status: filters.subscription_status,
+        start_date: filters.start_date || null,
+        end_date: filters.end_date || null,
+        payment_type: filters.payment_type,
+      });
+
+      console.log("💳 Payment history response:", result);
+
+      const items = result?.result?.items || result?.items || result?.data || result || [];
+      const totalItems = result?.result?.total || result?.total || items.length;
+      
+      if (append) {
+        setPayments((prev) => [...prev, ...items]);
+      } else {
+        setPayments(items);
+      }
+
+      setHasMore(pageNum * PER_PAGE < totalItems);
+      setPage(pageNum);
+    } catch (err) {
+      console.error("Failed to load payment history:", err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [filters]);
+
+  React.useEffect(() => {
+    loadPayments(1, false);
+  }, [loadPayments]);
+
+  const handleLoadMore = () => {
+    loadPayments(page + 1, true);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleApplyFilters = () => {
+    loadPayments(1, false);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      subscription_status: "",
+      start_date: "",
+      end_date: "",
+      payment_type: "",
+    });
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    try {
+      return new Date(dateStr).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatAmount = (amount, currency = "USD") => {
+    if (amount == null) return "—";
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency?.toUpperCase() || "USD",
+    }).format(amount / 100);
+  };
+
+  const getStatusBadge = (status) => {
+    const statusColors = {
+      active: { bg: "rgba(34, 197, 94, 0.15)", color: "#22c55e" },
+      succeeded: { bg: "rgba(34, 197, 94, 0.15)", color: "#22c55e" },
+      paid: { bg: "rgba(34, 197, 94, 0.15)", color: "#22c55e" },
+      past_due: { bg: "rgba(251, 146, 60, 0.15)", color: "#fb923c" },
+      canceled: { bg: "rgba(239, 68, 68, 0.15)", color: "#ef4444" },
+      failed: { bg: "rgba(239, 68, 68, 0.15)", color: "#ef4444" },
+      trialing: { bg: "rgba(59, 130, 246, 0.15)", color: "#3b82f6" },
+      unpaid: { bg: "rgba(239, 68, 68, 0.15)", color: "#ef4444" },
+      incomplete: { bg: "rgba(251, 146, 60, 0.15)", color: "#fb923c" },
+      incomplete_expired: { bg: "rgba(107, 114, 128, 0.15)", color: "#6b7280" },
+      paused: { bg: "rgba(107, 114, 128, 0.15)", color: "#6b7280" },
+      pending: { bg: "rgba(251, 146, 60, 0.15)", color: "#fb923c" },
+    };
+    const style = statusColors[status?.toLowerCase()] || { bg: "rgba(107, 114, 128, 0.15)", color: "#6b7280" };
+    return (
+      <span
+        style={{
+          display: "inline-block",
+          padding: "4px 8px",
+          borderRadius: 4,
+          fontSize: 11,
+          fontWeight: 600,
+          textTransform: "capitalize",
+          background: style.bg,
+          color: style.color,
+        }}
+      >
+        {status || "Unknown"}
+      </span>
+    );
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      {/* Filters */}
+      <div className="card" style={{ padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Filters</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 11, color: "var(--muted)" }}>Status</label>
+            <select
+              value={filters.subscription_status}
+              onChange={(e) => handleFilterChange("subscription_status", e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: "var(--bg)",
+                color: "var(--text)",
+                fontSize: 13,
+                minWidth: 160,
+              }}
+            >
+              {SUBSCRIPTION_STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 11, color: "var(--muted)" }}>Start Date</label>
+            <input
+              type="date"
+              value={filters.start_date}
+              onChange={(e) => handleFilterChange("start_date", e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: "var(--bg)",
+                color: "var(--text)",
+                fontSize: 13,
+              }}
+            />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 11, color: "var(--muted)" }}>End Date</label>
+            <input
+              type="date"
+              value={filters.end_date}
+              onChange={(e) => handleFilterChange("end_date", e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 6,
+                border: "1px solid var(--border)",
+                background: "var(--bg)",
+                color: "var(--text)",
+                fontSize: 13,
+              }}
+            />
+          </div>
+
+          <button className="btn primary small" onClick={handleApplyFilters}>
+            Apply
+          </button>
+          <button className="btn outline small" onClick={handleClearFilters}>
+            Clear
+          </button>
+        </div>
+      </div>
+
+      {/* Payment List */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>
+            Loading payment history...
+          </div>
+        ) : payments.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>
+            No payment history found.
+          </div>
+        ) : (
+          <>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Date</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Description</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Amount</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Status</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Invoice</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((payment, idx) => (
+                    <tr
+                      key={payment.id || idx}
+                      style={{
+                        borderBottom: "1px solid var(--border)",
+                        background: idx % 2 === 0 ? "transparent" : "var(--bg-secondary)",
+                      }}
+                    >
+                      <td style={{ padding: "12px 16px" }}>{formatDate(payment.created_at || payment.date)}</td>
+                      <td style={{ padding: "12px 16px" }}>
+                        {payment.description || payment.plan_name || payment.type || "Payment"}
+                      </td>
+                      <td style={{ padding: "12px 16px", fontWeight: 500 }}>
+                        {formatAmount(payment.amount, payment.currency)}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>{getStatusBadge(payment.status)}</td>
+                      <td style={{ padding: "12px 16px" }}>
+                        {payment.invoice_url || payment.receipt_url ? (
+                          <a
+                            href={payment.invoice_url || payment.receipt_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "var(--primary)", textDecoration: "none", fontSize: 12 }}
+                          >
+                            View
+                          </a>
+                        ) : (
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {hasMore && (
+              <div style={{ padding: 16, textAlign: "center", borderTop: "1px solid var(--border)" }}>
+                <button
+                  className="btn outline"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Loading..." : "Load More"}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

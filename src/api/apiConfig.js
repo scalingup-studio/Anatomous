@@ -176,7 +176,7 @@ export const CUSTOM_ENDPOINTS = {
     checkoutCancel: `${API_BASE_PAYMENT}/checkout/cancel`,
     createPaymentIntent: `${API_BASE_PAYMENT}/create-payment-intent`,
     paymentStatus: `${API_BASE_PAYMENT}/payment/status`,
-    paymentHistory: `${API_BASE_PAYMENT}/payment_history_GET`,
+    paymentHistory: `${API_BASE_PAYMENT}/payment_history`,
     subscriptionStatus: `${API_BASE_PAYMENT}/subscription_status_GET`,
     updateUsage: `${API_BASE_PAYMENT}/subscription/update-usage`,
     stripeWebhook: `${API_BASE_PAYMENT}/stripe-webhook`,
