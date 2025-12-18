@@ -2750,8 +2750,28 @@ function PaymentHistory() {
 
       console.log("💳 Payment history response:", result);
 
-      const items = result?.result?.items || result?.items || result?.data || result || [];
-      const totalItems = result?.result?.total || result?.total || items.length;
+      // Handle various API response structures
+      let items = [];
+      let totalItems = 0;
+      
+      if (Array.isArray(result)) {
+        items = result;
+        totalItems = result.length;
+      } else if (result?.result?.items && Array.isArray(result.result.items)) {
+        items = result.result.items;
+        totalItems = result.result.total || items.length;
+      } else if (result?.items && Array.isArray(result.items)) {
+        items = result.items;
+        totalItems = result.total || items.length;
+      } else if (result?.data && Array.isArray(result.data)) {
+        items = result.data;
+        totalItems = result.total || items.length;
+      } else if (result?.result && Array.isArray(result.result)) {
+        items = result.result;
+        totalItems = items.length;
+      }
+      
+      console.log("💳 Parsed items:", items, "Total:", totalItems);
       
       if (append) {
         setPayments((prev) => [...prev, ...items]);
