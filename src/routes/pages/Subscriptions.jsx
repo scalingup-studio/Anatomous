@@ -7,6 +7,7 @@ import { SubscriptionApi } from "../../api/subscriptionApi.js";
 import { PaymentApi } from "../../api/paymentApi.js";
 import { useNotifications } from "../../api/NotificationContext.jsx";
 import { PLAN_TIERS, getUserPlan } from "../../utils/subscriptionUtils.js";
+import DatePicker from "../../components/DatePicker.jsx";
 
 function Tabs({ value, onChange }) {
   const items = [
@@ -2900,35 +2901,21 @@ function PaymentHistory() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 11, color: "var(--muted)" }}>Start Date</label>
-            <input
-              type="date"
+            <DatePicker
               value={filters.start_date}
-              onChange={(e) => handleFilterChange("start_date", e.target.value)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg)",
-                color: "var(--text)",
-                fontSize: 13,
-              }}
+              onChange={(val) => handleFilterChange("start_date", val)}
+              placeholder="Start date"
+              maxDate={filters.end_date || undefined}
             />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 11, color: "var(--muted)" }}>End Date</label>
-            <input
-              type="date"
+            <DatePicker
               value={filters.end_date}
-              onChange={(e) => handleFilterChange("end_date", e.target.value)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--bg)",
-                color: "var(--text)",
-                fontSize: 13,
-              }}
+              onChange={(val) => handleFilterChange("end_date", val)}
+              placeholder="End date"
+              minDate={filters.start_date || undefined}
             />
           </div>
 
