@@ -1868,14 +1868,10 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
         success_url: successUrl,
         cancel_url: cancelUrl,
         payment_type: 'subscription',
-        // New: explicitly pass billing period to backend ("monthly" | "annual")
-        billing_period: monthly ? "monthly" : "annual",
+        billing_period: period, // "monthly" or "annual"
       };
 
-      // Log body of API call for debugging
-      try {
-        console.log('📤 [Subscriptions] createCheckoutSession payload:', checkoutPayload);
-      } catch {}
+      console.log('📤 createCheckoutSession body:', JSON.stringify(checkoutPayload));
 
       // Create Stripe Checkout Session
       // According to API spec: required fields are plan_id, success_url, cancel_url
