@@ -2102,7 +2102,7 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
           <span style={{ fontSize:12, color:'var(--muted)' }}>Billing:</span>
           <div className="btn-group" style={{ gap:0 }}>
             <button className={`btn small ${monthly ? 'primary' : 'outline'}`} onClick={()=>setPeriod('monthly')}>Monthly</button>
-            <button className={`btn small ${!monthly ? 'primary' : 'outline'}`} onClick={()=>setPeriod('yearly')}>Annual</button>
+            <button className={`btn small ${!monthly ? 'primary' : 'outline'}`} onClick={()=>setPeriod('annual')}>Annual</button>
           </div>
         </div>
       </div>
