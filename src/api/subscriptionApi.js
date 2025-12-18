@@ -165,8 +165,9 @@ export const SubscriptionApi = {
       end_date: options.end_date || null,
       payment_type: options.payment_type || "",
     };
+    console.log("💳 [getPaymentHistory] Request body:", body);
     return authRequest(CUSTOM_ENDPOINTS.payments.paymentHistory, {
-      method: "GET",
+      method: "POST",
       body,
     });
   },
