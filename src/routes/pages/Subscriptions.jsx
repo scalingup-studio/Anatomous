@@ -2751,28 +2751,12 @@ function PaymentHistory() {
 
       console.log("💳 Payment history response:", result);
 
-      // Handle various API response structures
-      let items = [];
-      let totalItems = 0;
+      // API returns { invoices: [...], pagination: {...} }
+      const items = result?.invoices || result?.result?.invoices || [];
+      const pagination = result?.pagination || result?.result?.pagination || {};
+      const totalItems = pagination.total_records || items.length;
       
-      if (Array.isArray(result)) {
-        items = result;
-        totalItems = result.length;
-      } else if (result?.result?.items && Array.isArray(result.result.items)) {
-        items = result.result.items;
-        totalItems = result.result.total || items.length;
-      } else if (result?.items && Array.isArray(result.items)) {
-        items = result.items;
-        totalItems = result.total || items.length;
-      } else if (result?.data && Array.isArray(result.data)) {
-        items = result.data;
-        totalItems = result.total || items.length;
-      } else if (result?.result && Array.isArray(result.result)) {
-        items = result.result;
-        totalItems = items.length;
-      }
-      
-      console.log("💳 Parsed items:", items, "Total:", totalItems);
+      console.log("💳 Parsed invoices:", items.length, "Total:", totalItems);
       
       if (append) {
         setPayments((prev) => [...prev, ...items]);
@@ -2815,25 +2799,30 @@ function PaymentHistory() {
     });
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "—";
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "—";
     try {
-      return new Date(dateStr).toLocaleDateString("en-US", {
+      // API returns timestamps in milliseconds
+      const date = new Date(typeof timestamp === "number" ? timestamp : parseInt(timestamp, 10));
+      if (isNaN(date.getTime())) return "—";
+      return date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
       });
     } catch {
-      return dateStr;
+      return "—";
     }
   };
 
   const formatAmount = (amount, currency = "USD") => {
-    if (amount == null) return "—";
+    if (amount == null || amount === 0) return "—";
+    const curr = currency?.toUpperCase() || "USD";
+    // amount_paid is already in dollars (not cents)
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: currency?.toUpperCase() || "USD",
-    }).format(amount / 100);
+      currency: curr,
+    }).format(amount);
   };
 
   const getStatusBadge = (status) => {
@@ -2945,10 +2934,10 @@ function PaymentHistory() {
                 <thead>
                   <tr style={{ background: "var(--bg-secondary)", borderBottom: "1px solid var(--border)" }}>
                     <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Date</th>
-                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Description</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Plan</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Billing</th>
                     <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Amount</th>
                     <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Status</th>
-                    <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600 }}>Invoice</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2960,28 +2949,17 @@ function PaymentHistory() {
                         background: idx % 2 === 0 ? "transparent" : "var(--bg-secondary)",
                       }}
                     >
-                      <td style={{ padding: "12px 16px" }}>{formatDate(payment.created_at || payment.date)}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        {payment.description || payment.plan_name || payment.type || "Payment"}
+                      <td style={{ padding: "12px 16px" }}>{formatDate(payment.subscription_start_date || payment.created_at)}</td>
+                      <td style={{ padding: "12px 16px", textTransform: "capitalize" }}>
+                        {payment.plan_name || "—"}
+                      </td>
+                      <td style={{ padding: "12px 16px", textTransform: "capitalize" }}>
+                        {payment.billing_cycle || "—"}
                       </td>
                       <td style={{ padding: "12px 16px", fontWeight: 500 }}>
-                        {formatAmount(payment.amount, payment.currency)}
+                        {formatAmount(payment.amount_paid, payment.currency)}
                       </td>
                       <td style={{ padding: "12px 16px" }}>{getStatusBadge(payment.status)}</td>
-                      <td style={{ padding: "12px 16px" }}>
-                        {payment.invoice_url || payment.receipt_url ? (
-                          <a
-                            href={payment.invoice_url || payment.receipt_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: "var(--primary)", textDecoration: "none", fontSize: 12 }}
-                          >
-                            View
-                          </a>
-                        ) : (
-                          <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>
-                        )}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
