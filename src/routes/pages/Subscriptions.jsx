@@ -947,7 +947,7 @@ function CurrentPlan() {
         >
           {loading ? '⏳' : '🔄'} Refresh
         </button>
-        <button className="btn outline">Manage billing</button>
+        
         <button className="btn primary" onClick={() => {
           const tabs = document.querySelector('[role="tablist"]');
           if (tabs) {
@@ -2814,11 +2814,11 @@ function PaymentHistory() {
   const formatAmount = (amount, currency = "USD") => {
     if (amount == null || amount === 0) return "—";
     const curr = currency?.toUpperCase() || "USD";
-    // amount_paid is already in dollars (not cents)
+    // amount_paid is in cents
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: curr,
-    }).format(amount);
+    }).format(amount / 100);
   };
 
   const getStatusBadge = (status) => {
@@ -2904,12 +2904,7 @@ function PaymentHistory() {
             />
           </div>
 
-          <button className="btn primary small" onClick={handleApplyFilters}>
-            Apply
-          </button>
-          <button className="btn outline small" onClick={handleClearFilters}>
-            Clear
-          </button>
+        
         </div>
       </div>
 
