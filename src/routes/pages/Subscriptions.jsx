@@ -2708,13 +2708,9 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
 const SUBSCRIPTION_STATUSES = [
   { value: "", label: "All statuses" },
   { value: "active", label: "Active" },
-  { value: "past_due", label: "Past Due" },
-  { value: "canceled", label: "Canceled" },
-  { value: "trialing", label: "Trialing" },
-  { value: "unpaid", label: "Unpaid" },
-  { value: "incomplete", label: "Incomplete" },
-  { value: "incomplete_expired", label: "Incomplete Expired" },
-  { value: "paused", label: "Paused" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "expired", label: "Expired" },
+  { value: "pending", label: "Pending" },
 ];
 
 function PaymentHistory() {
