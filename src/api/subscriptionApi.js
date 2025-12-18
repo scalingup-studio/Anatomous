@@ -157,18 +157,18 @@ export const SubscriptionApi = {
    * @param {string} options.payment_type - Тип платежу
    */
   getPaymentHistory: async (options = {}) => {
-    const body = {
-      page: options.page || 1,
-      per_page: options.per_page || 20,
-      subscription_status: options.subscription_status || "",
-      start_date: options.start_date || null,
-      end_date: options.end_date || null,
-      payment_type: options.payment_type || "",
-    };
-    console.log("💳 [getPaymentHistory] Request body:", body);
-    return authRequest(CUSTOM_ENDPOINTS.payments.paymentHistory, {
-      method: "POST",
-      body,
+    const params = new URLSearchParams();
+    params.append("page", options.page || 1);
+    params.append("per_page", options.per_page || 20);
+    if (options.subscription_status) params.append("subscription_status", options.subscription_status);
+    if (options.start_date) params.append("start_date", options.start_date);
+    if (options.end_date) params.append("end_date", options.end_date);
+    if (options.payment_type) params.append("payment_type", options.payment_type);
+    
+    const url = `${CUSTOM_ENDPOINTS.payments.paymentHistory}?${params.toString()}`;
+    console.log("💳 [getPaymentHistory] Request URL:", url);
+    return authRequest(url, {
+      method: "GET",
     });
   },
 
