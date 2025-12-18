@@ -121,7 +121,7 @@ function CurrentPlan() {
   const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
   const [upgradeFeature, setUpgradeFeature] = React.useState(null);
   const [cancelModalOpen, setCancelModalOpen] = React.useState(false);
-  const [cancelImmediate, setCancelImmediate] = React.useState(true);
+  const [cancelImmediate, setCancelImmediate] = React.useState(false);
   const [cancelReason, setCancelReason] = React.useState("");
   const [cancelLoading, setCancelLoading] = React.useState(false);
   const [familyModalOpen, setFamilyModalOpen] = React.useState(false);
@@ -1157,40 +1157,6 @@ function CurrentPlan() {
                 cursor:'pointer',
                 padding:8,
                 borderRadius:8,
-                border: cancelImmediate ? '1px solid var(--primary)' : '1px solid var(--border)',
-                background: cancelImmediate ? 'rgba(0, 186, 206, 0.06)' : 'transparent',
-              }}
-            >
-              <input
-                type="radio"
-                name="cancel-timing"
-                checked={cancelImmediate}
-                onChange={() => setCancelImmediate(true)}
-                style={{ 
-                  marginTop: 4,
-                  width: 18,
-                  height: 18,
-                  borderRadius: '50%',
-                  aspectRatio: '1 / 1',
-                  cursor: 'pointer',
-                }}
-              />
-              <div>
-                <div style={{ fontWeight:600, fontSize:13 }}>Cancel immediately</div>
-                <div style={{ fontSize:12, color:'var(--muted)' }}>
-                  Access to premium features will stop right away and your account will switch to the Free plan.
-                </div>
-              </div>
-            </label>
-
-            <label
-              style={{
-                display:'flex',
-                alignItems:'flex-start',
-                gap:8,
-                cursor:'pointer',
-                padding:8,
-                borderRadius:8,
                 border: !cancelImmediate ? '1px solid var(--primary)' : '1px solid var(--border)',
                 background: !cancelImmediate ? 'rgba(0, 186, 206, 0.06)' : 'transparent',
               }}
@@ -1213,6 +1179,40 @@ function CurrentPlan() {
                 <div style={{ fontWeight:600, fontSize:13 }}>Cancel at end of current period</div>
                 <div style={{ fontSize:12, color:'var(--muted)' }}>
                   You keep premium access until the end of your current billing period. After that, your plan will be cancelled.
+                </div>
+              </div>
+            </label>
+
+            <label
+              style={{
+                display:'flex',
+                alignItems:'flex-start',
+                gap:8,
+                cursor:'pointer',
+                padding:8,
+                borderRadius:8,
+                border: cancelImmediate ? '1px solid var(--primary)' : '1px solid var(--border)',
+                background: cancelImmediate ? 'rgba(0, 186, 206, 0.06)' : 'transparent',
+              }}
+            >
+              <input
+                type="radio"
+                name="cancel-timing"
+                checked={cancelImmediate}
+                onChange={() => setCancelImmediate(true)}
+                style={{ 
+                  marginTop: 4,
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  aspectRatio: '1 / 1',
+                  cursor: 'pointer',
+                }}
+              />
+              <div>
+                <div style={{ fontWeight:600, fontSize:13 }}>Cancel immediately</div>
+                <div style={{ fontSize:12, color:'var(--muted)' }}>
+                  Access to premium features will stop right away and your account will switch to the Free plan.
                 </div>
               </div>
             </label>
