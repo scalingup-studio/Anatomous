@@ -51,7 +51,6 @@ export default function DashboardHome(){
       const shouldShowModal = localStorage.getItem('showOnboardingModalAfterLogin') === 'true';
       
       if (!shouldShowModal) {
-        console.log('ℹ️ Not showing onboarding modal - not after login');
         setOnboardingChecked(true);
         return;
       }
@@ -79,7 +78,6 @@ export default function DashboardHome(){
         }
         
         if (!userId) {
-          console.warn('⚠️ No user ID available for onboarding check');
           setOnboardingChecked(true);
           // Clear flag if no user ID
           try {
@@ -91,7 +89,6 @@ export default function DashboardHome(){
         await checkOnboarding(userId);
         setOnboardingChecked(true);
       } catch (error) {
-        console.error('Error checking onboarding status:', error);
         setOnboardingChecked(true);
         // Clear flag on error
         try {
@@ -104,18 +101,14 @@ export default function DashboardHome(){
       // Import OnboardingApi dynamically
       const { OnboardingApi } = await import('../../api/onboardingApi.js');
       
-      console.log('📊 Checking onboarding progress for user:', userId);
       const onboardingProgress = await OnboardingApi.getProgress(userId);
       const progress = onboardingProgress?.save_onboarding;
-      
-      console.log('📊 Onboarding progress:', progress);
       
       // Check if onboarding is incomplete (progress < 100% or not completed)
       const isIncomplete = !progress?.completed && 
         (!progress?.progress?.percentage || progress.progress.percentage < 100);
       
       if (isIncomplete) {
-        console.log('⚠️ Onboarding is incomplete, showing modal...');
         setOnboardingModalOpen(true);
       } else {
         // Clear flag if onboarding is complete
@@ -133,7 +126,6 @@ export default function DashboardHome(){
       e.preventDefault();
       e.stopPropagation();
     }
-    console.log('🔄 Continuing to onboarding page...');
     
     // Close modal immediately
     setOnboardingModalOpen(false);
@@ -145,7 +137,6 @@ export default function DashboardHome(){
     
     // Use force=true parameter to bypass OnboardingGuard check
     // This allows access to onboarding even if hasCompletedOnboarding() returns true
-    console.log('📍 Current hash before navigation:', window.location.hash);
     
     // Navigate with force parameter to bypass guard
     navigate("/onboarding?force=true", { replace: true });
@@ -309,7 +300,6 @@ export default function DashboardHome(){
             to="/dashboard/subscriptions?tab=upgrade"
             onClick={() => {
               // Track upgrade banner click
-              console.log('📊 Upgrade banner clicked from Home dashboard');
               if (window.gtag) {
                 window.gtag('event', 'upgrade_banner_click', {
                   'event_category': 'subscription',

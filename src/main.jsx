@@ -39,7 +39,6 @@ function PrivateRoute({ children }) {
 
   if (loading) return <p>Loading…</p>;
   if (!authToken) {
-    console.log('No authToken - redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
@@ -53,32 +52,17 @@ function AutoRedirectRoute() {
   // Check onboarding status once
   const onboardingCompleted = hasCompletedOnboarding();
   
-  console.log('🔄 AutoRedirectRoute - Debug info:', {
-    loading,
-    isNewUser,
-    user: user ? {
-      id: user.id,
-      email: user.email,
-      completed: user.completed,
-      onboarding_completed: user.onboarding_completed,
-    } : null,
-    hasCompletedOnboardingResult: onboardingCompleted
-  });
-  
   if (loading) {
-    console.log('⏳ AutoRedirectRoute - Still loading...');
     return <p>Loading…</p>;
   }
   
   // Scenario 1: New user after signup - redirect to onboarding
   if (isNewUser) {
-    console.log('📝 AutoRedirectRoute - New user from signup, redirecting to /onboarding');
     return <Navigate to="/onboarding" replace />;
   }
   
   // For existing users, always redirect to dashboard
   // Modal on Overview page will handle prompting for incomplete onboarding
-  console.log('🎯 AutoRedirectRoute - Redirecting to /dashboard');
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -170,29 +154,15 @@ function OnboardingGuard({ children }) {
   // Check onboarding status once
   const onboardingCompleted = hasCompletedOnboarding();
   
-  console.log('🛡️ OnboardingGuard - Debug info:', {
-    loading,
-    isNewUser,
-    user: user ? {
-      id: user.id,
-      email: user.email,
-      onboarding_completed: user.onboarding_completed
-    } : null,
-    hasCompletedOnboardingResult: onboardingCompleted
-  });
-  
   if (loading) {
-    console.log('⏳ OnboardingGuard - Still loading...');
     return <p>Loading…</p>;
   }
   
   // Якщо onboarding вже завершено - перенаправляємо на dashboard (крім форс-режиму)
   if (onboardingCompleted && !force) {
-    console.log('🎯 OnboardingGuard - Onboarding already completed, redirecting to /dashboard');
     return <Navigate to="/dashboard" replace />;
   }
   
-  console.log('📝 OnboardingGuard - Allowing access to onboarding', { forceMode: force });
   return children;
 }
 
@@ -203,27 +173,13 @@ function DashboardGuard({ children }) {
   // Check onboarding status once
   const onboardingCompleted = hasCompletedOnboarding();
   
-  console.log('🛡️ DashboardGuard - Debug info:', {
-    loading,
-    isNewUser,
-    pathname: location.pathname,
-    user: user ? {
-      id: user.id,
-      email: user.email,
-      onboarding_completed: user.onboarding_completed
-    } : null,
-    hasCompletedOnboardingResult: onboardingCompleted
-  });
-  
   if (loading) {
-    console.log('⏳ DashboardGuard - Still loading...');
     return <p>Loading…</p>;
   }
   
   // Allow access to dashboard even if onboarding is not completed
   // The modal on Overview page will handle prompting users to complete onboarding
   // This allows users to access profile and other dashboard pages
-  console.log('🎯 DashboardGuard - Allowing access to dashboard (onboarding check disabled for dashboard access)');
   return children;
 }
 // 🔒 Wrap entire app in AuthProvider, NotificationProvider, and ThemeProvider

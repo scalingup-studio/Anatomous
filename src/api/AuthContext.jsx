@@ -11,12 +11,6 @@ export function AuthProvider({ children }) {
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false); // Track if this is a new user (signup)
 
-  // Debug: log current user state whenever it changes
-  useEffect(() => {
-    try {
-      console.log("👤 [AuthContext] user updated:", user);
-    } catch {}
-  }, [user]);
 
   // ✅ We move refreshAuth to useCallback for link stability
   const refreshAuth = useCallback(async () => {
@@ -26,7 +20,6 @@ export function AuthProvider({ children }) {
     try {
       const refreshRes = await AuthApi.refreshToken();
       if (!refreshRes?.authToken) {
-        console.log("❌ Refresh returned no token");
         return null;
       }
 
@@ -40,7 +33,6 @@ export function AuthProvider({ children }) {
 
       return refreshRes.authToken;
     } catch (error) {
-      console.error("❌ Manual refresh failed:", error);
       // On failed refresh, clear auth state
       setAuthToken(null);
       setUser(null);
@@ -81,16 +73,13 @@ export function AuthProvider({ children }) {
                 setUser(storedUser ?? null);
                 setIsNewUser(false);
                 setLoading(false);
-                console.log('✅ Restored valid session from storage without re-login');
                 return;
               }
             }
           } catch {}
         }
 
-        console.log('🔄 Attempting auto-authentication with refresh token...');
         const refreshRes = await AuthApi.refreshToken();
-        console.log('✅ Auto-authentication successful:', refreshRes);
 
         if (refreshRes?.authToken) {
           setAuthToken(refreshRes.authToken);
@@ -100,9 +89,7 @@ export function AuthProvider({ children }) {
             if (refreshRes.user) localStorage.setItem('user', JSON.stringify(refreshRes.user));
           } catch {}
           setIsNewUser(false);
-          console.log('🔄 Auto-authentication successful - existing user will go to dashboard');
         } else {
-          console.log('ℹ️ No valid session found');
           setAuthToken(null);
           setUser(null);
           setIsNewUser(false);
@@ -110,10 +97,7 @@ export function AuthProvider({ children }) {
         }
       } catch (error) {
         if (error.message?.includes('expired') || error.message?.includes('Invalid')) {
-          console.log('🔄 Refresh token expired or invalid, clearing session');
           await AuthApi.logout().catch(() => {});
-        } else {
-          console.log('ℹ️ Auto-authentication failed:', error.message);
         }
         setAuthToken(null);
         setUser(null);
@@ -136,7 +120,6 @@ export function AuthProvider({ children }) {
         // Check if token has valid JWT structure (header.payload.signature)
         const parts = authToken.split('.');
         if (parts.length !== 3) {
-          console.log('📝 Token is not a standard JWT, using default refresh time');
           return 10 * 60 * 1000; // 10 minutes default
         }
         
@@ -145,7 +128,6 @@ export function AuthProvider({ children }) {
         
         // Check if exp exists in payload
         if (!payload.exp) {
-          console.log('📝 Token does not have expiration time, using default refresh time');
           return 10 * 60 * 1000; // 10 minutes default
         }
         
@@ -154,7 +136,6 @@ export function AuthProvider({ children }) {
         const timeUntilExpiry = expiresAt - now;
         
         if (timeUntilExpiry <= 0) {
-          console.log('📝 Token already expired, using default refresh time');
           return 10 * 60 * 1000; // 10 minutes default
         }
         
@@ -163,9 +144,6 @@ export function AuthProvider({ children }) {
           60 * 1000, // Мінімум 1 хвилина
           timeUntilExpiry - (10 * 60 * 1000)// 10 minutes to go
         );
-        
-        console.log(`🕒 Token expires at: ${new Date(expiresAt).toLocaleTimeString()}`);
-        console.log(`🕒 Will refresh in: ${Math.round(refreshTime / 1000 / 60)} minutes`);
         
         return refreshTime;
       } catch (error) {
@@ -179,20 +157,14 @@ export function AuthProvider({ children }) {
 
     const refreshTimer = setTimeout(async () => {
       try {
-        console.log('🔄 Auto-refreshing token before expiration...');
-        const newTokens = await refreshAuth();
-        if (newTokens) {
-          console.log('✅ Token auto-refreshed successfully');
-        }
+        await refreshAuth();
       } catch (error) {
-        console.log('🔴 Auto-refresh failed:', error.message);
         // We don't clear the state here - the user can still use the current token
         // until it actually expires
       }
     }, refreshTime);
 
     return () => {
-      console.log('🧹 Cleaning up auto-refresh timer');
       clearTimeout(refreshTimer);
     };
   }, [authToken, refreshAuth]); // ✅ Now refreshAuth is a stable link
@@ -203,7 +175,6 @@ export function AuthProvider({ children }) {
       // MFA flow: backend can respond with mfa_required inside result wrapper
       const base = res?.result || res || {};
       if (base?.mfa_required) {
-        console.log("🔐 MFA required for login, waiting for code verification...", base);
         return {
           success: false,
           mfaRequired: true,
@@ -235,21 +206,15 @@ export function AuthProvider({ children }) {
       } catch {}
       setIsNewUser(false); // This is a login, not a signup
       
-      console.log('🔐 User logged in successfully - will redirect directly to dashboard');
-      console.log('🎯 Login redirect: Dashboard (no onboarding check)');
-      
       return { success: true };
     } catch (error) {
-      console.error("Login error:", error);
       return { success: false, error: error.message, mfaRequired: false };
     }
   }
 
   async function signup(email, password, userData = {}) {
     try {
-      console.log('📝 Starting signup process...');
       const res = await AuthApi.signup({ email, password, ...userData });
-      console.log('📝 AuthApi.signup response:', res);
 
       // Some backends return tokens on signup, others don't
       if (res?.authToken) {
@@ -261,7 +226,6 @@ export function AuthProvider({ children }) {
         } catch {}
       } else {
         // No token returned: perform immediate login to obtain authToken
-        console.log('📝 Signup returned no token, performing auto-login...');
         const loginRes = await AuthApi.login({ email, password });
         setAuthToken(loginRes.authToken);
         setUser(loginRes.user ?? res?.new_User ?? null);
@@ -275,14 +239,9 @@ export function AuthProvider({ children }) {
 
       // Mark as new user to route to onboarding
       setIsNewUser(true);
-
-      console.log('📝 New user signed up successfully - will redirect to onboarding');
-      console.log('🎯 Signup redirect: Onboarding (new user)');
-      console.log('📝 isNewUser set to:', true);
       
       return { success: true };
     } catch (error) {
-      console.error("Signup error:", error);
       return { success: false, error: error.message };
     }
   }
@@ -290,7 +249,6 @@ export function AuthProvider({ children }) {
   // Verify MFA code after login responded with mfa_required=true
   async function verifyMfa(email, code) {
     try {
-      console.log("🔐 Verifying MFA code for:", email);
       const res = await AccountApi.verifyMfaCode({ email, code });
 
       const data = res?.result || res || {};
@@ -317,10 +275,8 @@ export function AuthProvider({ children }) {
       } catch {}
 
       setIsNewUser(false);
-      console.log("✅ MFA verification successful, user authenticated");
       return { success: true };
     } catch (error) {
-      console.error("❌ MFA verification failed:", error);
       return { success: false, error: error.message || "MFA verification failed." };
     }
   }
@@ -344,8 +300,6 @@ export function AuthProvider({ children }) {
   // ✅ Added a function to complete onboarding
   async function completeOnboarding(status = "completed") {
     try {
-      console.log('🎯 Completing onboarding with status:', status);
-      
      // Update the user's state with both old and new structure
       setUser(prev => ({
         ...prev,
@@ -370,10 +324,8 @@ export function AuthProvider({ children }) {
       // Here you can add an API call to update on the server if needed
 // await AuthApi.updateOnboardingStatus({ onboarding_completed: true });
       
-      console.log('✅ Onboarding marked as completed in AuthContext');
       return { success: true };
     } catch (error) {
-      console.error("Error completing onboarding:", error);
       return { success: false, error: error.message };
     }
   }
@@ -381,18 +333,14 @@ export function AuthProvider({ children }) {
   // ✅ Added a function to load onboarding data from API
   async function loadOnboardingData() {
     try {
-      console.log('📊 Loading onboarding data from API...');
-      
       // Import OnboardingApi dynamically to avoid circular dependency
       const { OnboardingApi } = await import('./onboardingApi.js');
       
       if (!user?.id) {
-        console.log('⚠️ No user ID available for loading onboarding data');
         return { success: false, error: 'No user ID' };
       }
       
       const onboardingData = await OnboardingApi.getProgress(user.id);
-      console.log('📊 Onboarding data loaded:', onboardingData);
       
       // Update user state with onboarding data
       setUser(prev => ({
@@ -402,7 +350,6 @@ export function AuthProvider({ children }) {
       
       return { success: true, data: onboardingData };
     } catch (error) {
-      console.error('Error loading onboarding data:', error);
       return { success: false, error: error.message };
     }
   }
@@ -410,8 +357,6 @@ export function AuthProvider({ children }) {
   // ✅ Added a function to reset onboarding status (for testing)
   async function resetOnboarding() {
     try {
-      console.log('🔄 Resetting onboarding status...');
-      
      // Update the user's state with both old and new structure
       setUser(prev => ({
         ...prev,
@@ -429,10 +374,8 @@ export function AuthProvider({ children }) {
         }
       }));
       
-      console.log('✅ Onboarding status reset in AuthContext');
       return { success: true };
     } catch (error) {
-      console.error("Error resetting onboarding:", error);
       return { success: false, error: error.message };
     }
   }
@@ -445,23 +388,11 @@ export function AuthProvider({ children }) {
   // ✅ Added a function to check onboarding status
   const hasCompletedOnboarding = () => {
     if (!user) {
-      console.log('🔍 hasCompletedOnboarding check: No user, returning false');
       return false;
     }
     
-    console.log('🔍 hasCompletedOnboarding check - Current state:', {
-      isNewUser,
-      user: user ? {
-        id: user.id,
-        email: user.email,
-        completed: user.completed,
-        onboarding_completed: user.onboarding_completed
-      } : null
-    });
-    
     // If this is a new user (signup), always redirect to onboarding
     if (isNewUser) {
-      console.log('🔍 hasCompletedOnboarding check: New user from signup, returning false');
       return false;
     }
     
@@ -471,7 +402,6 @@ export function AuthProvider({ children }) {
                                  user.save_onboarding?.onboarding_completed ?? 
                                  user.save_onboarding?.completed ?? false;
     
-    console.log('🔍 hasCompletedOnboarding check: Existing user, onboarding_completed =', onboardingCompleted);
     return onboardingCompleted;
   };
 
@@ -488,7 +418,6 @@ export function AuthProvider({ children }) {
      // We assume that the token will expire soon if there are less than 15 minutes left
       return timeUntilExpiry < (15 * 60 * 1000);
     } catch (error) {
-      console.error('Error checking token expiry:', error);
       return true; // If the check fails, we assume it will expire
     }
   };

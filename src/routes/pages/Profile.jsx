@@ -475,7 +475,6 @@ export default function DashboardProfile() {
 
   // Function to handle adding new items to test data
   const handleAddTestItem = async (itemData) => {
-    console.log('Adding test item:', itemData);
     
     // Determine which category based on the data structure
     let category = 'medical_conditions';
@@ -898,12 +897,10 @@ export default function DashboardProfile() {
         return;
       }
 
-      console.log('Create Health Data - Request payload:', healthDataPayload);
 
       // Call API endpoint using HealthApi
       const response = await HealthApi.create(healthDataPayload);
 
-      console.log('✅ Health data create response:', response);
 
       // Reset form
       const resetNow = new Date();
@@ -1357,7 +1354,6 @@ export default function DashboardProfile() {
         ...(healthData.visibility_scope && { visibility_scope: healthData.visibility_scope }),
       };
 
-      console.log('Update Health Data - Request payload:', healthDataPayload);
 
       await HealthApi.updateRecord(user.id, editingRecord.id, healthDataPayload);
       showSuccess('Health data updated successfully!');
@@ -1413,9 +1409,6 @@ export default function DashboardProfile() {
   const loadHealthData = async () => {
     try {
       setLoadingHealthData(true);
-      console.log('Loading health data from API...');
-      console.log('API URL:', ENDPOINTS.healthData.getAll);
-      console.log('User ID:', user?.id);
       
       // Map sort column names to API format
       const sortColumnMap = {
@@ -1469,13 +1462,9 @@ export default function DashboardProfile() {
       // Remove undefined keys
       Object.keys(filterParams).forEach(key => filterParams[key] === undefined && delete filterParams[key]);
       
-      console.log('Filter parameters:', filterParams);
-      
       // First, let's test if the API is working with a known endpoint
       try {
-        console.log('Testing API with users endpoint...');
-        const testResponse = await authRequest(ENDPOINTS.users.getAll);
-        console.log('Users API test successful:', testResponse);
+        await authRequest(ENDPOINTS.users.getAll);
       } catch (testError) {
         console.error('Users API test failed:', testError);
       }
@@ -1484,11 +1473,8 @@ export default function DashboardProfile() {
       let response;
       try {
         response = await HealthApi.getByUserId(user.id, filterParams);
-        console.log('📥 Health data API response (filtered):', response);
       } catch (userError) {
-        console.log('getByUserId failed, trying getAll...', userError);
         response = await HealthApi.getAll();
-        console.log('📥 Health data API response (fallback getAll):', response);
       }
       
       // Handle API response format: { result: [...] } or { health_data: [...] } or direct array
@@ -1499,8 +1485,6 @@ export default function DashboardProfile() {
         healthDataArray = response.health_data;
       } else if (Array.isArray(response)) {
         healthDataArray = response;
-      } else {
-        console.warn('Unexpected health data response format:', response);
       }
       
       if (healthDataArray && Array.isArray(healthDataArray)) {
@@ -1521,26 +1505,14 @@ export default function DashboardProfile() {
 
         const recordsToDisplay = filteredRecords.length > 0 ? filteredRecords : healthDataArray;
         setHealthDataRecords(recordsToDisplay);
-        console.log('Health data loaded successfully:', recordsToDisplay.length, 'records (filtered:', filteredRecords.length, 'raw total:', healthDataArray.length, ')');
       } else {
-        console.log('No health data found or invalid response format');
-        console.log('Response structure:', response);
         setHealthDataRecords([]);
       }
     } catch (error) {
-      console.error('Error loading health data:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.status,
-        url: ENDPOINTS.healthData.getAll
-      });
-      
       // Try alternative endpoints
-      console.log('Trying alternative health data endpoints...');
       try {
         // Try with user_id as path parameter
         const altResponse = await authRequest(`${ENDPOINTS.healthData.getAll}/${user?.id}`);
-        console.log('Alternative endpoint response:', altResponse);
         let altHealthDataArray = null;
         if (altResponse?.result && Array.isArray(altResponse.result)) {
           altHealthDataArray = altResponse.result;
@@ -1678,23 +1650,18 @@ const calculateAgeFromDOB = (dob) => {
 
       try {
         setLoading(true);
-        console.log('🔍 Fetching profile for user ID:', user.id);
         
         // Try to get profile by user_id using ProfilesApi
         let profileData = null;
         try {
           // First try to get profile by user_id
           profileData = await ProfilesApi.getById(user.id);
-          console.log('✅ Profile found by user_id:', profileData);
         } catch (idError) {
-          console.log('⚠️ Profile not found by user_id, trying to get all profiles:', idError.message);
           // If not found by ID, try to get all profiles and filter by user_id
           const allProfilesResponse = await ProfilesApi.getAll();
-          console.log('📋 All profiles response:', allProfilesResponse);
           
           // Handle API response format: { result: [...], success: true }
           const allProfiles = allProfilesResponse?.result || allProfilesResponse;
-          console.log('📋 All profiles array:', allProfiles);
           
           if (Array.isArray(allProfiles)) {
             profileData = allProfiles.find(p => 
@@ -1704,7 +1671,6 @@ const calculateAgeFromDOB = (dob) => {
               (p.user_id && String(p.user_id) === String(user.id)) ||
               (p.id && String(p.id) === String(user.id))
             );
-            console.log('🔍 Found profile in list:', profileData);
           } else if (allProfiles && (
             allProfiles.user_id === user.id || 
             allProfiles.id === user.id ||
@@ -1713,37 +1679,7 @@ const calculateAgeFromDOB = (dob) => {
             (allProfiles.id && String(allProfiles.id) === String(user.id))
           )) {
             profileData = allProfiles;
-            console.log('🔍 Single profile found:', profileData);
           }
-        }
-        
-        // Log full profile data for debugging
-        if (profileData) {
-          console.log('📋 Full Profile API Response:', JSON.stringify(profileData, null, 2));
-          console.log('📋 Profile Fields Breakdown:', {
-            id: profileData?.id,
-            profiles_id: profileData?.profiles_id,
-            user_id: profileData?.user_id,
-            first_name: profileData?.first_name,
-            last_name: profileData?.last_name,
-            phone_number: profileData?.phone_number,
-            dob: profileData?.dob,
-            gender: profileData?.gender,
-            sex_of_birth: profileData?.sex_of_birth,
-            height_cm: profileData?.height_cm,
-            height_type: profileData?.height_type,
-            weight_kg: profileData?.weight_kg,
-            weight_type: profileData?.weight_type,
-            zip_code: profileData?.zip_code,
-            body_fat_percentage: profileData?.body_fat_percentage,
-            body_fat_method: profileData?.body_fat_method,
-            waist_circumference: profileData?.waist_circumference,
-            waist_circumference_unit: profileData?.waist_circumference_unit,
-            hip_circumference: profileData?.hip_circumference,
-            hip_circumference_unit: profileData?.hip_circumference_unit,
-          });
-        } else {
-          console.warn('⚠️ No profile data found for user:', user.id);
         }
         
         setProfile(profileData);
@@ -1770,9 +1706,7 @@ const calculateAgeFromDOB = (dob) => {
             const userMetrics = coreBodyMetricsList.find(m => m.user_id === user.id) || coreBodyMetricsList[0];
             coreBodyMetricsData = userMetrics;
             setCoreBodyMetrics(coreBodyMetricsData);
-            console.log('✅ Core body metrics found:', coreBodyMetricsData);
           } else {
-            console.log('ℹ️ No core body metrics records found');
             setCoreBodyMetrics(null);
           }
         } catch (coreMetricsError) {
@@ -1799,21 +1733,6 @@ const calculateAgeFromDOB = (dob) => {
             }
           : (coreBodyMetricsData || user);
         
-        console.log('📊 Data to use for form:', dataToUse);
-        console.log('📊 Profile data (source):', profileData);
-        console.log('📊 Core body metrics data (source):', coreBodyMetricsData);
-        console.log('📊 User data (fallback):', user);
-        console.log('📊 Merged dataToUse:', {
-          hasProfile: !!profileData,
-          hasCoreBodyMetrics: !!coreBodyMetricsData,
-          first_name: dataToUse?.first_name,
-          last_name: dataToUse?.last_name,
-          phone_number: dataToUse?.phone_number,
-          dob: dataToUse?.dob,
-          height_cm: dataToUse?.height_cm,
-          weight_kg: dataToUse?.weight_kg,
-        });
-        
         // Try to get unit types from profile data first
         let apiHeightType = dataToUse?.height_type 
           ? dataToUse.height_type.toString().toLowerCase().trim() 
@@ -1830,24 +1749,20 @@ const calculateAgeFromDOB = (dob) => {
           // If not in context, try to load from onboarding API
           if (!personalData) {
             try {
-              console.log('📊 Units not found in profile, checking onboarding API...');
               const onboardingProgress = await OnboardingApi.getProgress(user.id);
               personalData = onboardingProgress?.save_onboarding?.steps?.personal?.data;
             } catch (onboardingError) {
               console.warn('⚠️ Failed to load units from onboarding API:', onboardingError.message);
             }
           } else {
-            console.log('📊 Using onboarding data from user context');
           }
           
           if (personalData) {
             if (!apiHeightType && personalData.height_type) {
               apiHeightType = personalData.height_type.toString().toLowerCase().trim();
-              console.log('📏 Height unit from onboarding data:', apiHeightType);
             }
             if (!apiWeightType && personalData.weight_type) {
               apiWeightType = personalData.weight_type.toString().toLowerCase().trim();
-              console.log('⚖️ Weight unit from onboarding data:', apiWeightType);
             }
           }
         }
@@ -1863,8 +1778,6 @@ const calculateAgeFromDOB = (dob) => {
         setHeightUnit(validHeightUnit);
         setWeightUnit(validWeightUnit);
         
-        console.log('📏 Height unit from API:', apiHeightType, '→ using:', validHeightUnit);
-        console.log('⚖️ Weight unit from API:', apiWeightType, '→ using:', validWeightUnit);
         
         // Get stored values
         // NOTE: height_cm and weight_kg are just field names - the actual unit is determined by height_type/weight_type
@@ -1878,8 +1791,6 @@ const calculateAgeFromDOB = (dob) => {
         let heightForDisplay = heightStored;
         let weightForDisplay = weightStored;
         
-        console.log(`📏 Height: ${heightStored} (unit: ${validHeightUnit})`);
-        console.log(`⚖️ Weight: ${weightStored} (unit: ${validWeightUnit})`);
         
         // Get waist and hip circumference units from API
         let apiWaistUnit = dataToUse?.waist_circumference_unit 
@@ -1934,71 +1845,6 @@ const calculateAgeFromDOB = (dob) => {
           })(),
         };
         
-        console.log('📊 Form data to set:', formData);
-        console.log('📊 Form data mapping from API:', {
-          'first_name': {
-            from: 'dataToUse?.first_name || dataToUse?.firstName',
-            value: dataToUse?.first_name || dataToUse?.firstName,
-            result: formData.first_name
-          },
-          'last_name': {
-            from: 'dataToUse?.last_name || dataToUse?.lastName',
-            value: dataToUse?.last_name || dataToUse?.lastName,
-            result: formData.last_name
-          },
-          'phone_number': {
-            from: 'dataToUse?.phone_number || dataToUse?.phone',
-            value: dataToUse?.phone_number || dataToUse?.phone,
-            result: formData.phone_number
-          },
-          'dob': {
-            from: 'dataToUse?.dob || dataToUse?.date_of_birth',
-            value: dataToUse?.dob || dataToUse?.date_of_birth,
-            result: formData.dob
-          },
-          'height_cm': {
-            from: 'dataToUse?.height_cm',
-            stored: heightStored,
-            unit: validHeightUnit,
-            display: heightForDisplay,
-            result: formData.height_cm
-          },
-          'weight_kg': {
-            from: 'dataToUse?.weight_kg',
-            stored: weightStored,
-            unit: validWeightUnit,
-            display: weightForDisplay,
-            result: formData.weight_kg
-          },
-          'body_fat_percentage': {
-            from: 'dataToUse?.body_fat ?? dataToUse?.body_fat_percentage',
-            value: dataToUse?.body_fat ?? dataToUse?.body_fat_percentage,
-            result: formData.body_fat_percentage
-          },
-          'waist_circumference': {
-            from: 'dataToUse?.waist_circumference',
-            stored: waistStored,
-            unit: validWaistUnit,
-            display: waistForDisplay,
-            result: formData.waist_circumference
-          },
-          'hip_circumference': {
-            from: 'dataToUse?.hip_circumference',
-            stored: hipStored,
-            unit: validHipUnit,
-            display: hipForDisplay,
-            result: formData.hip_circumference
-          }
-        });
-        console.log('📊 Conversion details:', {
-          heightStored,
-          heightForDisplay,
-          heightUnit: validHeightUnit,
-          weightStored,
-          weightForDisplay,
-          weightUnit: validWeightUnit
-        });
-        console.log('📝 Setting form values:', formData);
         setFormValues(formData);
         // Save initial form values for cancel functionality
         setInitialFormValues({
@@ -2009,9 +1855,7 @@ const calculateAgeFromDOB = (dob) => {
         setError(null);
         
         if (!profileData) {
-          console.log('ℹ️ No profile found, using user data as fallback');
         } else {
-          console.log('✅ Profile data loaded and form values set successfully');
         }
       } catch (err) {
         console.warn('❌ Failed to fetch profile from API, using user data:', err.message);
@@ -2043,7 +1887,6 @@ const calculateAgeFromDOB = (dob) => {
           // If not in context, try to load from onboarding API
           if (!personalData) {
             try {
-              console.log('📊 Units not found in fallback, checking onboarding API...');
               const onboardingProgress = await OnboardingApi.getProgress(user.id);
               personalData = onboardingProgress?.save_onboarding?.steps?.personal?.data;
             } catch (onboardingError) {
@@ -2078,8 +1921,6 @@ const calculateAgeFromDOB = (dob) => {
         
         // Values are already in the correct units as specified by height_type/weight_type
         // No conversion needed - just use the values as-is
-        console.log(`📏 Fallback Height: ${fallbackHeight} (unit: ${fallbackHeightUnit})`);
-        console.log(`⚖️ Fallback Weight: ${fallbackWeight} (unit: ${fallbackWeightUnit})`);
         
         // Get waist and hip circumference units from fallback data
         let fallbackWaistUnit = profileData?.waist_circumference_unit 
@@ -2137,13 +1978,6 @@ const calculateAgeFromDOB = (dob) => {
           ...fallbackFormData,
           heightUnit: fallbackHeightUnit,
           weightUnit: fallbackWeightUnit,
-        });
-        console.log('📊 Fallback form data set:', {
-          first_name: profileData?.first_name || profileData?.firstName || "",
-          last_name: profileData?.last_name || profileData?.lastName || "",
-          phone_number: profileData?.phone_number || profileData?.phone || "",
-          dob: profileData?.dob || profileData?.date_of_birth || "",
-          gender: profileData?.gender || "",
         });
         const msg = `Profile API unavailable: ${err.message}`;
         setError(msg);
@@ -2289,33 +2123,17 @@ const calculateAgeFromDOB = (dob) => {
         hip_circumference_unit: hipUnit || null,
       };
       
-      console.log('💾 Saving core body metrics:', coreBodyMetricsPayload);
       
       // Save core_body_metrics
       let updatedCoreBodyMetrics = null;
       if (coreBodyMetrics && coreBodyMetrics.id) {
         // Update existing core_body_metrics record
-        console.log('🔄 UPDATING existing core body metrics:');
-        console.log('📍 Endpoint:', `PATCH ${ENDPOINTS.coreBodyMetrics.update(coreBodyMetrics.id)}`);
-        console.log('📦 PATCH Request Body (JSON):', JSON.stringify(coreBodyMetricsPayload, null, 2));
-        console.log('📦 PATCH Request Body (object):', coreBodyMetricsPayload);
-        console.log('📦 PATCH Request Body (pretty):', {
-          method: 'PATCH',
-          url: ENDPOINTS.coreBodyMetrics.update(coreBodyMetrics.id),
-          body: coreBodyMetricsPayload
-        });
-        
         updatedCoreBodyMetrics = await CoreBodyMetricsApi.update(coreBodyMetrics.id, coreBodyMetricsPayload);
-        console.log('✅ Core body metrics updated successfully:', updatedCoreBodyMetrics);
         setCoreBodyMetrics(updatedCoreBodyMetrics);
       } else {
         // Create new core_body_metrics record
-        console.log('🆕 CREATING new core body metrics:');
-        console.log('📍 Endpoint:', `POST ${ENDPOINTS.coreBodyMetrics.create}`);
-        console.log('📦 Request Body:', JSON.stringify(coreBodyMetricsPayload, null, 2));
         
         updatedCoreBodyMetrics = await CoreBodyMetricsApi.create(coreBodyMetricsPayload);
-        console.log('✅ Core body metrics created successfully:', updatedCoreBodyMetrics);
         setCoreBodyMetrics(updatedCoreBodyMetrics);
       }
       
@@ -2342,22 +2160,11 @@ const calculateAgeFromDOB = (dob) => {
       if (pendingPhotoFile) {
         try {
           setUploadingPhoto(true);
-          console.log('📸 UPLOADING photo:');
-          console.log('📍 Endpoint:', `${CUSTOM_ENDPOINTS.uploudFile.uploudFile}`);
-          console.log('📦 File:', {
-            name: pendingPhotoFile.name,
-            size: pendingPhotoFile.size,
-            type: pendingPhotoFile.type
-          });
-          console.log('📦 User ID:', user.id);
-          console.log('📦 Category:', 'profile');
           
           const res = await UploadFileApi.uploadAvatar(pendingPhotoFile, user.id);
           const uploaded = res?.result || res;
           const url = uploaded?.url || uploaded?.path || '';
           
-          console.log('✅ Photo upload response:', uploaded);
-          console.log('🔗 Photo URL:', url);
           
           // Store photo data for profile update
           uploadedPhotoData = {
@@ -2417,32 +2224,16 @@ const calculateAgeFromDOB = (dob) => {
         payload = { user_id: formValues.user_id || user.id, ...basePayload };
       }
       
-      console.log('💾 Saving profile with payload (no photo):', payload);
-      console.log('📸 Photo handling:', {
-        uploadedPhotoData: uploadedPhotoData ? 'Photo uploaded separately' : 'No new photo',
-        existingPhoto: profile?.profile_photo ? 'Preserved in UI' : 'No existing photo'
-      });
-      
       // Save profile (without core_body_metrics fields)
       let updated;
       if (profile && profile.id) {
         // Update existing profile using user_id
-        console.log('🔄 UPDATING existing profile:');
-        console.log('📍 Endpoint:', `PATCH ${ENDPOINTS.profiles.update(user.id)}`);
-        console.log('📦 Request Body:', JSON.stringify(payload, null, 2));
-        console.log('📦 Request Body (formatted):', payload);
         
         updated = await ProfilesApi.update(user.id, payload);
-        console.log('✅ Profile updated successfully:', updated);
       } else {
         // Create new profile
-        console.log('🆕 CREATING new profile:');
-        console.log('📍 Endpoint:', `POST ${ENDPOINTS.profiles.create}`);
-        console.log('📦 Request Body:', JSON.stringify(payload, null, 2));
-        console.log('📦 Request Body (formatted):', payload);
         
         updated = await ProfilesApi.create(payload);
-        console.log('✅ Profile created successfully:', updated);
       }
       
       setProfile(updated);
@@ -6611,7 +6402,6 @@ const calculateAgeFromDOB = (dob) => {
                                 <button
                                   className="btn outline"
                                   onClick={() => {
-                                    console.log('🗑️ Delete button clicked, record:', record);
                                     handleDeleteHealthData(record.id);
                                   }}
                                   disabled={deletingRecordId === record.id}

@@ -41,36 +41,12 @@ export const authRequest = async (url, options = {}, retry = true) => {
   const authToken = localStorage.getItem('authToken');
   if (authToken) {
     config.headers["Authorization"] = `Bearer ${authToken}`;
-    // Debug: show token in console in development or when explicitly enabled
-    try {
-      const isDev = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.MODE === 'development') || (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development');
-      const explicit = localStorage.getItem('debugShowToken') === '1';
-      if (isDev || explicit) {
-        console.log('🔐 authToken:', authToken);
-      }
-    } catch {}
   }
 
   if (config.body && typeof config.body === "object" && !isFormData) {
     config.body = JSON.stringify(config.body);
   }
 
-  // Debug log for specific endpoints (e.g., /my_subscription)
-  try {
-    if (url?.includes("/my_subscription")) {
-      const method = (config.method || "GET").toUpperCase();
-      let bodyPreview = null;
-      if (isFormData) {
-        bodyPreview = "[FormData]";
-      } else if (config.body) {
-        bodyPreview = typeof config.body === "string" ? config.body : JSON.stringify(config.body);
-      }
-      console.log("🔍 Request to /my_subscription", {
-        method,
-        body: bodyPreview,
-      });
-    }
-  } catch {}
 
   try {
     let response = await fetch(url, config);
@@ -99,12 +75,9 @@ export const authRequest = async (url, options = {}, retry = true) => {
       isRefreshing = true;
 
       try {
-        console.log("🔄 Token expired, attempting refresh...");
         const refreshRes = await AuthApi.refreshToken();
         
         if (refreshRes?.authToken) {
-          console.log("✅ Token refresh successful");
-          
           // Сповіщаємо всі очікуючі запити
           onRefreshed(refreshRes.authToken);
           
@@ -122,8 +95,6 @@ export const authRequest = async (url, options = {}, retry = true) => {
           throw new Error("No authToken received from refresh");
         }
       } catch (refreshError) {
-        console.error("❌ Token refresh failed:", refreshError);
-        
         // Сповіщаємо всі очікуючі запити про помилку
         refreshSubscribers.forEach(callback => callback(null));
         refreshSubscribers = [];
@@ -184,7 +155,6 @@ export const authRequest = async (url, options = {}, retry = true) => {
       if (obj.guard_info && obj.guard_info.check_result) {
         const checkResult = obj.guard_info.check_result;
         if (checkResult.success === false && checkResult.error) {
-          console.log('🔴 Found error in guard_info.check_result:', checkResult);
           return {
             message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
             data: obj
@@ -196,7 +166,6 @@ export const authRequest = async (url, options = {}, retry = true) => {
       if (obj.blocked === true && obj.guard_info && obj.guard_info.check_result) {
         const checkResult = obj.guard_info.check_result;
         if (checkResult.success === false && checkResult.error) {
-          console.log('🔴 Found blocked response with error:', checkResult);
           return {
             message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
             data: obj
@@ -209,7 +178,6 @@ export const authRequest = async (url, options = {}, retry = true) => {
     
     const errorInfo = checkForError(data);
     if (errorInfo) {
-      console.log('🔴 Throwing ApiError:', errorInfo.message, errorInfo.data);
       throw new ApiError(errorInfo.message, response.status || 400, errorInfo.data);
     }
 
@@ -303,7 +271,6 @@ export const request = async (url, options = {}) => {
       if (obj.guard_info && obj.guard_info.check_result) {
         const checkResult = obj.guard_info.check_result;
         if (checkResult.success === false && checkResult.error) {
-          console.log('🔴 Found error in guard_info.check_result:', checkResult);
           return {
             message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
             data: obj
@@ -315,7 +282,6 @@ export const request = async (url, options = {}) => {
       if (obj.blocked === true && obj.guard_info && obj.guard_info.check_result) {
         const checkResult = obj.guard_info.check_result;
         if (checkResult.success === false && checkResult.error) {
-          console.log('🔴 Found blocked response with error:', checkResult);
           return {
             message: checkResult.message || checkResult.error || obj.message || 'An error occurred',
             data: obj
@@ -328,7 +294,6 @@ export const request = async (url, options = {}) => {
     
     const errorInfo = checkForError(data);
     if (errorInfo) {
-      console.log('🔴 Throwing ApiError:', errorInfo.message, errorInfo.data);
       throw new ApiError(errorInfo.message, response.status || 400, errorInfo.data);
     }
 

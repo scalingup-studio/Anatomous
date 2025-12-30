@@ -68,7 +68,6 @@ function getUserIdFromToken() {
     
     return null;
   } catch (error) {
-    console.warn('Failed to get user ID from token:', error);
     return null;
   }
 }
@@ -76,20 +75,12 @@ function getUserIdFromToken() {
 export const AuthApi = {
   async login(payload) {
     try {
-      console.log('🔐 Attempting login for:', payload.email);
-      
       const requestData = {
         email: payload.email,
         password: payload.password,
         user_agent: navigator.userAgent,
         ip_address: await getIPAddress()
       };
-
-      console.log('📤 Login request data:', { 
-        email: requestData.email,
-        user_agent: requestData.user_agent,
-        ip_address: requestData.ip_address 
-      });
 
       const response = await request(CUSTOM_ENDPOINTS.auth.login, { 
         method: "POST", 
@@ -104,10 +95,8 @@ export const AuthApi = {
       const authToken = data.authToken || data.token || data.auth_token || data?.auth?.token || null;
       const user = data.user || data.me || data.profile || null;
 
-      console.log('✅ Login successful, user:', (user && (user.email || user.id)) || 'unknown');
       return { ...response, authToken, user };
     } catch (error) {
-      console.error('🔴 Login error:', error);
       // Clear cookies on login error
       clearAuthCookies();
       throw error;
@@ -116,12 +105,10 @@ export const AuthApi = {
 
   async logout() {
     try {
-      console.log('🚪 Attempting logout...');
       await request(CUSTOM_ENDPOINTS.auth.logout, { 
         method: "POST",
         credentials: "include"
       });
-      console.log('✅ Logout successful');
     } catch (error) {
       console.error('🔴 Logout error:', error);
     } finally {
@@ -132,8 +119,6 @@ export const AuthApi = {
 
   async refreshToken() {
     try {
-      console.log('🔄 Attempting token refresh...');
-      
       const requestData = {
         user_id: getUserIdFromToken(),
         user_agent: navigator.userAgent,
@@ -153,11 +138,8 @@ export const AuthApi = {
       const authToken = data.authToken || data.token || data.auth_token || data?.auth?.token || null;
       const user = data.user || data.me || data.profile || null;
 
-      console.log('✅ Token refresh successful');
       return { ...response, authToken, user };
     } catch (error) {
-      console.error('🔴 Token refresh failed:', error.message);
-      
      // Automatically clear cookies on refresh error
       clearAuthCookies();
       
@@ -171,8 +153,6 @@ export const AuthApi = {
 
   async signup(userData) {
     try {
-      console.log('👤 Attempting signup for:', userData.email);
-      
       const requestData = {
         email: userData.email,
         password: userData.password,
@@ -191,17 +171,14 @@ export const AuthApi = {
       const authToken = response.authToken || response.token || response.auth_token || response?.auth?.token || null;
       const user = response.user || response.me || response.profile || response.new_User || null;
 
-      console.log('✅ Signup successful');
       return { ...response, authToken, user };
     } catch (error) {
-      console.error('🔴 Signup error:', error);
       throw error;
     }
   },
 
   async requestPasswordReset(email, opts = {}) {
     try {
-      console.log('📧 Requesting password reset for:', email);
       // Build default reset URL (works for dev and GH Pages)
       let defaultUrl = 'https://scalingup-studio.github.io/Anatomous#/reset-password';
       try {
@@ -218,56 +195,43 @@ export const AuthApi = {
         body: { email, url },
       });
 
-      console.log('✅ Password reset email sent');
       return response;
     } catch (error) {
-      console.error('🔴 Password reset request error:', error);
       throw error;
     }
   },
 
   async resetPassword({ token, new_password }) {
     try {
-      console.log('🔑 Resetting password...');
-      
       const response = await request(CUSTOM_ENDPOINTS.auth.resetPassword, {
         method: "POST",
         body: { token, new_password },
       });
 
-      console.log('✅ Password reset successful');
       return response;
     } catch (error) {
-      console.error('🔴 Password reset error:', error);
       throw error;
     }
   },
 
   async getGoogleAuthUrl() {
     try {
-      console.log('🔗 Getting Google auth URL...');
       const response = await request(CUSTOM_ENDPOINTS.auth.google);
-      console.log('✅ Google auth URL received');
       return response.url;
     } catch (error) {
-      console.error('🔴 Google auth URL error:', error);
       throw error;
     }
   },
 
   async handleGoogleCallback(code) {
     try {
-      console.log('🔐 Handling Google callback...');
-      
       const response = await request(`${CUSTOM_ENDPOINTS.auth.googleCallback}?code=${code}`, {
         method: "GET",
         credentials: "include"
       });
 
-      console.log('✅ Google callback successful');
       return response;
     } catch (error) {
-      console.error('🔴 Google callback error:', error);
       clearAuthCookies();
       throw error;
     }
@@ -276,16 +240,13 @@ export const AuthApi = {
   // Нова функція для перевірки статусу токена
   async validateToken() {
     try {
-      console.log('🔍 Validating auth token...');
       // Можна використати простий endpoint для перевірки
       const response = await request('/auth/validate', {
         method: "GET",
         credentials: "include"
       });
-      console.log('✅ Token validation successful');
       return response;
     } catch (error) {
-      console.error('🔴 Token validation failed:', error);
       throw error;
     }
   },
@@ -319,7 +280,6 @@ export const TokenUtils = {
       }).join(''));
       return JSON.parse(jsonPayload);
     } catch (error) {
-      console.error('🔴 JWT parsing error:', error);
       return null;
     }
   },

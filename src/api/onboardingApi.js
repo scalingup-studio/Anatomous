@@ -27,7 +27,6 @@ export const OnboardingApi = {
         }
       };
 
-      console.log('💾 Saving personal info:', payload);
       
       // Debug: show what would be sent to profiles/{user_id}
       try {
@@ -45,7 +44,6 @@ export const OnboardingApi = {
           weight_kg: payload.data_json.weight ?? null,
           weight_type: payload.data_json.weight_type || ''
         };
-        console.log('🔎 Debug POST →', profileUrl, 'with body:', profilePayload);
       } catch (e) {
         // swallow debug errors
       }
@@ -65,7 +63,6 @@ export const OnboardingApi = {
           height_type: payload.data_json.height_type || '',
           weight_type: payload.data_json.weight_type || ''
         };
-        console.log('🛠️ PATCH →', profilePatchUrl, 'with body:', patchBody);
         await authRequest(profilePatchUrl, {
           method: "PATCH",
           headers: {
@@ -109,10 +106,6 @@ export const OnboardingApi = {
         }
       };
 
-      console.log('💾 Saving health snapshot');
-      console.log('📤 Request URL:', CUSTOM_ENDPOINTS.onboarding.healthSnapshot);
-      console.log('📦 Request Body (payload):', JSON.stringify(payload, null, 2));
-      console.log('📦 Request Body (object):', payload);
       
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.healthSnapshot, {
         method: "POST",
@@ -149,7 +142,6 @@ export const OnboardingApi = {
         }
       };
 
-      console.log('💾 Saving lifestyle:', payload);
       
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.lifestyle, {
         method: "POST",
@@ -260,7 +252,6 @@ export const OnboardingApi = {
         }
       };
 
-      console.log('💾 Saving privacy settings:', payload);
       
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.privacy, {
         method: "POST",
@@ -298,7 +289,6 @@ export const OnboardingApi = {
         }
       };
 
-      console.log('🎯 Completing onboarding:', payload);
       
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.complete, {
         method: "POST",
@@ -323,7 +313,6 @@ export const OnboardingApi = {
     try {
       const endpoint = CUSTOM_ENDPOINTS.onboarding.step(stepId);
       
-      console.log(`💾 Saving step ${stepId}:`, data);
       
       const res = await authRequest(endpoint, {
         method: "POST",
@@ -347,7 +336,6 @@ export const OnboardingApi = {
         data_json: {}
       };
 
-      console.log('📊 Getting onboarding progress via welcome API with payload:', payload);
 
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.step('welcome'), {
         method: "POST",

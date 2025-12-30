@@ -47,7 +47,6 @@ export default function DashboardLayout() {
           per_page: 20,
         });
         try {
-          console.log("👨‍👩‍👧 [DashboardLayout] Initial family/members call done");
         } catch {}
       } catch (err) {
         console.error("Failed initial family/members call:", err);
@@ -71,7 +70,6 @@ export default function DashboardLayout() {
           per_page: 20,
         });
         try {
-          console.log("👨‍👩‍👧 [DashboardLayout] initial family members fetch on mount:", res);
         } catch {}
       } catch (err) {
         console.error("Failed initial family members fetch:", err);
@@ -99,25 +97,20 @@ export default function DashboardLayout() {
       const error = event.reason;
       if (!error) return;
       
-      console.log('🔴 Global error handler triggered:', error);
-      
       // Check if it's an ApiError with success: false and error field
       // Check both top level and nested structures (e.g., guard_info.check_result)
       let errorMessage = null;
       
       if (error.data) {
-        console.log('🔴 Error data:', error.data);
         // Check top level
         if (error.data.success === false && error.data.error) {
           errorMessage = error.data.message || error.message || error.data.error || 'An error occurred';
-          console.log('🔴 Found top level error:', errorMessage);
         }
         // Check nested structures like guard_info.check_result
         else if (error.data.guard_info && error.data.guard_info.check_result) {
           const checkResult = error.data.guard_info.check_result;
           if (checkResult.success === false && checkResult.error) {
             errorMessage = checkResult.message || checkResult.error || error.data.message || error.message || 'An error occurred';
-            console.log('🔴 Found nested error:', errorMessage);
           }
         }
         // Also check for blocked responses
@@ -125,18 +118,14 @@ export default function DashboardLayout() {
           const checkResult = error.data.guard_info.check_result;
           if (checkResult.success === false && checkResult.error) {
             errorMessage = checkResult.message || checkResult.error || error.data.message || error.message || 'An error occurred';
-            console.log('🔴 Found blocked error:', errorMessage);
           }
         }
       }
       
       if (errorMessage) {
-        console.log('🔴 Showing error notification:', errorMessage);
         showError(errorMessage);
         // Prevent default browser error handling
         event.preventDefault();
-      } else {
-        console.log('🔴 No error message found, error:', error);
       }
     };
 
@@ -261,7 +250,6 @@ function UserSummaryAndLogout({ onLogout }) {
     async function loadFamilyMembers() {
       if (!user?.id) {
         try {
-          console.log("👨‍👩‍👧 [DashboardLayout] Skip family members load: no user id");
         } catch {}
         return;
       }
@@ -278,7 +266,6 @@ function UserSummaryAndLogout({ onLogout }) {
         const base = res?.result || res || {};
         const items = base.items || base;
         try {
-          console.log("👨‍👩‍👧 [DashboardLayout] family members response:", res);
         } catch {}
         if (cancelled) return;
         const list = Array.isArray(items) ? items : [];
@@ -309,7 +296,6 @@ function UserSummaryAndLogout({ onLogout }) {
       setFamilyLoading(true);
       const idToSend = memberId || primaryFamilyId;
       try {
-        console.log("🔁 [DashboardLayout] Switching profile, idToSend:", idToSend);
       } catch {}
       await SubscriptionApi.switchFamilyMember(idToSend);
       setActiveFamilyId(memberId || primaryFamilyId || null);

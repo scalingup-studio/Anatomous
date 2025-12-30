@@ -67,9 +67,6 @@ export function LoginPage({ onOpenSignup }) {
   React.useEffect(() => {
     if (hasPlanParam) {
       // Automatically open signup modal when ?plan= is present (even if empty)
-      try {
-        console.log("🔗 [LoginPage] Detected plan param in URL:", planValue);
-      } catch {}
       setSignupOpen(true);
     }
   }, [hasPlanParam, planValue]);
@@ -98,7 +95,6 @@ export function LoginPage({ onOpenSignup }) {
 
     try {
       setLoading(true);
-      console.log('🔐 Attempting login...');
 
       // Use login from AuthContext - it handles token storage & MFA flow
       const result = await login(email, password);
@@ -117,13 +113,10 @@ export function LoginPage({ onOpenSignup }) {
         throw new Error(result.error || "Login failed");
       }
 
-      console.log('✅ Login successful, redirecting to root...');
-
       // Navigate to root - AutoRedirectRoute will handle the rest
       navigate("/", { replace: true });
 
     } catch (err) {
-      console.error('❌ Login error:', err);
       setError(err.message || "Login failed. Please check your credentials.");
       showError(err.message || "Login failed");
     } finally {
@@ -140,7 +133,6 @@ export function LoginPage({ onOpenSignup }) {
     try {
       setMfaLoading(true);
       setError("");
-      console.log("🔐 Submitting MFA code...");
       const res = await verifyMfa(pendingEmail, mfaCode.trim());
       if (!res.success) {
         throw new Error(res.error || "Invalid MFA code.");
@@ -151,7 +143,6 @@ export function LoginPage({ onOpenSignup }) {
       setPendingEmail("");
       navigate("/", { replace: true });
     } catch (err) {
-      console.error("❌ MFA verification error:", err);
       setError(err.message || "MFA verification failed.");
       showError(err.message || "MFA verification failed.");
     } finally {
@@ -162,7 +153,6 @@ export function LoginPage({ onOpenSignup }) {
   async function handleGoogleLogin() {
     try {
       setLoading(true);
-      console.log('🔗 Starting Google OAuth...');
 
       // Import AuthApi dynamically
       const { AuthApi } = await import('../api/authApi.js');
@@ -173,11 +163,9 @@ export function LoginPage({ onOpenSignup }) {
         throw new Error('Failed to get Google OAuth URL');
       }
 
-      console.log('✅ Redirecting to Google...');
       window.location.href = url;
 
     } catch (err) {
-      console.error('❌ Google login failed:', err);
       setError('Failed to start Google login. Please try again.');
       showError('Failed to start Google login');
       setLoading(false);
