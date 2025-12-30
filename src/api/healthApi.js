@@ -1,5 +1,5 @@
 import { authRequest } from "./apiClient";
-import { ENDPOINTS } from "./apiConfig";
+import { ENDPOINTS, CUSTOM_ENDPOINTS } from "./apiConfig";
 
 export const HealthApi = {
   /**
@@ -97,12 +97,28 @@ export const HealthApi = {
    */
   async create(data) {
     try {
-      console.log('📝 Health data create payload:', data);
-      console.log('📝 Health data create payload (JSON):', JSON.stringify(data, null, 2));
       const response = await authRequest(ENDPOINTS.healthData.create, {
         method: "POST",
         body: data,
       });
+
+      // After successful health data creation, trigger comprehensive alerts
+      try {
+        // Endpoint requires `metrics` array; reuse the same payload inside it
+        const alertPayload = {
+          user_id: data.user_id || data.userId || data.user || data.id,
+          metrics: Array.isArray(data?.metrics) ? data.metrics : [data],
+        };
+
+        await authRequest(CUSTOM_ENDPOINTS.comprehensiveAlerts.comprehensiveAlerts, {
+          method: "POST",
+          body: alertPayload,
+        });
+      } catch (alertError) {
+        // Do not block health data flow if alerts generation fails
+        console.error("⚠️ Failed to trigger comprehensive alerts after health data create:", alertError);
+      }
+
       return response;
     } catch (error) {
       console.error('Error creating health data:', error);

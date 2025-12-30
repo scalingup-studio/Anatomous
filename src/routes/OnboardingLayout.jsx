@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../api/AuthContext.jsx';
@@ -127,55 +128,34 @@ const OnboardingLayout = () => {
   // Load user profile from database
   const loadUserProfile = async () => {
     if (!user?.id) {
-      console.log('❌ No user ID available for profile loading');
       return;
     }
     
     try {
       setProfileLoading(true);
-      console.log('🔍 Loading user profile for onboarding, user ID:', user.id);
-      console.log('👤 User object:', user);
       
       // Try to get profile by user_id
       let profileData = null;
       try {
-        console.log('📡 Calling ProfilesApi.getById with user_id:', user.id);
         profileData = await ProfilesApi.getById(user.id);
-        console.log('✅ Profile found by ID:', profileData);
-        
-        if (profileData) {
-          console.log('📝 Profile contains:', {
-            first_name: profileData.first_name,
-            last_name: profileData.last_name,
-            user_id: profileData.user_id,
-            id: profileData.id
-          });
-        }
       } catch (idError) {
-        console.log('⚠️ Profile not found by ID, trying to get all profiles:', idError.message);
         // If not found by ID, try to get all profiles and filter by user_id
         const allProfilesResponse = await ProfilesApi.getAll();
         const allProfiles = allProfilesResponse?.result || allProfilesResponse;
         
-        console.log('📋 All profiles response:', allProfiles);
         
         if (Array.isArray(allProfiles)) {
           profileData = allProfiles.find(p => p.user_id === user.id || p.id === user.id);
-          console.log('🔍 Found profile in list:', profileData);
         } else if (allProfiles && (allProfiles.user_id === user.id || allProfiles.id === user.id)) {
           profileData = allProfiles;
-          console.log('🔍 Single profile found:', profileData);
         }
       }
       
       setProfile(profileData);
-      console.log('📊 Final profile data loaded:', profileData);
       
       if (!profileData) {
-        console.log('⚠️ No profile found for user_id:', user.id);
       } else {
         // Force update form data when profile is loaded
-        console.log('🔄 Profile loaded, updating form data...');
         await updateFormWithProfileData(profileData);
       }
       
@@ -189,8 +169,8 @@ const OnboardingLayout = () => {
 
   // Update form data with profile data (similar to Profile.jsx logic)
   const updateFormWithProfileData = async (profileData) => {
-    console.log('🔄 Updating form with profile data:', profileData);
-    console.log('🔍 Profile data fields:', {
+    setFormData(prev => ({
+      ...prev,
       first_name: profileData.first_name,
       last_name: profileData.last_name,
       dob: profileData.dob,
@@ -200,7 +180,7 @@ const OnboardingLayout = () => {
       height_type: profileData.height_type,
       weight_type: profileData.weight_type,
       zip_code: profileData.zip_code
-    });
+    }));
     
     // Try to get unit types from profile data first
     let apiHeightType = profileData?.height_type 
@@ -210,8 +190,6 @@ const OnboardingLayout = () => {
       ? profileData.weight_type.toString().toLowerCase().trim() 
       : null;
     
-    console.log('📏 Initial height_type from profile:', apiHeightType);
-    console.log('⚖️ Initial weight_type from profile:', apiWeightType);
     
     // If not found in profile, try to get from user context
     if (!apiHeightType || !apiWeightType) {
@@ -223,8 +201,6 @@ const OnboardingLayout = () => {
         if (!apiWeightType && personalData.weight_type) {
           apiWeightType = personalData.weight_type.toString().toLowerCase().trim();
         }
-        console.log('📏 Height type from user context:', apiHeightType);
-        console.log('⚖️ Weight type from user context:', apiWeightType);
       }
     }
     
@@ -240,8 +216,6 @@ const OnboardingLayout = () => {
           if (!apiWeightType && personalData.weight_type) {
             apiWeightType = personalData.weight_type.toString().toLowerCase().trim();
           }
-          console.log('📏 Height type from onboarding API:', apiHeightType);
-          console.log('⚖️ Weight type from onboarding API:', apiWeightType);
         }
       } catch (onboardingError) {
         console.warn('⚠️ Failed to load units from onboarding API:', onboardingError.message);
@@ -264,17 +238,8 @@ const OnboardingLayout = () => {
     let heightForDisplay = heightStored;
     let weightForDisplay = weightStored;
     
-    console.log(`📏 Height: ${heightStored} (unit: ${validHeightUnit})`);
-    console.log(`⚖️ Weight: ${weightStored} (unit: ${validWeightUnit})`);
     
     setFormData(prev => {
-      console.log('📋 Previous form data:', {
-        firstName: prev.firstName,
-        lastName: prev.lastName,
-        heightUnit: prev.heightUnit,
-        weightUnit: prev.weightUnit
-      });
-      
       const updated = {
         ...prev,
         user_id: user?.id || prev.user_id,
@@ -292,23 +257,6 @@ const OnboardingLayout = () => {
         weightUnit: validWeightUnit,
       };
       
-      console.log('📝 Updated form data:', {
-        user_id: updated.user_id,
-        firstName: updated.firstName,
-        lastName: updated.lastName,
-        email: updated.email,
-        phoneNumber: updated.phoneNumber,
-        dateOfBirth: updated.dateOfBirth,
-        sexAtBirth: updated.sexAtBirth,
-        height: updated.height,
-        weight: updated.weight,
-        heightUnit: updated.heightUnit,
-        weightUnit: updated.weightUnit,
-        zipCode: updated.zipCode
-      });
-      
-      console.log('✅ Form update complete! firstName:', updated.firstName, 'lastName:', updated.lastName);
-      
       return updated;
     });
   };
@@ -316,22 +264,15 @@ const OnboardingLayout = () => {
   // Load onboarding progress from welcome API
   const loadOnboardingProgress = async (currentFormData) => {
     try {
-      console.log('📊 Loading onboarding progress from welcome API...');
       
       // Call welcome API to get onboarding progress
       const response = await OnboardingApi.getProgress(currentFormData.user_id);
-      console.log('📊 Onboarding API response:', response);
       
       // Extract progress data from the response structure
       const progress = response?.save_onboarding;
-      console.log('📊 Extracted progress data:', progress);
-      console.log('📊 Progress completed status:', progress?.completed);
-      console.log('📊 Progress percentage:', progress?.progress?.percentage);
-      console.log('📊 Current user onboarding_completed:', user?.onboarding_completed);
       
       // If onboarding is 100% complete, mark all steps as completed and move to last step (no redirect)
       if (progress?.progress?.percentage === 100) {
-        console.log('🎯 Onboarding is 100% complete per API. Marking all steps as completed.');
         await completeOnboarding();
         const allCompleted = new Set();
         for (let i = 0; i < steps.length; i++) allCompleted.add(i);
@@ -341,16 +282,13 @@ const OnboardingLayout = () => {
         localStorage.removeItem('onboarding-progress');
         localStorage.removeItem('onboarding-step');
         localStorage.removeItem('onboarding-completed');
-        console.log('🚫 Skipping auto-redirect to dashboard after 100% onboarding');
         // Continue to populate form data below
       }
       
       // Check if progress has the expected structure
       if (!progress || !progress.progress || !progress.progress.completed_steps) {
         console.warn('⚠️ Unexpected progress structure:', progress);
-        console.log('📊 Available progress keys:', Object.keys(progress || {}));
         if (progress?.progress) {
-          console.log('📊 Available progress.progress keys:', Object.keys(progress.progress));
         }
         return; // Exit early if structure is unexpected
       }
@@ -368,7 +306,6 @@ const OnboardingLayout = () => {
       
       // Automatically mark welcome step as completed (index 0)
       completedStepsSet.add(0);
-      console.log('✅ Automatically marking welcome step as completed');
       
       setCompletedSteps(completedStepsSet);
       
@@ -380,7 +317,6 @@ const OnboardingLayout = () => {
         const currentStepIndex = steps.findIndex(step => step.id === progress.current_step);
         if (currentStepIndex !== -1) {
           nextUncompletedStepIndex = currentStepIndex;
-          console.log(`📍 API indicates next step: ${progress.current_step} (index: ${currentStepIndex})`);
         } else {
           console.warn(`⚠️ Unknown step ID from API: ${progress.current_step}`);
         }
@@ -397,18 +333,9 @@ const OnboardingLayout = () => {
         }
       }
       
-      console.log(`🔍 Debug step logic:`, {
-        apiCurrentStep: progress.current_step,
-        completedSteps: progress.progress.completed_steps,
-        completedStepsSet: [...completedStepsSet],
-        nextUncompletedStepIndex,
-        stepsLength: steps.length
-      });
-      
       if (nextUncompletedStepIndex === -1) {
         // All steps completed
         if (progress.completed === true) {
-          console.log('✅ Onboarding completed per API. Marking all steps as completed.');
           await completeOnboarding();
           const allCompleted = new Set();
           for (let i = 0; i < steps.length; i++) allCompleted.add(i);
@@ -419,21 +346,17 @@ const OnboardingLayout = () => {
           localStorage.removeItem('onboarding-completed');
         } else {
           // All steps completed but not marked as completed, show last step
-          console.log(`📍 All steps completed but onboarding not finished, staying on last step: ${steps[steps.length - 1].id} (index: ${steps.length - 1})`);
           setCurrentStep(steps.length - 1);
         }
       } else {
-        console.log(`📍 Setting current step to next uncompleted step: ${steps[nextUncompletedStepIndex].id} (index: ${nextUncompletedStepIndex})`);
         setCurrentStep(nextUncompletedStepIndex);
       }
       
       // Populate form data with completed step data
       const populatedFormData = { ...currentFormData };
-      console.log('📝 Starting to populate form data from API response...');
       
       // Personal step data
       if (progress.steps.personal?.completed && progress.steps.personal.data) {
-        console.log('👤 Populating personal step data:', progress.steps.personal.data);
         const personalData = progress.steps.personal.data;
         
         populatedFormData.firstName = personalData.first_name || populatedFormData.firstName;
@@ -453,7 +376,6 @@ const OnboardingLayout = () => {
           populatedFormData.weightUnit = personalData.weight_type === 'lb' ? 'lb' : 'kg';
         }
         
-        console.log('✅ Personal data populated from API');
       }
       
       // Health snapshot data
@@ -502,7 +424,6 @@ const OnboardingLayout = () => {
         }
       }
       
-      console.log('📝 Populated form data from API:', populatedFormData);
       // Merge instead of replace to preserve units and other defaults
       setFormData(prev => ({
         ...prev,
@@ -517,8 +438,6 @@ const OnboardingLayout = () => {
       // Continue with default initialization if API fails
     }
   };
-
-
   // Load user profile from database
   useEffect(() => {
     if (user?.id) {
@@ -530,8 +449,6 @@ const OnboardingLayout = () => {
   useEffect(() => {
     if (initializedRef.current) return;
     if (user?.id && !profileLoading) {
-      console.log('👤 Loading user data for onboarding:', user);
-      console.log('📊 Profile data from database:', profile);
       
       // Initialize form data with user profile data from database
       const initialFormData = {
@@ -556,7 +473,6 @@ const OnboardingLayout = () => {
         wearableSync: false
       };
 
-      console.log('📝 Initial form data with profile info:', initialFormData);
       setFormData(prev => ({ ...prev, ...initialFormData }));
       
       // Load onboarding progress from welcome API
@@ -568,37 +484,22 @@ const OnboardingLayout = () => {
   // Track current step changes (only log in development)
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🔄 Current step changed to: ${currentStep} (${steps[currentStep]?.id})`);
     }
   }, [currentStep]);
 
   // Track form data changes (only log when step changes to avoid spam)
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && (formData.firstName || formData.lastName || formData.email)) {
-      console.log(`📝 Form data updated for step ${currentStep}:`, {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phoneNumber: formData.phoneNumber,
-        dateOfBirth: formData.dateOfBirth,
-        sexAtBirth: formData.sexAtBirth,
-        height: formData.height,
-        weight: formData.weight,
-        zipCode: formData.zipCode
-      });
-    }
+    // Development logging removed
   }, [currentStep]); // Changed dependency from formData to currentStep
 
   // Save progress to localStorage
   const saveProgress = () => {
-    console.log('💾 Saving progress to localStorage, currentStep:', currentStep);
     localStorage.setItem('onboarding-progress', JSON.stringify(formData));
     localStorage.setItem('onboarding-step', currentStep.toString());
     localStorage.setItem('onboarding-completed', JSON.stringify([...completedSteps]));
   };
 
   const updateFormData = (field, value) => {
-    console.log(`🔄 Updating form field ${field} to:`, value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -656,19 +557,15 @@ const OnboardingLayout = () => {
   };
 
   const nextStep = async () => {
-    console.log('🔄 nextStep called, currentStep:', currentStep);
     if (currentStep < steps.length - 1) {
       setLoading(true);
       try {
-        console.log('💾 Saving step data for step:', currentStep);
         // Save current step data to server
         await saveStepData(currentStep);
         
-        console.log('✅ Step data saved, moving to next step');
         setCompletedSteps(prev => new Set([...prev, currentStep]));
         setCurrentStep(prev => {
           const next = prev + 1;
-          console.log('📈 Moving from step', prev, 'to step', next);
           return next;
         });
         saveProgress();
@@ -679,7 +576,6 @@ const OnboardingLayout = () => {
         setCompletedSteps(prev => new Set([...prev, currentStep]));
         setCurrentStep(prev => {
           const next = prev + 1;
-          console.log('📈 Moving from step', prev, 'to step', next, '(despite save error)');
           return next;
         });
         saveProgress();
@@ -714,12 +610,9 @@ const OnboardingLayout = () => {
   };
 
   const finishLater = () => {
-    console.log('⏸️ Finishing onboarding later...');
-    console.log('💾 Saving current progress...');
     saveProgress();
     
     showSuccess('Your progress has been saved. You can continue onboarding anytime from your dashboard.');
-    console.log('🚀 Navigating to dashboard (Overview)...');
     // Mark as not a new user so DashboardGuard allows access
     try { setIsNewUser(false); } catch {}
     // Navigate to dashboard (Overview/Home page)
@@ -729,19 +622,15 @@ const OnboardingLayout = () => {
   const completeOnboardingProcess = async () => {
     try {
       setLoading(true);
-      console.log('🎯 Starting onboarding completion process...');
       
       // Check current progress before completing
-      console.log('📊 Checking current onboarding progress...');
       const response = await OnboardingApi.getProgress(formData.user_id);
       const progress = response?.save_onboarding;
       
       // Save all edited steps before completing onboarding
-      console.log('💾 Saving all edited steps before completion...');
       
       // Save personal step if it has data (always save if we have basic info)
       if (formData.firstName || formData.lastName || formData.email || formData.phoneNumber || formData.dateOfBirth) {
-        console.log('💾 Saving personal information...');
         await OnboardingApi.savePersonalInfo(formData);
       }
       
@@ -750,41 +639,33 @@ const OnboardingLayout = () => {
       const hasMedications = Array.isArray(formData.medications) ? formData.medications.length > 0 : formData.medications;
       const hasAllergies = Array.isArray(formData.allergies) ? formData.allergies.length > 0 : formData.allergies;
       if (hasHealthConditions || hasMedications || hasAllergies) {
-        console.log('💾 Saving health snapshot...');
         await OnboardingApi.saveHealthSnapshot(formData);
       }
       
       // Save lifestyle if it has data
       if (formData.lifestyleHabits && formData.lifestyleHabits.length > 0) {
-        console.log('💾 Saving lifestyle habits...');
         await OnboardingApi.saveLifestyle(formData);
       }
       
       // Save health goals if it has data
       if (formData.healthGoals && formData.healthGoals.length > 0) {
-        console.log('💾 Saving health goals...');
         await OnboardingApi.saveHealthGoals(formData);
       }
       
       // Save privacy settings (always save if we're completing onboarding)
-      console.log('💾 Saving privacy settings...');
       await OnboardingApi.savePrivacySettings(formData);
       
       // Complete onboarding
-      console.log('✅ Completing onboarding...');
       const result = await OnboardingApi.completeOnboarding({
         user_id: user?.id,
         stepsCompleted: [...completedSteps, currentStep]
       });
       
-      console.log('📊 Onboarding completion result:', result);
       
       // Mark onboarding as completed in AuthContext
-      console.log('🔐 Updating auth context...');
       await completeOnboarding();
       
       // Clear saved progress
-      console.log('🧹 Clearing localStorage...');
       localStorage.removeItem('onboarding-progress');
       localStorage.removeItem('onboarding-step');
       localStorage.removeItem('onboarding-completed');
@@ -795,14 +676,12 @@ const OnboardingLayout = () => {
       // - otherwise go to dashboard overview
       if (selectedPlan) {
         const target = `/dashboard/subscriptions?plan=${encodeURIComponent(selectedPlan)}`;
-        console.log('🚀 Navigating to', target, 'after completing onboarding with selected plan');
         try {
           navigate(target, { replace: true });
         } catch (error) {
           console.error('❌ Error navigating to subscriptions:', error);
         }
       } else {
-        console.log('🚀 Navigating to /dashboard (Overview) after completing onboarding...');
         try {
           navigate('/dashboard', { replace: true });
         } catch (error) {
@@ -818,7 +697,6 @@ const OnboardingLayout = () => {
   };
 
   const renderStepContent = () => {
-    console.log(`🎭 Rendering step content for currentStep: ${currentStep} (${steps[currentStep]?.id})`);
     
     switch (currentStep) {
       case 0: // Welcome
@@ -873,7 +751,6 @@ const OnboardingLayout = () => {
             <div className="form-grid">
               <div className="form-field">
                 <label>First Name *</label>
-                {console.log('🎯 Rendering First Name field with value:', formData.firstName)}
                 <input
                   type="text"
                   value={formData.firstName}
@@ -885,7 +762,6 @@ const OnboardingLayout = () => {
               
               <div className="form-field">
                 <label>Last Name *</label>
-                {console.log('🎯 Rendering Last Name field with value:', formData.lastName)}
                 <input
                   type="text"
                   value={formData.lastName}
@@ -1205,18 +1081,6 @@ const OnboardingLayout = () => {
                     });
                     bmiValue = parseFloat(bmi.toFixed(1));
                   }
-                  
-                  // Debug logging
-                  console.log('BMI Calculation:', {
-                    height: h,
-                    heightUnit: normalizedHeightUnit,
-                    weight: w,
-                    weightUnit: normalizedWeightUnit,
-                    heightMeters: parseFloat(heightMeters.toFixed(3)),
-                    weightKg: parseFloat(weightKg.toFixed(2)),
-                    bmi: parseFloat(bmi.toFixed(2)),
-                    bmiValue
-                  });
                   
                   // BMI categories (as per image)
                   const getBMICategory = (bmi) => {

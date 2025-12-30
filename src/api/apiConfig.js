@@ -116,7 +116,8 @@ export const CUSTOM_ENDPOINTS = {
     getAlertsInsight: `${API_BASE}/alerts_ai/{user_id}`
   },
   comprehensiveAlerts: {
-    comprehensiveAlerts: `${API_BASE}/get-comprehensive-alerts`,
+    // POST/GET comprehensive alerts generation & retrieval
+    comprehensiveAlerts: `${API_BASE}/comprehensive-alerts`,
   },
   uploudFile: {
     uploudFile: `${API_BASE}/upload/attachment_file`,

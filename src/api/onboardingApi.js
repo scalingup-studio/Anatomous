@@ -173,29 +173,55 @@ export const OnboardingApi = {
    */
   async saveHealthGoals(data) {
     try {
-      // Create the main goal data structure
-      const goalsData = {
-        title: "Health Goals",
-        description: data.goalNotes || `Goals: ${data.healthGoals.join(', ') || 'No specific goals'}`,
-        status: "on track",
-        target_date: data.targetDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +90 days default
-        visibility_scope: data.goalVisibility || "private",
-      };
+      // Get selected health goals (array of goal titles)
+      const selectedGoals = Array.isArray(data.healthGoals) ? data.healthGoals : [];
+      
+      // Default target date (+90 days from now)
+      const defaultTargetDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const targetDate = data.targetDate || defaultTargetDate;
+      const visibilityScope = data.goalVisibility || "private";
+      
+      // Create an array of goal objects - one for each selected goal
+      const goalsDataArray = selectedGoals.map((goalTitle) => {
+        // Use goalNotes as description if provided, otherwise use a default description based on the goal title
+        const description = data.goalNotes || `Goal: ${goalTitle}`;
+        
+        return {
+          title: goalTitle,
+          description: description,
+          status: "on track",
+          target_date: targetDate,
+          visibility_scope: visibilityScope,
+        };
+      });
+
+      // If no goals selected but there's a goalNotes or otherGoal, create a single goal
+      if (goalsDataArray.length === 0 && (data.goalNotes || data.otherGoal)) {
+        goalsDataArray.push({
+          title: data.otherGoal || "Health Goals",
+          description: data.goalNotes || "General wellness and balance",
+          status: "on track",
+          target_date: targetDate,
+          visibility_scope: visibilityScope,
+        });
+      }
+
+      // If still no goals, create a default one
+      if (goalsDataArray.length === 0) {
+        goalsDataArray.push({
+          title: "Health Goals",
+          description: "General wellness and balance",
+          status: "on track",
+          target_date: targetDate,
+          visibility_scope: visibilityScope,
+        });
+      }
 
       const payload = {
         user_id: data.userId || data.user_id,
         step: "health_goals",
-        data_json: goalsData
+        data_json: goalsDataArray
       };
-
-      console.log('💾 Saving health goals:', payload);
-      console.log('📋 Goals structure:', {
-        title: goalsData.title,
-        description: goalsData.description,
-        status: goalsData.status,
-        target_date: goalsData.target_date,
-        visibility_scope: goalsData.visibility_scope
-      });
       
       const res = await authRequest(CUSTOM_ENDPOINTS.onboarding.healthGoals, {
         method: "POST",
