@@ -21,17 +21,6 @@ const useOpenAI = () => {
     /severe chest pain/i, /can'?t breathe/i, /suicid/i, /overdose/i, /bleeding that won'?t stop/i
   ];
 
-  const EMERGENCY_FALLBACK_MESSAGES = [
-    "I understand you're experiencing concerning symptoms. It's important to seek immediate medical attention. Please call your local emergency services or go to the nearest emergency room.",
-    "Your symptoms suggest you need urgent medical care. Please contact emergency services right away - your health is the priority.",
-    "For immediate health concerns, please reach out to a healthcare professional or emergency services. This assistant cannot provide emergency medical advice."
-  ];
-
-  const GENERAL_FALLBACK_MESSAGES = [
-    "I'm here to help with general health information and wellness tips. For specific medical concerns, please consult with a healthcare professional.",
-    "I can provide educational health information to help you understand general health topics. For personalized medical advice, please speak with your doctor.",
-    "Let's discuss general health and wellness topics. For specific symptoms or medical questions, consulting a healthcare professional is recommended."
-  ];
 
   const checkEmergencyContent = useCallback((input) => {
     const emergencyPatterns = [
@@ -49,9 +38,6 @@ const useOpenAI = () => {
     conversationRef.current = conversation;
   }, [conversation]);
 
-  const getRandomMessage = (messages) => {
-    return messages[Math.floor(Math.random() * messages.length)];
-  };
 
   const buildContextPayload = useCallback((historySnapshot = []) => {
     const maxMessages = 8;
@@ -83,13 +69,7 @@ const useOpenAI = () => {
       const conversationSnapshot = [...conversationRef.current, userMessage];
       setConversation(conversationSnapshot);
       
-      // Check for emergency content
-      if (checkEmergencyContent(message)) {
-        const fallbackResponse = getRandomMessage(EMERGENCY_FALLBACK_MESSAGES);
-        setConversation(prev => [...prev, { role: 'assistant', content: fallbackResponse }]);
-        setLoading(false);
-        return fallbackResponse;
-      }
+      // Emergency content check removed - all requests go to API
 
       // Check if user is logged in and has auth token
       if (!user || !user.id) {
@@ -228,17 +208,27 @@ const useOpenAI = () => {
         return limitReachedResponse;
       }
 
-      if (response && response.result) {
-        // Safely extract content from various possible response formats
-        let insightContent = null;
-        
+      // Safely extract content from various possible response formats
+      let insightContent = null;
+      
+      // First, try result1.safe_insight.insight (new API format)
+      if (response?.result1?.safe_insight?.insight) {
+        insightContent = response.result1.safe_insight.insight;
+      }
+      // Then try result1.safe_insight.response_summary as fallback
+      else if (response?.result1?.safe_insight?.response_summary) {
+        insightContent = response.result1.safe_insight.response_summary;
+      }
+      // Then try result (old API format)
+      else if (response && response.result) {
         // Try different fields that might contain the response
         const possibleFields = [
           response.result.description,
           response.result.educational_insight,
           response.result.response,
           response.result.message,
-          response.result.content
+          response.result.content,
+          response.result.insight
         ];
         
         for (const field of possibleFields) {
@@ -255,20 +245,15 @@ const useOpenAI = () => {
             }
           }
         }
-        
-        // Fallback if nothing found
-        if (!insightContent) {
-          insightContent = "I'd be happy to help you learn more about general health topics.";
-        }
-        
-        setConversation(prev => [...prev, { role: 'assistant', content: insightContent }]);
-        return insightContent;
-      } else {
-        // Fallback to general message
-        const fallbackResponse = getRandomMessage(GENERAL_FALLBACK_MESSAGES);
-        setConversation(prev => [...prev, { role: 'assistant', content: fallbackResponse }]);
-        return fallbackResponse;
       }
+      
+      // Fallback if nothing found
+      if (!insightContent) {
+        insightContent = "I'd be happy to help you learn more about general health topics.";
+      }
+      
+      setConversation(prev => [...prev, { role: 'assistant', content: insightContent }]);
+      return insightContent;
     } catch (err) {
       console.error('Error generating insight:', err);
       
@@ -288,11 +273,11 @@ const useOpenAI = () => {
         return networkErrorResponse;
       }
       
-      // Fallback message on error
-      const fallbackResponse = getRandomMessage(GENERAL_FALLBACK_MESSAGES);
-      setConversation(prev => [...prev, { role: 'assistant', content: fallbackResponse }]);
+      // Fallback message on error - show error message instead of generic fallback
+      const errorResponse = "I'm having trouble processing your request. Please try again later.";
+      setConversation(prev => [...prev, { role: 'assistant', content: errorResponse }]);
       setError('Failed to generate response');
-      return fallbackResponse;
+      return errorResponse;
     } finally {
       setLoading(false);
     }
