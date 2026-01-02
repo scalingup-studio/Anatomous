@@ -4,6 +4,7 @@ import { useAuth } from "../../api/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { OnboardingIncompleteModal } from "../../components/OnboardingIncompleteModal";
 import { getUserPlan, PLAN_TIERS } from "../../utils/subscriptionUtils.js";
+import { SubscriptionApi } from "../../api/subscriptionApi.js";
 
 export default function DashboardHome(){
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function DashboardHome(){
   
   const [onboardingModalOpen, setOnboardingModalOpen] = React.useState(false);
   const [onboardingChecked, setOnboardingChecked] = React.useState(false);
+  const [currentPlan, setCurrentPlan] = React.useState(null);
 
   // Snapshot mock data (replace with API later)
   const riskScore = { label: 'Moderate Risk', color: '#e7b416', value: 62 };
@@ -166,7 +168,41 @@ export default function DashboardHome(){
     'Small wins compound: a 10-minute walk still counts.',
   ];
 
-  const userPlan = getUserPlan(user);
+  // Load subscription data to get current plan
+  React.useEffect(() => {
+    async function loadSubscription() {
+      try {
+        const data = await SubscriptionApi.getMySubscription();
+        
+        // Нова структура API: { result: { subscription: {...}, usage: {...}, plan_features: {...} } }
+        // Стара структура: { result: { subscription: {...} } } або { subscription: {...} }
+        const subscriptionData = data?.result?.subscription || 
+                                data?.result || 
+                                data?.subscription ||
+                                data;
+        
+        if (subscriptionData?.plan_name) {
+          // Normalize plan name to lowercase to match PLAN_TIERS
+          const planName = subscriptionData.plan_name.toLowerCase();
+          setCurrentPlan(planName);
+        } else {
+          // Fallback to user object from AuthContext if no plan_name in subscription
+          const userPlan = getUserPlan(user);
+          setCurrentPlan(userPlan);
+        }
+      } catch (error) {
+        console.error("Failed to load subscription in Home:", error);
+        // Fallback to user object from AuthContext
+        const userPlan = getUserPlan(user);
+        setCurrentPlan(userPlan);
+      }
+    }
+    
+    loadSubscription();
+  }, [user]);
+
+  // Determine current plan: use subscription data if available, otherwise fallback to user object
+  const userPlan = currentPlan || getUserPlan(user);
   const isFreePlan = userPlan === PLAN_TIERS.STARTER;
 
   return (
