@@ -5,6 +5,11 @@ import { useTheme } from "../../contexts/ThemeContext.jsx";
 import { OnboardingIncompleteModal } from "../../components/OnboardingIncompleteModal";
 import { getUserPlan, PLAN_TIERS } from "../../utils/subscriptionUtils.js";
 import { SubscriptionApi } from "../../api/subscriptionApi.js";
+import { HealthApi } from "../../api/healthApi.js";
+import { GoalsApi } from "../../api/goalsApi.js";
+import { InsightApi } from "../../api/insightApi.js";
+import { TrendsApi } from "../../api/trendsApi.js";
+import { ComprehensiveAlertsApi } from "../../api/comprehensiveAlertsApi.js";
 
 export default function DashboardHome(){
   const navigate = useNavigate();
@@ -17,32 +22,32 @@ export default function DashboardHome(){
   const [onboardingModalOpen, setOnboardingModalOpen] = React.useState(false);
   const [onboardingChecked, setOnboardingChecked] = React.useState(false);
   const [currentPlan, setCurrentPlan] = React.useState(null);
+  
+  // Dashboard data state
+  const [dashboardData, setDashboardData] = React.useState({
+    riskScore: { label: 'Calculating...', color: '#e7b416', value: 0 },
+    latestInsight: "Loading insights...",
+    vitals: { hr: null, bp: null, sleep: null },
+    suggestedGoal: null,
+    areas: [
+      { key:'Lifestyle', value: 0, color:'#00bace' },
+      { key:'Vitals', value: 0, color:'#4caf50' },
+      { key:'Labs', value: 0, color:'#ff9800' },
+      { key:'Nutrition', value: 0, color:'#9c27b0' },
+      { key:'Sleep', value: 0, color:'#2196f3' },
+    ],
+    trend: [],
+    actions: [],
+    activity: [],
+    loading: true
+  });
 
-  // Snapshot mock data (replace with API later)
-  const riskScore = { label: 'Moderate Risk', color: '#e7b416', value: 62 };
-  const latestInsight = "Your vitamin D levels may be low based on recent trends.";
-  const vitals = { hr: 72, bp: '118/74', sleep: 6.5 };
-  const suggestedGoal = "Increase fiber intake this week";
-
-  // Focus areas (ring chart style)
-  const areas = [
-    { key:'Lifestyle', value: 28, color:'#00bace' },
-    { key:'Vitals', value: 22, color:'#4caf50' },
-    { key:'Labs', value: 16, color:'#ff9800' },
-    { key:'Nutrition', value: 20, color:'#9c27b0' },
-    { key:'Sleep', value: 14, color:'#2196f3' },
-  ];
-
-  // Trends (simple spark bars)
-  const trend = [48, 52, 55, 50, 58, 64, 62, 66, 69, 71, 70, 72];
-
-  const [actions, setActions] = React.useState([
-    { id:1, text:'Drink 80 oz of water', done:false },
-    { id:2, text:'Add leafy greens to one meal', done:false },
-    { id:3, text:'Review your lab result summary', done:false },
-  ]);
-
-  const toggleAction = (id) => setActions(prev => prev.map(a => a.id===id ? { ...a, done:!a.done } : a));
+  const toggleAction = (id) => {
+    setDashboardData(prev => ({
+      ...prev,
+      actions: prev.actions.map(a => a.id === id ? { ...a, done: !a.done } : a)
+    }));
+  };
 
   // Check onboarding status only after login (not on every navigation)
   React.useEffect(() => {
@@ -155,13 +160,6 @@ export default function DashboardHome(){
     } catch {}
   }
 
-  const activity = [
-    { id:1, time:'2h ago', text:'AI Insight generated: Hydration trend' },
-    { id:2, time:'Yesterday', text:'Report shared with provider' },
-    { id:3, time:'2 days ago', text:'Lab results uploaded' },
-    { id:4, time:'3 days ago', text:'Profile updated: medications' },
-  ];
-
   const tips = [
     'Stay consistent: meaningful trends appear within 30 days.',
     'Add your latest lab report to improve recommendations.',
@@ -200,6 +198,265 @@ export default function DashboardHome(){
     
     loadSubscription();
   }, [user]);
+
+  // Load dashboard data from APIs
+  React.useEffect(() => {
+    async function loadDashboardData() {
+      if (!user?.id) {
+        setDashboardData(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
+      try {
+        setDashboardData(prev => ({ ...prev, loading: true }));
+
+        // Load data in parallel
+        const [
+          healthDataResponse,
+          goalsResponse,
+          insightsResponse,
+          alertsResponse
+        ] = await Promise.allSettled([
+          HealthApi.getByUserId(user.id, { sort_date: 'desc' }),
+          GoalsApi.listGoals({ limit: 5 }),
+          InsightApi.getInsightUser(),
+          ComprehensiveAlertsApi.fetchComprehensiveAlerts(user.id)
+        ]);
+
+        // Process health data for vitals
+        let vitals = { hr: null, bp: null, sleep: null };
+        let healthDataArray = [];
+        
+        if (healthDataResponse.status === 'fulfilled') {
+          const healthData = healthDataResponse.value;
+          healthDataArray = healthData?.result || healthData?.health_data || (Array.isArray(healthData) ? healthData : []);
+          
+          if (healthDataArray.length > 0) {
+            const latest = healthDataArray[0];
+            vitals = {
+              hr: latest.heart_rate || null,
+              bp: latest.blood_pressure_systolic && latest.blood_pressure_diastolic 
+                ? `${latest.blood_pressure_systolic}/${latest.blood_pressure_diastolic}` 
+                : null,
+              sleep: latest.sleep_duration || null
+            };
+          }
+        }
+
+        // Process goals for suggested goal and actions
+        let suggestedGoal = null;
+        let actions = [];
+        
+        if (goalsResponse.status === 'fulfilled') {
+          const goalsData = goalsResponse.value;
+          const goals = goalsData?.result || goalsData?.goals || (Array.isArray(goalsData) ? goalsData : []);
+          
+          if (goals.length > 0) {
+            // Get first active goal as suggested
+            const activeGoal = goals.find(g => g.status === 'active' || !g.status) || goals[0];
+            if (activeGoal) {
+              suggestedGoal = activeGoal.goal_name || activeGoal.name || activeGoal.description || "Complete your health goal";
+            }
+            
+            // Convert goals to actions
+            actions = goals.slice(0, 3).map((goal, idx) => ({
+              id: goal.id || goal.goal_id || idx + 1,
+              text: goal.goal_name || goal.name || goal.description || `Goal ${idx + 1}`,
+              done: goal.status === 'completed' || false
+            }));
+          }
+        }
+
+        // Process insights for latest insight
+        // getInsightUser() returns list of chats, not insights
+        let latestInsight = "No insights available yet. Start tracking your health data to get personalized insights.";
+        
+        if (insightsResponse.status === 'fulfilled') {
+          const insightsData = insightsResponse.value;
+          // getInsightUser returns { result: [...] } where each item is a chat with: id, title, created_at, last_message_at
+          const chats = insightsData?.result || (Array.isArray(insightsData) ? insightsData : []);
+          
+          if (chats.length > 0) {
+            // Get the most recent chat (sorted by last_message_at or created_at)
+            const latestChat = chats.sort((a, b) => {
+              const timeA = a.last_message_at || a.created_at || 0;
+              const timeB = b.last_message_at || b.created_at || 0;
+              return timeB - timeA; // Newest first
+            })[0];
+            
+            // Use chat title as insight, or try to get description
+            if (latestChat.title) {
+              latestInsight = latestChat.title;
+            } else if (latestChat.description) {
+              latestInsight = latestChat.description;
+            } else {
+              latestInsight = "You have active health insights. Click to view details.";
+            }
+          }
+        }
+
+        // Process alerts for risk score
+        let riskScore = { label: 'Low Risk', color: '#4caf50', value: 0 };
+        
+        if (alertsResponse.status === 'fulfilled') {
+          const alertsData = alertsResponse.value;
+          const alerts = alertsData?.result || alertsData?.alerts || (Array.isArray(alertsData) ? alertsData : []);
+          
+          // Calculate risk score based on active alerts
+          const activeAlerts = alerts.filter(a => a.status === 'active' || !a.status);
+          const highPriorityAlerts = activeAlerts.filter(a => a.severity === 'high' || a.priority === 'high');
+          
+          if (highPriorityAlerts.length > 0) {
+            riskScore = { label: 'High Risk', color: '#f44336', value: Math.min(90, 50 + highPriorityAlerts.length * 10) };
+          } else if (activeAlerts.length > 0) {
+            riskScore = { label: 'Moderate Risk', color: '#e7b416', value: Math.min(70, 30 + activeAlerts.length * 5) };
+          } else {
+            riskScore = { label: 'Low Risk', color: '#4caf50', value: 20 };
+          }
+        }
+
+        // Calculate focus areas from health data
+        const areas = [
+          { key:'Lifestyle', value: 0, color:'#00bace' },
+          { key:'Vitals', value: 0, color:'#4caf50' },
+          { key:'Labs', value: 0, color:'#ff9800' },
+          { key:'Nutrition', value: 0, color:'#9c27b0' },
+          { key:'Sleep', value: 0, color:'#2196f3' },
+        ];
+
+        if (healthDataArray.length > 0) {
+          // Calculate percentages based on data availability
+          const hasActivity = healthDataArray.some(d => d.weekly_activity_minutes > 0);
+          const hasVitals = healthDataArray.some(d => d.heart_rate > 0 || d.blood_pressure_systolic > 0);
+          const hasLabs = healthDataArray.some(d => d.fasting_glucose > 0 || d.body_temperature > 0);
+          const hasNutrition = healthDataArray.some(d => d.hydration_liters > 0);
+          const hasSleep = healthDataArray.some(d => d.sleep_duration > 0);
+
+          areas[0].value = hasActivity ? 30 : 0; // Lifestyle
+          areas[1].value = hasVitals ? 25 : 0; // Vitals
+          areas[2].value = hasLabs ? 20 : 0; // Labs
+          areas[3].value = hasNutrition ? 15 : 0; // Nutrition
+          areas[4].value = hasSleep ? 10 : 0; // Sleep
+        }
+
+        // Load health trend data
+        let trend = [];
+        try {
+          const endDate = new Date();
+          const startDate = new Date();
+          startDate.setDate(startDate.getDate() - 84); // 12 weeks ago
+          
+          const trendResponse = await TrendsApi.getTrends({
+            typeMetric: 'heart_rate',
+            period: 'week',
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0]
+          });
+
+          const trendData = trendResponse?.result || trendResponse?.data || [];
+          if (Array.isArray(trendData) && trendData.length > 0) {
+            trend = trendData.slice(-12).map(item => {
+              const value = item.daily_value || item.weekly_value || item.monthly_value || item.value || 0;
+              return Math.min(100, Math.max(0, value));
+            });
+          }
+        } catch (error) {
+          console.error("Failed to load trend data:", error);
+        }
+
+        // Generate recent activity from various sources
+        const activity = [];
+        
+        // Add insight activity (from chats)
+        if (insightsResponse.status === 'fulfilled') {
+          const insightsData = insightsResponse.value;
+          const chats = insightsData?.result || (Array.isArray(insightsData) ? insightsData : []);
+          if (chats.length > 0) {
+            const latestChat = chats.sort((a, b) => {
+              const timeA = a.last_message_at || a.created_at || 0;
+              const timeB = b.last_message_at || b.created_at || 0;
+              return timeB - timeA;
+            })[0];
+            const date = new Date(latestChat.last_message_at || latestChat.created_at || Date.now());
+            const timeAgo = getTimeAgo(date);
+            const chatTitle = latestChat.title || 'AI Insight';
+            activity.push({ id: 1, time: timeAgo, text: `AI Insight: ${chatTitle}` });
+          }
+        }
+
+        // Add health data activity
+        if (healthDataArray.length > 0) {
+          const recentHealth = healthDataArray[0];
+          const date = new Date(recentHealth.date || recentHealth.created_at || Date.now());
+          const timeAgo = getTimeAgo(date);
+          activity.push({ id: 2, time: timeAgo, text: 'Health data updated' });
+        }
+
+        // Add goals activity
+        if (goalsResponse.status === 'fulfilled') {
+          const goalsData = goalsResponse.value;
+          const goals = goalsData?.result || goalsData?.goals || (Array.isArray(goalsData) ? goalsData : []);
+          if (goals.length > 0) {
+            const recentGoal = goals.sort((a, b) => {
+              const timeA = a.created_at || a.updated_at || 0;
+              const timeB = b.created_at || b.updated_at || 0;
+              return timeB - timeA;
+            })[0];
+            const date = new Date(recentGoal.created_at || recentGoal.updated_at || Date.now());
+            const timeAgo = getTimeAgo(date);
+            const goalName = recentGoal.goal_name || recentGoal.name || 'Goal';
+            activity.push({ id: 3, time: timeAgo, text: `Goal: ${goalName}` });
+          }
+        }
+        
+        // Sort activity by time (newest first)
+        activity.sort((a, b) => {
+          // Simple sort by id (which represents order) - newest first
+          return b.id - a.id;
+        });
+
+        // Update state with all loaded data
+        setDashboardData({
+          riskScore,
+          latestInsight,
+          vitals,
+          suggestedGoal,
+          areas,
+          trend: trend.length > 0 ? trend : [48, 52, 55, 50, 58, 64, 62, 66, 69, 71, 70, 72], // Fallback
+          actions: actions.length > 0 ? actions : [
+            { id: 1, text: 'Add your first health data entry', done: false },
+            { id: 2, text: 'Create a health goal', done: false },
+            { id: 3, text: 'Generate your first AI insight', done: false },
+          ],
+          activity: activity.length > 0 ? activity : [
+            { id: 1, time: '—', text: 'No recent activity' }
+          ],
+          loading: false
+        });
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+        setDashboardData(prev => ({ ...prev, loading: false }));
+      }
+    }
+
+    loadDashboardData();
+  }, [user?.id]);
+
+  // Helper function to format time ago
+  function getTimeAgo(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return `${Math.floor(diffDays / 7)}w ago`;
+  }
 
   // Determine current plan: use subscription data if available, otherwise fallback to user object
   const userPlan = currentPlan || getUserPlan(user);
@@ -384,8 +641,8 @@ export default function DashboardHome(){
         <div className="card" style={{ display:'grid', gap:8 }}>
           <div className="home-card-title" style={{ fontWeight:600 }}>Personal Risk Score</div>
           <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ width:40, height:40, borderRadius:999, background: riskScore.color, display:'flex', alignItems:'center', justifyContent:'center', color:'#111', fontWeight:800, fontSize:'clamp(14px, 2.5vw, 18px)' }}>{riskScore.value}</div>
-            <div className="home-card-text" style={{ color:'var(--muted)' }}>{riskScore.label}</div>
+            <div style={{ width:40, height:40, borderRadius:999, background: dashboardData.riskScore.color, display:'flex', alignItems:'center', justifyContent:'center', color:'#111', fontWeight:800, fontSize:'clamp(14px, 2.5vw, 18px)' }}>{dashboardData.riskScore.value}</div>
+            <div className="home-card-text" style={{ color:'var(--muted)' }}>{dashboardData.riskScore.label}</div>
           </div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
             <Link className="btn outline small" to="/dashboard/insights">View Insights</Link>
@@ -393,21 +650,34 @@ export default function DashboardHome(){
         </div>
         <div className="card" style={{ display:'grid', gap:8 }}>
           <div className="home-card-title" style={{ fontWeight:600 }}>Latest AI Insight</div>
-          <div className="home-card-text" style={{ color:'var(--muted)' }}>{latestInsight}</div>
+          <div className="home-card-text" style={{ color:'var(--muted)' }}>
+            {dashboardData.loading ? 'Loading...' : dashboardData.latestInsight}
+          </div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
             <Link className="btn outline small" to="/dashboard/insights">Explore Suggestion</Link>
           </div>
         </div>
         <div className="card" style={{ display:'grid', gap:8 }}>
           <div className="home-card-title" style={{ fontWeight:600 }}>Vitals Summary</div>
-          <div className="home-card-text" style={{ color:'var(--muted)' }}>HR: {vitals.hr} | BP: {vitals.bp} | Sleep: {vitals.sleep}h</div>
+          <div className="home-card-text" style={{ color:'var(--muted)' }}>
+            {dashboardData.loading ? 'Loading...' : (
+              <>
+                {dashboardData.vitals.hr ? `HR: ${dashboardData.vitals.hr} bpm` : 'HR: —'}
+                {dashboardData.vitals.bp ? ` | BP: ${dashboardData.vitals.bp}` : ' | BP: —'}
+                {dashboardData.vitals.sleep ? ` | Sleep: ${dashboardData.vitals.sleep}h` : ' | Sleep: —'}
+                {!dashboardData.vitals.hr && !dashboardData.vitals.bp && !dashboardData.vitals.sleep && 'No vitals data yet'}
+              </>
+            )}
+          </div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
             <Link className="btn outline small" to="/dashboard/profile?tab=health_data">See Health Data</Link>
           </div>
         </div>
         <div className="card" style={{ display:'grid', gap:8 }}>
           <div className="home-card-title" style={{ fontWeight:600 }}>Suggested Goal</div>
-          <div className="home-card-text" style={{ color:'var(--muted)' }}>{suggestedGoal}</div>
+          <div className="home-card-text" style={{ color:'var(--muted)' }}>
+            {dashboardData.loading ? 'Loading...' : (dashboardData.suggestedGoal || 'Create your first health goal')}
+          </div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
             <Link className="btn outline small" to="/dashboard/goals">Manage Goals</Link>
           </div>
@@ -420,10 +690,10 @@ export default function DashboardHome(){
         <div style={{ display:'grid', gap:10 }}>
           <div className="home-chart-title" style={{ fontWeight:600 }}>Focus Areas</div>
           <div style={{ position:'relative', width:'clamp(140px, 20vw, 180px)', height:'clamp(140px, 20vw, 180px)', alignSelf:'center', margin:'0 auto' }}>
-            {renderRing(areas, isLight)}
+            {renderRing(dashboardData.areas, isLight)}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))', gap:6 }}>
-            {areas.map(a => (
+            {dashboardData.areas.map(a => (
               <div key={a.key} className="home-chart-legend" style={{ display:'flex', alignItems:'center', gap:8, color:'var(--muted)', fontSize:12 }}>
                 <span style={{ width:10, height:10, background:a.color, borderRadius:2, flexShrink:0 }} />
                 <span>{a.key} — {a.value}%</span>
@@ -436,7 +706,7 @@ export default function DashboardHome(){
         <div style={{ display:'grid', gap:10 }}>
           <div className="home-chart-title" style={{ fontWeight:600 }}>Health Trend (last 12 weeks)</div>
           <div style={{ display:'flex', alignItems:'flex-end', height:'clamp(80px, 15vw, 120px)', gap:4 }}>
-            {trend.map((v,i)=> (
+            {dashboardData.trend.length > 0 ? dashboardData.trend.map((v,i)=> (
               <div key={i} style={{ 
                 width:'clamp(12px, 2vw, 18px)', 
                 height: Math.max(6, (v/100)*110), 
@@ -445,7 +715,9 @@ export default function DashboardHome(){
                 borderRadius:4,
                 transition: 'all 0.2s ease'
               }} />
-            ))}
+            )) : (
+              <div style={{ color:'var(--muted)', fontSize:12 }}>No trend data available</div>
+            )}
           </div>
           <div className="home-tip-text" style={{ color:'var(--muted)', fontSize:12 }}>Tip: values are normalized to 0–100 for display.</div>
         </div>
@@ -456,26 +728,36 @@ export default function DashboardHome(){
         <div className="card" style={{ display:'grid', gap:8 }}>
           <div className="home-card-title" style={{ fontWeight:600 }}>Today's Action Plan</div>
           <div style={{ display:'grid', gap:6 }}>
-            {actions.map(a => (
-              <label key={a.id} className="checkbox" style={{ alignItems:'flex-start' }}>
-                <input type="checkbox" checked={a.done} onChange={()=>toggleAction(a.id)} />
-                <span className="home-action-text" style={{ textDecoration: a.done ? 'line-through' : 'none', fontSize:14 }}>{a.text}</span>
-              </label>
-            ))}
+            {dashboardData.loading ? (
+              <div style={{ color:'var(--muted)', fontSize:14 }}>Loading actions...</div>
+            ) : dashboardData.actions.length > 0 ? (
+              dashboardData.actions.map(a => (
+                <label key={a.id} className="checkbox" style={{ alignItems:'flex-start' }}>
+                  <input type="checkbox" checked={a.done} onChange={()=>toggleAction(a.id)} />
+                  <span className="home-action-text" style={{ textDecoration: a.done ? 'line-through' : 'none', fontSize:14 }}>{a.text}</span>
+                </label>
+              ))
+            ) : (
+              <div style={{ color:'var(--muted)', fontSize:14 }}>No actions yet. Create goals to see your action plan.</div>
+            )}
           </div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
-            <button className="btn primary">Save for today</button>
+            <Link className="btn primary" to="/dashboard/goals">Manage Goals</Link>
           </div>
         </div>
         <div className="card" style={{ display:'grid', gap:8 }}>
           <div className="home-card-title" style={{ fontWeight:600 }}>Recent Activity</div>
           <div style={{ display:'grid', gap:6 }}>
-            {activity.map(item => (
-              <div key={item.id} style={{ display:'flex', justifyContent:'space-between', borderBottom:'1px solid var(--border)', padding:'6px 0' }}>
-                <div className="home-action-text" style={{ fontSize:14 }}>{item.text}</div>
-                <div className="home-activity-time" style={{ color:'var(--muted)', fontSize:12 }}>{item.time}</div>
-              </div>
-            ))}
+            {dashboardData.loading ? (
+              <div style={{ color:'var(--muted)', fontSize:14 }}>Loading activity...</div>
+            ) : (
+              dashboardData.activity.map(item => (
+                <div key={item.id} style={{ display:'flex', justifyContent:'space-between', borderBottom:'1px solid var(--border)', padding:'6px 0' }}>
+                  <div className="home-action-text" style={{ fontSize:14 }}>{item.text}</div>
+                  <div className="home-activity-time" style={{ color:'var(--muted)', fontSize:12 }}>{item.time}</div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
