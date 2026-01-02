@@ -2076,63 +2076,65 @@ function TrendsTab() {
       </div>
 
       {/* Bottom section - Trends & Forecasts */}
-        <div className="card">
+      <div className="card">
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 style={{ marginTop: 0 }}>Trends & Forecasts</h3>
-              {loading && <span style={{ fontSize: 12, color: "var(--primary)" }}>Loading...</span>}
-            </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <select
-                value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
-                style={{
-                  padding: "8px 32px 8px 12px",
-                  background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  color: "var(--text)",
-                  fontSize: 13,
-                  minWidth: 180,
-                  cursor: 'pointer',
-                  appearance: 'none',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none'
-                }}
-              >
-                {metrics.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <div style={{
-                position: 'absolute',
-                right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                pointerEvents: 'none',
-                color: 'var(--muted)',
-                fontSize: '12px'
-              }}>
-                ▼
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {loading && <span style={{ fontSize: 12, color: "var(--primary)" }}>Loading...</span>}
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <select
+                    value={selectedMetric}
+                    onChange={(e) => setSelectedMetric(e.target.value)}
+                    style={{
+                      padding: "8px 32px 8px 12px",
+                      background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      color: "var(--text)",
+                      fontSize: 13,
+                      minWidth: 180,
+                      cursor: 'pointer',
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none'
+                    }}
+                  >
+                    {metrics.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    color: 'var(--muted)',
+                    fontSize: '12px'
+                  }}>
+                    ▼
+                  </div>
+                </div>
               </div>
             </div>
-            {["Overview", "Daily", "Monthly"].map((period) => (
-              <button
-                key={period}
-                onClick={() => setSelectedPeriod(period)}
-                className={`btn ${selectedPeriod === period ? "primary" : "outline"} small`}
-                style={{ height: 32 }}
-              >
-                {period}
-              </button>
-            ))}
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              {["Overview", "Daily", "Monthly"].map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setSelectedPeriod(period)}
+                  className={`btn ${selectedPeriod === period ? "primary" : "outline"} small`}
+                  style={{ height: 32 }}
+                >
+                  {period}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
           {/* Health Trend */}
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center"}}>
