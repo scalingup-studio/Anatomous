@@ -31,8 +31,6 @@ export const InsightApi = {
         ...(data?.data_range || data?.date_range ? { data_range: data.data_range || data.date_range } : {})
       };
 
-      try { console.log('📤 generate-insight body:', requestData); } catch {}
-
       const response = await authRequest(`${API_BASE}/generate-insight`, {
         method: "POST",
         body: requestData,
@@ -53,14 +51,11 @@ export const InsightApi = {
   async getInsightUser() {
     try {
       const url = `${API_BASE}/get-insight-user`;
-      
-      console.log('📤 get-insight-user URL:', url);
 
       const response = await authRequest(url, {
         method: "GET",
       });
       
-      console.log('✅ get-insight-user response received:', response);
       return response;
     } catch (error) {
       console.error('❌ Error getting insight user:', error);

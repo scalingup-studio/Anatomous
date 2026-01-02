@@ -132,10 +132,12 @@ class TokenManager {
             timeUntilExpiry - 5 * 60 * 1000         // or 5 mins before expiry
         );
 
-        console.log(`🕐 Scheduling refresh in ${Math.round(refreshTime / 1000 / 60)} minutes`);
+        // SECURITY: Commented to prevent token information leakage
+        // console.log(`🕐 Scheduling refresh in ${Math.round(refreshTime / 1000 / 60)} minutes`);
 
         this.tokenExpiryTimer = setTimeout(() => {
-            console.log('🔄 Auto-refreshing token (metadata mode)...');
+            // SECURITY: Commented to prevent token information leakage
+            // console.log('🔄 Auto-refreshing token (metadata mode)...');
             this.refreshToken()
                 .catch(error => {
                     console.error('Auto-refresh failed:', error);
@@ -151,11 +153,13 @@ class TokenManager {
     async refreshToken() {
         // If refresh is already in progress, return the existing promise
         if (this.refreshPromise) {
-            console.log('⏳ Refresh already in progress, waiting...');
+            // SECURITY: Commented to prevent token information leakage
+            // console.log('⏳ Refresh already in progress, waiting...');
             return this.refreshPromise;
         }
 
-        console.log('🔄 Starting token refresh...');
+        // SECURITY: Commented to prevent token information leakage
+        // console.log('🔄 Starting token refresh...');
 
         this.refreshPromise = this._performRefresh()
             .finally(() => {
@@ -210,7 +214,8 @@ class TokenManager {
             // Store new token and metadata
             this.setToken(data.authToken, { exp: data.authTokenExpiresAt });
 
-            console.log('✅ Token refreshed successfully');
+            // SECURITY: Commented to prevent token information leakage
+            // console.log('✅ Token refreshed successfully');
 
             return {
                 authToken: data.authToken,
@@ -238,7 +243,8 @@ class TokenManager {
 
         // If token is expired, refresh it
         if (this.isTokenExpired()) {
-            console.log('Token expired, refreshing...');
+            // SECURITY: Commented to prevent token information leakage
+            // console.log('Token expired, refreshing...');
             const result = await this.refreshToken();
             return result.authToken;
         }
@@ -246,7 +252,8 @@ class TokenManager {
         // If token expires in less than 1 minute, refresh it
         const timeUntilExpiry = this.getTimeUntilExpiry();
         if (timeUntilExpiry < 60000) {
-            console.log('Token expiring soon, refreshing...');
+            // SECURITY: Commented to prevent token information leakage
+            // console.log('Token expiring soon, refreshing...');
             const result = await this.refreshToken();
             return result.authToken;
         }

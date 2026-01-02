@@ -24,6 +24,28 @@ function onRefreshed(authToken) {
   refreshSubscribers = [];
 }
 
+/**
+ * Функція для перевірки наявності токена в cookies
+ * Використовується для приховування токена від Network вкладки браузера
+ * httpOnly cookies автоматично відправляються браузером і не видимі в JavaScript
+ * @returns {string|null} Токен з cookies або null
+ */
+function getTokenFromCookies() {
+  if (typeof document === 'undefined') return null;
+  try {
+    const cookies = document.cookie.split('; ');
+    const authCookie = cookies.find(cookie => 
+      cookie.startsWith('auth_token=') || 
+      cookie.startsWith('authToken=') ||
+      cookie.startsWith('access_token=') ||
+      cookie.startsWith('refresh_token=')
+    );
+    return authCookie ? authCookie.split('=')[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 // ✅ Експортована функція authRequest
 export const authRequest = async (url, options = {}, retry = true) => {
   const isFormData = options?.body instanceof FormData;
@@ -33,15 +55,37 @@ export const authRequest = async (url, options = {}, retry = true) => {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...options.headers,
     },
-    credentials: "include",
+    credentials: "include", // Важливо: дозволяє відправляти cookies (httpOnly cookies будуть відправлені автоматично)
     ...options,
   };
 
-  // Додаємо токен з localStorage до заголовків
-  const authToken = localStorage.getItem('authToken');
-  if (authToken) {
-    config.headers["Authorization"] = `Bearer ${authToken}`;
+  // ПРИХОВУВАННЯ ТОКЕНА: Використовуємо cookies замість headers
+  // httpOnly cookies автоматично відправляються браузером і не видимі в Network вкладці
+  // 
+  // Логіка:
+  // 1. Спочатку перевіряємо наявність токена в cookies (httpOnly cookies не доступні через JS, але відправляються автоматично)
+  // 2. Якщо cookies є - НЕ додаємо токен в headers (приховано від Network)
+  // 3. Якщо cookies немає - використовуємо fallback на headers (для сумісності зі старим API)
+  
+  // Перевіряємо, чи є httpOnly cookies (вони не доступні через document.cookie, але відправляються автоматично)
+  // Якщо бекенд встановлює httpOnly cookies, вони будуть відправлені через credentials: "include"
+  // Перевіряємо тільки доступні через JS cookies як індикатор
+  const hasAccessibleCookie = getTokenFromCookies() !== null;
+  
+  // Додаємо токен в headers ТІЛЬКИ якщо:
+  // 1. Немає доступних cookies (fallback для сумісності)
+  // 2. Або явно вказано використовувати headers через опцію
+  const useHeaderToken = options.useHeaderToken === true || (!hasAccessibleCookie && options.useHeaderToken !== false);
+  
+  if (useHeaderToken) {
+    const authToken = localStorage.getItem('authToken');
+    if (authToken) {
+      config.headers["Authorization"] = `Bearer ${authToken}`;
+    }
   }
+  
+  // Важливо: httpOnly cookies (якщо встановлені бекендом) будуть відправлені автоматично
+  // через credentials: "include" і НЕ будуть видимі в Network headers
 
   if (config.body && typeof config.body === "object" && !isFormData) {
     config.body = JSON.stringify(config.body);
@@ -51,46 +95,57 @@ export const authRequest = async (url, options = {}, retry = true) => {
   try {
     let response = await fetch(url, config);
 
-    // 🔄 Покращена логіка refresh token
-    if (response.status === 401 && retry) {
-      // Якщо вже йде процес refresh - додаємо запит в чергу
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          addRefreshSubscriber((newAuthToken) => {
-            // Повторюємо запит з новим токеном
+      // 🔄 Покращена логіка refresh token
+      if (response.status === 401 && retry) {
+        // Якщо вже йде процес refresh - додаємо запит в чергу
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            addRefreshSubscriber((newAuthToken) => {
+              // Повторюємо запит - якщо токен в cookies, не передаємо в headers
+              const retryConfig = {
+                ...config,
+                useHeaderToken: !getTokenFromCookies() // Використовуємо headers тільки якщо немає cookies
+              };
+              // Якщо все ж потрібен header token (немає cookies), додаємо його
+              if (!getTokenFromCookies() && newAuthToken) {
+                retryConfig.headers = {
+                  ...retryConfig.headers,
+                  "Authorization": `Bearer ${newAuthToken}`
+                };
+              }
+              authRequest(url, retryConfig, false)
+                .then(resolve)
+                .catch(reject);
+            });
+          });
+        }
+
+        isRefreshing = true;
+
+        try {
+          const refreshRes = await AuthApi.refreshToken();
+          
+          if (refreshRes?.authToken) {
+            // Сповіщаємо всі очікуючі запити
+            onRefreshed(refreshRes.authToken);
+            
+            // Перевіряємо, чи токен встановлено в cookies після refresh
+            // Якщо так, не передаємо його в headers (безпечніше)
+            const hasCookieToken = getTokenFromCookies();
             const retryConfig = {
               ...config,
-              headers: {
-                ...config.headers,
-                "Authorization": `Bearer ${newAuthToken}`
-              }
+              useHeaderToken: !hasCookieToken // Використовуємо headers тільки якщо немає cookies
             };
-            authRequest(url, retryConfig, false)
-              .then(resolve)
-              .catch(reject);
-          });
-        });
-      }
-
-      isRefreshing = true;
-
-      try {
-        const refreshRes = await AuthApi.refreshToken();
-        
-        if (refreshRes?.authToken) {
-          // Сповіщаємо всі очікуючі запити
-          onRefreshed(refreshRes.authToken);
-          
-          // Повторюємо поточний запит з новим токеном
-          const retryConfig = {
-            ...config,
-            headers: {
-              ...config.headers,
-              "Authorization": `Bearer ${refreshRes.authToken}`
+            
+            // Додаємо токен в headers тільки якщо його немає в cookies
+            if (!hasCookieToken && refreshRes.authToken) {
+              retryConfig.headers = {
+                ...retryConfig.headers,
+                "Authorization": `Bearer ${refreshRes.authToken}`
+              };
             }
-          };
-          
-          return authRequest(url, retryConfig, false);
+            
+            return authRequest(url, retryConfig, false);
         } else {
           throw new Error("No authToken received from refresh");
         }

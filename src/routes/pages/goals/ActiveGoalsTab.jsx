@@ -13,7 +13,7 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
     try {
       const d = new Date(v);
       if (Number.isNaN(d.getTime())) return String(v);
-      // Format to US format (MM/DD/YYYY)
+      // Format to consistent US format (MM/DD/YYYY)
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       const year = d.getFullYear();
@@ -29,12 +29,17 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
     archived: "outline",
   }[String(goal.status || "on track").toLowerCase()] || "secondary";
 
+  // Normalize description - remove "Goal: " prefix if present for consistent display
+  const normalizedDescription = goal.description 
+    ? goal.description.replace(/^Goal:\s*/i, '').trim() 
+    : null;
+
   return (
     <div className="card goal-item" style={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 12 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 200 }}>
         <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>{goal.title}</div>
-        {goal.description && (
-          <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4, wordBreak: 'break-word' }}>{goal.description}</div>
+        {normalizedDescription && (
+          <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 4, wordBreak: 'break-word' }}>{normalizedDescription}</div>
         )}
         <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 6, display:'flex', gap:12, flexWrap:'wrap' }}>
           {(() => {
@@ -42,10 +47,17 @@ function GoalItem({ goal, onUpdate, onDelete, onEdit }) {
             const target = goal.target_date || goal.targetDate;
             const updated = goal.updated_at || goal.updatedAt;
             const parts = [];
+            // Always show Created date if available
             if (created) parts.push(`Created: ${formatDate(created)}`);
+            // Always show Target date if available
             if (target) parts.push(`Target: ${formatDate(target)}`);
-            if (goal.completed_at) parts.push(`Completed: ${formatDate(goal.completed_at)}`);
-            else if (updated) parts.push(`Updated: ${formatDate(updated)}`);
+            // Show Completed date if goal is completed, otherwise show Updated if available
+            if (goal.completed_at) {
+              parts.push(`Completed: ${formatDate(goal.completed_at)}`);
+            } else if (updated && goal.status !== 'on track') {
+              // Only show Updated for non-active goals (paused, archived, etc.)
+              parts.push(`Updated: ${formatDate(updated)}`);
+            }
             return parts.length ? <span>{parts.join(' · ')}</span> : null;
           })()}
         </div>
@@ -235,7 +247,8 @@ function EditGoalModal({ open, goal, onClose, onSave }) {
                 type,
                 visibility_scope: visibility,
               };
-              console.log('Update Goal - Request payload:', payload);
+              // SECURITY: Commented to prevent sensitive payload data leakage
+              // console.log('Update Goal - Request payload:', payload);
               onSave(payload);
             }}
             style={{ flex: 1, minWidth: '120px' }}
@@ -360,7 +373,8 @@ function AddGoalForm({ onCreate, loading }) {
             type,
             visibility_scope: visibility,
           };
-          console.log('Create Goal - Request payload:', payload);
+          // SECURITY: Commented to prevent sensitive payload data leakage
+          // console.log('Create Goal - Request payload:', payload);
           const ok = await onCreate(payload);
           if (ok) {
             setTitle("");

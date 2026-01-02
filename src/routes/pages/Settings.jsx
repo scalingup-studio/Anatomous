@@ -142,7 +142,6 @@ function NotificationsTab(){
       try {
         setLoading(true);
         const prefs = await NotificationsApi.getPreferences();
-        console.log("🔔 Loaded notification preferences:", prefs);
 
         if (!prefs || prefs.error) {
           // If no preferences exist yet, keep defaults
@@ -198,10 +197,8 @@ function NotificationsTab(){
         email_enabled: !!channels.email,
       };
 
-      console.log("🔔 Updating notification preferences with payload:", payload);
 
       const updated = await NotificationsApi.updatePreferences(payload);
-      console.log("✅ Notification preferences updated:", updated);
 
       showSuccess("Notification settings saved");
     } catch (error) {
@@ -466,7 +463,6 @@ function PrivacyTab(){
       try {
         setLoading(true);
         const res = await UserSettingsApi.getAiPreferences();
-        console.log("🛡️ Loaded AI preferences:", res);
         if (!isMounted) return;
         applyAiPreferences(res);
       } catch (error) {
@@ -510,9 +506,7 @@ function PrivacyTab(){
 
       const prefs = merged;
 
-      console.log("🛡️ Updating AI preferences with payload:", prefs);
       const res = await UserSettingsApi.updateAiPreferences(prefs);
-      console.log("✅ AI preferences updated:", res);
       // Локально оновлюємо lastApiPrefs, не перезавантажуючи з бекенда
       setLastApiPrefs(prefs);
       showSuccess("Privacy preferences updated");
@@ -533,7 +527,6 @@ function PrivacyTab(){
       merged.data_visibility = mapVisibilityToApi(dataVisibility);
       merged.data_retention = mapRetentionToApi(retention);
 
-      console.log("🛡️ Updating visibility/retention only with merged payload:", merged);
       await UserSettingsApi.updateAiPreferences(merged);
       // Локально оновлюємо lastApiPrefs
       setLastApiPrefs(merged);
@@ -782,7 +775,6 @@ function AccountTab({ onSaved, onAction }){
     try {
       setSaving(true);
       const res = await AccountApi.updateCredentials(payload);
-      console.log("✅ update_credentials response:", res);
 
       const success = res?.success !== false;
       const message =
@@ -815,7 +807,8 @@ function AccountTab({ onSaved, onAction }){
   const handleRevokeSession = async (device) => {
     try {
       // In this UI we don't have real token IDs yet, so we call revoke without payload.
-      console.log("🔐 Revoking session for device:", device);
+      // SECURITY: Commented to prevent session/device information leakage
+      // console.log("🔐 Revoking session for device:", device);
       await AccountApi.revokeToken({});
       showSuccess("Session revoked. You may need to log in again on that device.");
       onAction && onAction("Session revoked");
@@ -830,13 +823,15 @@ function AccountTab({ onSaved, onAction }){
       setDangerLoading(true);
       if (dangerType === "delete") {
         const res = await AccountApi.deleteAccount();
-        console.log("🗑️ delete_account response:", res);
+        // SECURITY: Commented to prevent sensitive account deletion response data leakage
+        // console.log("🗑️ delete_account response:", res);
         showSuccess(res?.message || "Account deleted permanently.");
         onAction && onAction("Account deletion requested");
         await logout();
       } else {
         const res = await AccountApi.deactivateAccount();
-        console.log("🛑 deactivate_account response:", res);
+        // SECURITY: Commented to prevent sensitive account deactivation response data leakage
+        // console.log("🛑 deactivate_account response:", res);
         showSuccess(res?.message || "Account deactivated temporarily.");
         onAction && onAction("Account deactivation requested");
         await logout();

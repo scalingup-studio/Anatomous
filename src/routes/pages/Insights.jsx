@@ -927,7 +927,6 @@ function PreviousQueriesList({ hook }) {
 
   // Auto-load previous queries on component mount
   useEffect(() => {
-    console.log('🔄 PreviousQueriesList mounted, auto-loading previous queries...');
     loadPreviousQueriesFromUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -936,12 +935,8 @@ function PreviousQueriesList({ hook }) {
     setLoading(true);
     setError('');
     try {
-      console.log('🔄 Loading previous queries from /get-insight-user...');
-      
       // Call /get-insight-user to get all previous queries/insights
       const response = await InsightApi.getInsightUser();
-      
-      console.log('✅ get-insight-user response:', response);
       
       // Parse the response structure: { result: [...] }
       // Each item has: id, created_at, user_id, last_message_at, title, archived
@@ -949,7 +944,6 @@ function PreviousQueriesList({ hook }) {
       
       if (response?.result && Array.isArray(response.result)) {
         items = response.result;
-        console.log('📊 Found items in response.result:', items.length);
       } else if (Array.isArray(response)) {
         items = response;
         console.log('📊 Found items as array:', items.length);
@@ -974,8 +968,6 @@ function PreviousQueriesList({ hook }) {
         title: item.title || `Chat ${item.id}`,
         archived: item.archived || false
       }));
-      
-      console.log('📋 Formatted queries:', formattedQueries.length);
       
       setQueries(formattedQueries);
       if (formattedQueries.length === 0) {
@@ -1355,7 +1347,6 @@ function TrendsTab() {
   const healthTrendData = React.useMemo(() => {
     if (trends && trends.result && Array.isArray(trends.result)) {
       const apiData = trends.result;
-      console.log("Using API data for Health Trend:", apiData);
       
       // Process API data with null values as 0
       const processedData = apiData
@@ -1410,9 +1401,6 @@ function TrendsTab() {
     }
     
     // Use mock data if no real data available
-    if (trends) {
-      console.log("API returned data but no valid values found, using mock data. API response:", trends);
-    }
     return mockHealthTrendData;
   }, [trends, mockHealthTrendData]);
 
@@ -1427,8 +1415,6 @@ function TrendsTab() {
   // Transform forecast data for display
   const forecastDonutData = React.useMemo(() => {
     if (forecast && forecast.result_forecast) {
-      console.log("Using API forecast data:", forecast.result_forecast);
-      
       const resultForecast = forecast.result_forecast;
       const forecastData = resultForecast.forecast;
       
@@ -1452,7 +1438,6 @@ function TrendsTab() {
       
       // If no forecast but we have trend/confidence info
       if (resultForecast.trend || resultForecast.message) {
-        console.log("Using trend info for forecast");
         // Create simple forecast based on trend
         const trend = resultForecast.trend || 'neutral';
         const confidence = forecastData?.confidence || 'low';
@@ -1475,7 +1460,6 @@ function TrendsTab() {
     }
     
     // Use mock data if no real forecast available
-    console.log("Using mock forecast data");
     return mockForecastDonutData;
   }, [forecast, mockForecastDonutData]);
 
@@ -1509,10 +1493,8 @@ function TrendsTab() {
       // Set trends if we got valid data (support both 'succes' and 'success' spelling)
       if (response && (response.success !== false && response.success !== undefined) || (response.succes !== false && response.succes !== undefined)) {
         setTrends(response);
-        console.log("Trends loaded successfully from API:", response);
       }
     } catch (error) {
-      console.log("Error fetching trends from API, using mock data instead", error);
       // Keep using mock data on error - this is expected if backend API is not available
     } finally {
       setLoading(false);
@@ -1528,10 +1510,8 @@ function TrendsTab() {
       // Set forecast if we got valid data
       if (response && (response.success !== false && response.success !== undefined) || (response.succes !== false && response.succes !== undefined)) {
         setForecast(response);
-        console.log("Forecast loaded successfully from API:", response);
       }
     } catch (error) {
-      console.log("Error fetching forecast from API, using mock data instead", error);
       // Keep using mock data on error
     } finally {
       setForecastLoading(false);
@@ -1748,11 +1728,6 @@ function AlertsTab() {
       }
     } catch (error) {
       console.error('Error loading alerts:', error);
-      console.log('Error details:', {
-        message: error.message,
-        data: error.data,
-        isApiError: error instanceof Error && error.data
-      });
       
       // Check if it's an ApiError with subscription_limit_reached
       if (error.data) {

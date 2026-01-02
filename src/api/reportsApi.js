@@ -61,7 +61,8 @@ export const ReportsApi = {
       output_format: resolvedFormat,
     };
 
-    try { console.log('📤 ReportsApi.generate payload:', body); } catch {}
+    // SECURITY: Commented to prevent sensitive data leakage in payload
+    // try { console.log('📤 ReportsApi.generate payload:', body); } catch {}
 
     // Choose endpoint based on layout
     const layoutLower = String(body.layout || 'detailed').toLowerCase();
@@ -69,33 +70,45 @@ export const ReportsApi = {
       ? CUSTOM_ENDPOINTS.reports.generateSimple
       : CUSTOM_ENDPOINTS.reports.generateDetailed;
 
-    // Strategy: 1) JSON (per docs). If 400 filename -> 2) JSON + ?filename. If still fails -> 3) multipart + ?filename
+    // Strategy: Try with filename in query first (most common case), then fallback to JSON only, then multipart
+    // This reduces unnecessary retries
+    const params = new URLSearchParams();
+    params.set('filename', body.filename);
+    const urlWithFilename = `${endpoint}?${params.toString()}`;
+    
     try {
-      return await authRequest(endpoint, { method: 'POST', body });
+      // First try: JSON with filename in query (most common successful case)
+      return await authRequest(urlWithFilename, { method: 'POST', body });
     } catch (err1) {
-      const needsFilename = (err1?.status === 400) && (
-        err1?.data?.code === 'ERROR_CODE_INPUT_ERROR' || String(err1?.message || '').toLowerCase().includes('filename')
+      // Check if error is specifically about filename format
+      const isFilenameError = (err1?.status === 400) && (
+        err1?.data?.code === 'ERROR_CODE_INPUT_ERROR' || 
+        String(err1?.message || '').toLowerCase().includes('filename') ||
+        String(err1?.data?.message || '').toLowerCase().includes('filename')
       );
-      if (!needsFilename) throw err1;
+      
+      // If it's not a filename error, don't retry - throw immediately
+      if (!isFilenameError) throw err1;
 
-      // Retry JSON with filename in query
-      const params1 = new URLSearchParams();
-      params1.set('filename', body.filename);
-      const url1 = `${endpoint}?${params1.toString()}`;
+      // Second try: JSON without filename in query
       try {
-        return await authRequest(url1, { method: 'POST', body });
+        return await authRequest(endpoint, { method: 'POST', body });
       } catch (err2) {
-        const stillNeeds = (err2?.status === 400) && (
-          err2?.data?.code === 'ERROR_CODE_INPUT_ERROR' || String(err2?.message || '').toLowerCase().includes('filename')
+        // If still filename error, try multipart as last resort
+        const stillFilenameError = (err2?.status === 400) && (
+          err2?.data?.code === 'ERROR_CODE_INPUT_ERROR' || 
+          String(err2?.message || '').toLowerCase().includes('filename') ||
+          String(err2?.data?.message || '').toLowerCase().includes('filename')
         );
-        if (!stillNeeds) throw err2;
+        
+        if (!stillFilenameError) throw err2;
 
         // Final fallback: multipart + query
         const form = new FormData();
         Object.entries(body).forEach(([k, v]) => {
           if (v !== undefined && v !== null) form.append(k, String(v));
         });
-        return await authRequest(url1, { method: 'POST', body: form });
+        return await authRequest(urlWithFilename, { method: 'POST', body: form });
       }
     }
   },

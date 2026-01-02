@@ -141,7 +141,8 @@ export default function DashboardHome(){
     // Navigate with force parameter to bypass guard
     navigate("/onboarding?force=true", { replace: true });
     
-    console.log('✅ Navigation triggered to /onboarding?force=true');
+    // SECURITY: Commented to prevent navigation information leakage
+    // console.log('✅ Navigation triggered to /onboarding?force=true');
   }
 
   function handleOnboardingSkip() {

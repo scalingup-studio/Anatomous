@@ -61,7 +61,8 @@ export function SignupPage({ onClose, initialPlan }) {
           lastName
         });
         if (!res?.success) throw new Error(res?.error || "Signup failed");
-        console.log('📝 Signup via AuthContext successful');
+        // SECURITY: Commented to prevent sensitive signup data leakage
+        // console.log('📝 Signup via AuthContext successful');
       } else {
         // Fallback to direct API call if AuthContext not available
         const data = await AuthApi.signup({

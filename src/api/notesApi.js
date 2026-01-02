@@ -28,7 +28,6 @@ export const NotesApi = {
     const res = await authRequest(url, {
       method: "GET",
     });
-    console.log('📝 NotesApi.list response:', res);
     
     // Handle different response formats
     // API might return: array, { result: [...] }, { sorted_list: [...] }, or { data: [...] }

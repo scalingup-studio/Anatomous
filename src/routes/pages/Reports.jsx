@@ -639,6 +639,7 @@ function ExportSettingsTab() {
   const [message, setMessage] = React.useState("");
   const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
   const [upgradeFeature, setUpgradeFeature] = React.useState(null);
+  const isGeneratingRef = React.useRef(false); // Prevent multiple simultaneous calls
 
   const computedFilename = React.useMemo(() => {
     const safeTitle = String(title || 'Report').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '');
@@ -647,6 +648,10 @@ function ExportSettingsTab() {
   }, [title, format]);
 
   const handleGenerate = async () => {
+    // Prevent multiple simultaneous calls
+    if (loading || isGeneratingRef.current) return;
+    
+    isGeneratingRef.current = true;
     try {
       setMessage("");
       setLoading(true);
@@ -665,27 +670,29 @@ function ExportSettingsTab() {
           usage?.pdf_reports?.enabled === true ||
           hasFeatureAccess(user, "reportsPdf");
 
-        try {
-          console.log(
-            "🔎 [ExportSettingsTab] PDF access check:",
-            JSON.stringify(
-              {
-                plan_tier: subscription?.plan_tier,
-                plan_name: subscription?.plan_name,
-                backend_plan_pdf_feature: planFeatures.pdf_reports,
-                backend_usage_pdf_enabled: usage?.pdf_reports?.enabled,
-                final_has_access: hasPdfAccess,
-              },
-              null,
-              2
-            )
-          );
-        } catch {}
+        // SECURITY: Commented to prevent sensitive subscription data leakage
+        // try {
+        //   console.log(
+        //     "🔎 [ExportSettingsTab] PDF access check:",
+        //     JSON.stringify(
+        //       {
+        //         plan_tier: subscription?.plan_tier,
+        //         plan_name: subscription?.plan_name,
+        //         backend_plan_pdf_feature: planFeatures.pdf_reports,
+        //         backend_usage_pdf_enabled: usage?.pdf_reports?.enabled,
+        //         final_has_access: hasPdfAccess,
+        //       },
+        //       null,
+        //       2
+        //     )
+        //   );
+        // } catch {}
       } catch (e) {
-        console.log(
-          "⚠️ [ExportSettingsTab] Failed to load subscription, falling back to plan-only access:",
-          e?.message
-        );
+        // SECURITY: Commented - error message may contain sensitive info
+        // console.log(
+        //   "⚠️ [ExportSettingsTab] Failed to load subscription, falling back to plan-only access:",
+        //   e?.message
+        // );
         hasPdfAccess = hasFeatureAccess(user, "reportsPdf");
       }
 
@@ -712,12 +719,13 @@ function ExportSettingsTab() {
         output_format: format,
       };
 
-      try {
-        console.log(
-          "📤 [ExportSettingsTab] Sending generate report payload:",
-          JSON.stringify(payload, null, 2)
-        );
-      } catch {}
+      // SECURITY: Commented to prevent sensitive payload data leakage
+      // try {
+      //   console.log(
+      //     "📤 [ExportSettingsTab] Sending generate report payload:",
+      //     JSON.stringify(payload, null, 2)
+      //   );
+      // } catch {}
 
       await ReportsApi.generate(payload);
       // Optional: could reload list in Download tab, but keeping local here
@@ -726,6 +734,7 @@ function ExportSettingsTab() {
       setMessage(e?.message || 'Failed to start report generation.');
     } finally {
       setLoading(false);
+      isGeneratingRef.current = false;
     }
   };
 

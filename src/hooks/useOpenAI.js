@@ -84,10 +84,8 @@ const useOpenAI = () => {
       let shouldGenerate = false;
       try {
         const check = await CheckQueryApi.checkQuery(message);
-        try { console.log('✅ check_query raw:', check); } catch {}
         // Normalize nested structures: some backends wrap data in { response: { ... } }
         const payload = (check && typeof check === 'object' && ('response' in check)) ? check.response : check;
-        try { console.log('✅ check_query payload:', payload); } catch {}
         const isAllowed = !!(payload && (
           payload.success === true ||
           payload.allowed === true ||
@@ -97,7 +95,6 @@ const useOpenAI = () => {
         if (isAllowed) {
           // Allowed → proceed to generate insight
           shouldGenerate = true;
-          try { console.log('➡️ check_query OK — proceeding to generate-insight'); } catch {}
         } else {
           // Not allowed → DO NOT generate; respond with backend message (or generic)
           const decline = (payload?.response && payload.response.message) || payload?.message || payload?.reason || "I'm unable to answer that request.";
@@ -132,8 +129,6 @@ const useOpenAI = () => {
             : (typeof currentChatId === 'number' ? currentChatId : 0);
         }
         
-        console.log('📤 Sending message with chat_id:', chatIdToSend, '(currentChatId:', currentChatId, ')');
-        
         const contextPayload = buildContextPayload(conversationSnapshot);
 
         response = await InsightApi.generateInsight({
@@ -142,8 +137,6 @@ const useOpenAI = () => {
           chat_id: chatIdToSend, // null for new chats, or integer for existing chats
           context: contextPayload || 'General health Q&A context.'
         });
-        
-        console.log('✅ generate-insight response:', response);
         
         // Check if API returned success: false with subscription_limit_reached error
         if (response && response.success === false && response.error === 'subscription_limit_reached') {

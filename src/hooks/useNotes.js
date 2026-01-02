@@ -24,11 +24,9 @@ export function useNotes() {
         Object.entries(filters).filter(([_, v]) => v !== undefined && v !== null && String(v).trim() !== "")
       );
       const list = await NotesApi.list(cleaned);
-      console.log('📝 useNotes.load - received items:', list);
       // Ensure we always set an array
       const itemsArray = Array.isArray(list) ? list : [];
       setItems(itemsArray);
-      console.log('📝 useNotes.load - set items:', itemsArray.length, 'items');
     } catch (e) {
       console.error('❌ useNotes.load error:', e);
       addNotification(e.message || "Failed to load notes", "error");

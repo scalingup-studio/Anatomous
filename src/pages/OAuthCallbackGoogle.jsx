@@ -20,21 +20,22 @@ export default function OAuthCallbackGoogle() {
     async function handleCallback() {
       try {
         setStatus('Processing authentication...');
-        console.log('🔄 OAuth callback page loaded');
+        // console.log('🔄 OAuth callback page loaded'); // SECURITY: Commented to prevent token leakage
 
         // Small delay to ensure cookies are set
         await new Promise(resolve => setTimeout(resolve, 500));
 
         setStatus('Getting authentication token...');
-        console.log('🔄 Calling refreshAuth to exchange cookie for token...');
+        // console.log('🔄 Calling refreshAuth to exchange cookie for token...'); // SECURITY: Commented to prevent token leakage
 
         // Use token manager to refresh (which uses the refresh_token cookie)
         const refreshResult = await tokenManager.refreshToken();
 
-        console.log('📋 refreshAuth result:', {
-          hasToken: !!refreshResult.authToken,
-          tokenLength: refreshResult.authToken?.length,
-        });
+        // SECURITY: Commented to prevent token leakage - was logging token length
+        // console.log('📋 refreshAuth result:', {
+        //   hasToken: !!refreshResult.authToken,
+        //   tokenLength: refreshResult.authToken?.length,
+        // });
 
         if (!refreshResult.authToken) {
           throw new Error('Failed to get authentication token. The login session may have expired.');
@@ -62,10 +63,10 @@ export default function OAuthCallbackGoogle() {
         const isNewUser = !user || !onboardingCompleted;
         
         if (isNewUser) {
-          console.log('🆕 New user detected via Google OAuth - redirecting to onboarding');
+          // console.log('🆕 New user detected via Google OAuth - redirecting to onboarding'); // SECURITY: Commented
           setIsNewUser(true);
         } else {
-          console.log('👤 Existing user via Google OAuth - redirecting to dashboard');
+          // console.log('👤 Existing user via Google OAuth - redirecting to dashboard'); // SECURITY: Commented
           setIsNewUser(false);
         }
         
@@ -76,7 +77,7 @@ export default function OAuthCallbackGoogle() {
           } catch {}
         }
 
-        console.log('✅ Authentication successful!');
+        // console.log('✅ Authentication successful!'); // SECURITY: Commented
         setStatus('Success! Redirecting...');
 
         // Small delay so user sees success message
@@ -84,20 +85,21 @@ export default function OAuthCallbackGoogle() {
 
         // Redirect based on user status
         if (isNewUser) {
-          console.log('🚀 Navigating to onboarding for new user...');
+          // console.log('🚀 Navigating to onboarding for new user...'); // SECURITY: Commented
           navigate('/onboarding', { replace: true });
         } else {
-          console.log('🚀 Navigating to root (AutoRedirectRoute will handle)...');
+          // console.log('🚀 Navigating to root (AutoRedirectRoute will handle)...'); // SECURITY: Commented
           navigate('/', { replace: true });
         }
 
       } catch (err) {
-        console.error('❌ OAuth callback error:', err);
-        console.error('Error details:', {
-          message: err.message,
-          status: err.status,
-          data: err.data
-        });
+        // SECURITY: Commented to prevent sensitive error data leakage
+        // console.error('❌ OAuth callback error:', err);
+        // console.error('Error details:', {
+        //   message: err.message,
+        //   status: err.status,
+        //   data: err.data
+        // });
 
         const errorMessage = err.message || 'Failed to complete Google login';
         setError(errorMessage);

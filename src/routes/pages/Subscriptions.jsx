@@ -142,7 +142,6 @@ function CurrentPlan() {
     try {
       setLoading(true);
       const data = await SubscriptionApi.getMySubscription();
-      console.log('📊 Subscription data from API (raw):', data);
       
       // Нова структура API: { result: { subscription: {...}, usage: {...}, plan_features: {...} } }
       // Стара структура: { result: { subscription: {...} } } або { subscription: {...} }
@@ -160,13 +159,6 @@ function CurrentPlan() {
         subscriptionData.usage = usageData || subscriptionData.usage;
         subscriptionData.plan_features = planFeaturesData || subscriptionData.plan_features;
       }
-      
-      console.log('📊 Subscription data (extracted):', subscriptionData);
-      console.log('📊 Usage data:', usageData);
-      console.log('📊 Plan features data:', planFeaturesData);
-      console.log('🔍 subscription_plan_id:', subscriptionData?.subscription_plan_id);
-      console.log('🔍 plan_name:', subscriptionData?.plan_name);
-      console.log('🔍 plan_tier:', subscriptionData?.plan_tier);
 
       setSubscription(subscriptionData);
 
@@ -222,7 +214,6 @@ function CurrentPlan() {
       const response = await SubscriptionApi.getPlans();
       const plansData = response?.result || response || [];
       setAllPlans(plansData);
-      console.log('📋 Plans loaded for features:', plansData);
     } catch (error) {
       console.error("Failed to load plans:", error);
       // Не критично, продовжуємо без планів
@@ -354,10 +345,6 @@ function CurrentPlan() {
       }
     }
     
-    console.log('🔍 Current plan from API:', currentPlanFromApi);
-    console.log('🔍 Subscription plan ID:', subscriptionPlanId);
-    console.log('🔍 Plan name/tier:', subscription.plan_name || subscription.plan_tier);
-    
     // Отримуємо features з плану з API /plans або з plan_features з API /my_subscription
     let features = [];
     
@@ -423,7 +410,6 @@ function CurrentPlan() {
       if (planFeatures.secure_data_backup) featureNames.push("Secure Data Backup");
       
       features = featureNames;
-      console.log('✅ Using plan_features from API:', features);
     } else if (currentPlanFromApi?.features) {
       // Fallback: використовуємо features з плану з API /plans
       // Форматуємо features з плану
@@ -611,7 +597,6 @@ function CurrentPlan() {
       };
 
       const res = await SubscriptionApi.addFamilyMember(payload);
-      console.log("👨‍👩‍👧 Family member created:", res);
       showNotification("Family member profile created.", "success");
 
       // Refresh subscription limits (familyUsed/familyMax, etc.)
@@ -649,10 +634,7 @@ function CurrentPlan() {
         reason: cancelReason.trim() ? cancelReason.trim() : null,
       };
 
-      console.log("🧾 Sending cancel subscription request with payload:", payload);
-
       const response = await PaymentApi.cancelSubscription(payload);
-      console.log("✅ Cancel subscription response:", response);
 
       const success = response?.success !== false;
       const backendMessage =
@@ -1445,7 +1427,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
   const loadCurrentSubscription = React.useCallback(async () => {
     try {
       const data = await SubscriptionApi.getMySubscription();
-      console.log('📊 Current subscription in UpgradeOptions (raw):', data);
 
       // Нова структура API: { result: { subscription: {...}, usage: {...}, plan_features: {...} } }
       // Стара структура: { result: { subscription: {...} } } або { subscription: {...} }
@@ -1463,16 +1444,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
         subscriptionData.usage = usageData || subscriptionData.usage;
         subscriptionData.plan_features = planFeaturesData || subscriptionData.plan_features;
       }
-      
-      console.log('📊 Current subscription data (extracted):', subscriptionData);
-      console.log('📊 Usage data:', usageData);
-      console.log('📊 Plan features data:', planFeaturesData);
-      console.log('🔍 subscription_plan_id:', subscriptionData?.subscription_plan_id);
-      console.log('🔍 plan_name:', subscriptionData?.plan_name);
-      console.log('🔍 plan_tier:', subscriptionData?.plan_tier);
-      console.log('🔍 subscription_details:', subscriptionData?.subscription_details);
-      console.log('🔍 current_plan:', subscriptionData?.current_plan);
-      console.log('🔍 plan_id:', subscriptionData?.plan_id);
 
       setCurrentSubscription(subscriptionData);
     } catch (error) {
@@ -1505,7 +1476,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
   // Використовуємо subscription_plan_id з API /my_subscription, який збігається з id плану
   const currentPlanId = React.useMemo(() => {
     if (!currentSubscription) {
-      console.log('⚠️ No current subscription data');
       return null;
     }
     
@@ -1519,18 +1489,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
                                 currentSubscription.plan?.id ||
                                 null;
     
-    console.log('🔍 Current plan ID from subscription:', subscriptionPlanId);
-    console.log('🔍 All subscription fields:', {
-      subscription_plan_id: currentSubscription.subscription_plan_id,
-      plan_name: currentSubscription.plan_name,
-      plan_tier: currentSubscription.plan_tier,
-      'subscription_details.subscription_plan_id': currentSubscription.subscription_details?.subscription_plan_id,
-      plan_id: currentSubscription.plan_id,
-      'subscription_details.plan_id': currentSubscription.subscription_details?.plan_id,
-      current_plan_id: currentSubscription.current_plan_id,
-      'plan.id': currentSubscription.plan?.id,
-      final: subscriptionPlanId
-    });
     return subscriptionPlanId;
   }, [currentSubscription]);
 
@@ -1871,15 +1829,11 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
         billing_period: period, // "monthly" or "annual"
       };
 
-      console.log('📤 createCheckoutSession body:', JSON.stringify(checkoutPayload));
 
       // Create Stripe Checkout Session
       // According to API spec: required fields are plan_id, success_url, cancel_url
       // payment_type is optional with default "subscription"
       const sessionResult = await PaymentApi.createCheckoutSession(checkoutPayload);
-
-      // Log response for debugging
-      console.log('🔍 createCheckoutSession response:', sessionResult);
 
       if (!sessionResult) {
         throw new Error("Failed to create checkout session: empty response");
@@ -1894,7 +1848,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
       
       // Якщо success: true, message - це просто інформація, не помилка
       if (sessionResult.success === true && sessionResult.message) {
-        console.log('ℹ️ Info message:', sessionResult.message);
       }
 
       // Backend returns checkout URL directly (no need for Stripe.js on frontend)
@@ -2020,14 +1973,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
         console.warn('⚠️ Fixed URL:', checkoutUrl, '→', cleanUrl);
       }
       
-      console.log('✅ Redirecting to checkout URL:', cleanUrl);
-      console.log('🔍 URL type check:', {
-        isAbsolute: cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://'),
-        isHashRouter: cleanUrl.includes('#'),
-        fullUrl: cleanUrl,
-        urlLength: cleanUrl.length
-      });
-      
       // Перевіряємо, чи URL валідний
       if (!cleanUrl || cleanUrl.trim() === '') {
         throw new Error('Invalid checkout URL: empty or undefined');
@@ -2035,8 +1980,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
       
       // Redirect to checkout URL
       // Для HashRouter URLs (#/dashboard/...) використовуємо window.location.href
-      console.log('🚀 Executing redirect...');
-      console.log('📍 Current location before redirect:', window.location.href);
       
       // Використовуємо href для HashRouter (має працювати для обох випадків)
       window.location.href = cleanUrl;
@@ -2057,8 +2000,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
           
           // Спробуємо ще раз
           window.location.href = cleanUrl;
-      } else {
-          console.log('✅ Redirect successful!');
       }
       }, 300);
     } catch (error) {
@@ -2114,17 +2055,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
           const pricePerMonth = monthly ? price : Math.round(price / 12);
           const isLightTheme = document.documentElement.classList.contains('light-theme');
           
-          // Логування для Starter плану
-          if (p.key === 'starter') {
-            console.log('🔍 Starter plan check:', {
-              planKey: p.key,
-              isFree: isFree,
-              planId: p.id,
-              currentPlanId: currentPlanId,
-              isCurrentPlan: false // Will be calculated below
-            });
-          }
-          
           // Перевіряємо, чи це поточний план користувача
           // Основне порівняння: subscription_plan_id з API === id плану
           // Starter (Free) НЕ може бути поточним планом, якщо є активна підписка
@@ -2135,23 +2065,6 @@ function UpgradeOptions({ onUpgradeSuccess, onSubscriptionUpdate }) {
           // Starter не може бути поточним планом, якщо є currentPlanId (тобто є активна підписка)
           const isCurrentPlan = (planIdMatch || planKeyMatch || planNameMatch) && 
                                  !(p.key === 'starter' && currentPlanId); // Starter не є поточним, якщо є активна підписка
-          
-          // Детальне логування для debugging
-          if (p.key === 'starter' || p.key === 'complete' || isCurrentPlan) {
-            console.log(`🔍 Plan ${p.key} (${p.name}):`, {
-              planKey: p.key,
-              planName: p.name,
-              planId: p.id,
-              planIdType: typeof p.id,
-              currentPlanId: currentPlanId,
-              currentPlanIdType: typeof currentPlanId,
-              planIdMatch: planIdMatch,
-              planKeyMatch: planKeyMatch,
-              planNameMatch: planNameMatch,
-              isCurrentPlan: isCurrentPlan,
-              comparison: currentPlanId && p.id ? `${String(currentPlanId)} === ${String(p.id)}` : 'N/A'
-            });
-          }
           
           return (
             <div 
@@ -2741,14 +2654,10 @@ function PaymentHistory() {
         payment_type: filters.payment_type,
       });
 
-      console.log("💳 Payment history response:", result);
-
       // API returns { invoices: [...], pagination: {...} }
       const items = result?.invoices || result?.result?.invoices || [];
       const pagination = result?.pagination || result?.result?.pagination || {};
       const totalItems = pagination.total_records || items.length;
-      
-      console.log("💳 Parsed invoices:", items.length, "Total:", totalItems);
       
       if (append) {
         setPayments((prev) => [...prev, ...items]);

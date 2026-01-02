@@ -137,7 +137,6 @@ export const SubscriptionApi = {
   switchFamilyMember: async (familyMemberId) => {
     const body = { family_member_id: familyMemberId };
     try {
-      console.log("🔁 [SubscriptionApi.switchFamilyMember] Request body:", body);
     } catch {}
     return authRequest(CUSTOM_ENDPOINTS.subscription.switchFamilyMember, {
       method: "POST",
@@ -166,7 +165,6 @@ export const SubscriptionApi = {
     if (options.payment_type) params.append("payment_type", options.payment_type);
     
     const url = `${CUSTOM_ENDPOINTS.payments.paymentHistory}?${params.toString()}`;
-    console.log("💳 [getPaymentHistory] Request URL:", url);
     return authRequest(url, {
       method: "GET",
     });
