@@ -1,5 +1,5 @@
 import { authRequest } from "./apiClient";
-import { API_BASE } from "./apiConfig";
+import { CUSTOM_ENDPOINTS } from "./apiConfig";
 
 export const TrendsApi = {
   /**
@@ -11,7 +11,7 @@ export const TrendsApi = {
    */
   async getTrends({ typeMetric, period, startDate, endDate }) {
     try {
-      const response = await authRequest(`${API_BASE}/metrics/trends`, {
+      const response = await authRequest(CUSTOM_ENDPOINTS.trends.getTrends, {
         method: "POST",
         body: {
           type_metric: typeMetric,
@@ -34,7 +34,7 @@ export const TrendsApi = {
    */
   async getForecast(typeMetric) {
     try {
-      const response = await authRequest(`${API_BASE}/metrics/forecast`, {
+      const response = await authRequest(CUSTOM_ENDPOINTS.trends.getForecast, {
         method: "POST",
         body: {
           type_metric: typeMetric,

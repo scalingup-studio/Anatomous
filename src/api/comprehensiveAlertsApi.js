@@ -30,11 +30,11 @@ export const ComprehensiveAlertsApi = {
 
   /**
    * Fetch all comprehensive alerts for a specific user
-   * @param {string} userId - The user ID
+   * @param {string} userId - The user ID (optional, backend filters by auth.id)
    */
   async fetchComprehensiveAlerts(userId) {
     try {
-      const response = await authRequest(CUSTOM_ENDPOINTS.comprehensiveAlerts.comprehensiveAlerts, {
+      const response = await authRequest(CUSTOM_ENDPOINTS.comprehensiveAlerts.getComprehensiveAlerts, {
         method: "GET",
         headers: {
           'Content-Type': 'application/json',

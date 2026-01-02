@@ -50,9 +50,7 @@ export const InsightApi = {
    */
   async getInsightUser() {
     try {
-      const url = `${API_BASE}/get-insight-user`;
-
-      const response = await authRequest(url, {
+      const response = await authRequest(CUSTOM_ENDPOINTS.insights.getInsightUser, {
         method: "GET",
       });
       
@@ -98,7 +96,8 @@ export const InsightApi = {
   async getRecentInsights(typeMetric) {
     try {
       const params = new URLSearchParams({ type_metric: typeMetric });
-      const response = await authRequest(`${API_BASE}/insights_recent?${params}`, {
+      const url = `${CUSTOM_ENDPOINTS.insights.getRecentInsights}?${params}`;
+      const response = await authRequest(url, {
         method: "GET",
       });
       

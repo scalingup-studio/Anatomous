@@ -59,7 +59,16 @@ export const GoalsApi = {
     const q = new URLSearchParams(params).toString();
     return authRequest(`${CUSTOM_ENDPOINTS.goalProgress.getProgress}?${q}`);
   },
-  deleteProgress: (goal_progress_id) => authRequest(CUSTOM_ENDPOINTS.goalProgress.remove(goal_progress_id), { method: "DELETE" }),
+  deleteProgress: (goal_progress_id) => {
+    // Use DELETE endpoint if available, otherwise use remove
+    if (CUSTOM_ENDPOINTS.goalProgress.deleteProgress) {
+      return authRequest(CUSTOM_ENDPOINTS.goalProgress.deleteProgress, { 
+        method: "DELETE", 
+        body: { goal_progress_id } 
+      });
+    }
+    return authRequest(CUSTOM_ENDPOINTS.goalProgress.remove(goal_progress_id), { method: "DELETE" });
+  },
 
   // Goals History & Readd
   getHistory: (params = {}) => {

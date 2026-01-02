@@ -87,6 +87,10 @@ export const CUSTOM_ENDPOINTS = {
     sharedByToken: (token) => `${API_BASE}/reports/shared/token${token ? `?token=${encodeURIComponent(token)}` : ''}`,
     // Email send endpoint
     shareEmailSend: `${API_BASE}/reports/share/email-send`,
+    sendEmail: `${API_BASE}/reports/share/send-email`,
+    sendEmailById: (shareId) => `${API_BASE}/reports/share/send-email/${shareId}`,
+    // Shares management
+    shares: `${API_BASE}/reports/shares`,
     // Update share info (expiration, visibility, title)
     updateShare: (shareId) => `${API_BASE}/reports/shares/${shareId}`,
     // Revoke share (set is_active=false)
@@ -103,26 +107,36 @@ export const CUSTOM_ENDPOINTS = {
   },
   healthHistory: {
     getHealthHistorySummary: `${API_BASE}/health_history_summary`,
-    userHealthSummary: `${API_BASE}/user-health-summary`
+    userHealthSummary: `${API_BASE}/user-health-summary`,
+    getUserHealthSummary: `${API_BASE}/get/user-health-summary`,
   }, 
   insights: {
     generateInsights: `${API_BASE}/generate-insight`,
-    getInsight: `${API_BASE}/get-insight`
+    getInsight: `${API_BASE}/get-insight`,
+    getInsightUser: `${API_BASE}/get-insight-user`,
+    getRecentInsights: `${API_BASE}/insights_recent`,
   },
   checkThreshold: {
     checkThreshold: `${API_BASE}/check-threshold`
+  },
+  trends: {
+    getTrends: `${API_BASE}/metrics/trends`,
+    getForecast: `${API_BASE}/metrics/forecast`,
   },
   alertsInsight: {
     getAlertsInsight: `${API_BASE}/alerts_ai/{user_id}`
   },
   comprehensiveAlerts: {
-    // POST/GET comprehensive alerts generation & retrieval
+    // POST comprehensive alerts generation
     comprehensiveAlerts: `${API_BASE}/comprehensive-alerts`,
+    // GET comprehensive alerts retrieval
+    getComprehensiveAlerts: `${API_BASE}/get-comprehensive-alerts`,
   },
   uploudFile: {
     uploudFile: `${API_BASE}/upload/attachment_file`,
     avatarUpload: `${API_BASE}/upload/avatar`,
     getUserUploudFiles: `${API_BASE}/upload/get_files`,
+    getAvatar: `${API_BASE}/upload/get_avatar`,
     downloadFile: `${API_BASE}/upload/download_file`,
     deleteFile: `${API_BASE}/upload/delete_file`
   },
@@ -144,6 +158,7 @@ export const CUSTOM_ENDPOINTS = {
   goalProgress: {
     create: `${API_BASE}/goal/progress`,
     getProgress: `${API_BASE}/goal/get/progress`,
+    deleteProgress: `${API_BASE}/goal/delete/progress`,
     remove: (id) => `${API_BASE}/goal/progress/${id}`,
   },
   notes: {

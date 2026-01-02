@@ -258,12 +258,37 @@ export default function DashboardHome(){
               suggestedGoal = activeGoal.goal_name || activeGoal.name || activeGoal.description || "Complete your health goal";
             }
             
-            // Convert goals to actions
-            actions = goals.slice(0, 3).map((goal, idx) => ({
-              id: goal.id || goal.goal_id || idx + 1,
-              text: goal.goal_name || goal.name || goal.description || `Goal ${idx + 1}`,
-              done: goal.status === 'completed' || false
-            }));
+            // Convert goals to actions, filter out goals with past target dates
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Set to start of day for comparison
+            
+            actions = goals
+              .filter((goal) => {
+                // Filter out completed goals
+                if (goal.status === 'completed') return false;
+                
+                // Check if target_date exists and is in the past
+                const targetDate = goal.target_date || goal.targetDate || goal.end_date || goal.endDate;
+                if (targetDate) {
+                  try {
+                    const target = new Date(targetDate);
+                    target.setHours(0, 0, 0, 0);
+                    // If target date is in the past, exclude this goal
+                    if (target < now) return false;
+                  } catch (e) {
+                    // If date parsing fails, include the goal
+                    console.warn('Failed to parse target_date:', targetDate);
+                  }
+                }
+                
+                return true;
+              })
+              .slice(0, 3)
+              .map((goal, idx) => ({
+                id: goal.id || goal.goal_id || idx + 1,
+                text: goal.goal_name || goal.name || goal.description || `Goal ${idx + 1}`,
+                done: goal.status === 'completed' || false
+              }));
           }
         }
 
@@ -296,23 +321,63 @@ export default function DashboardHome(){
         }
 
         // Process alerts for risk score
-        let riskScore = { label: 'Low Risk', color: '#4caf50', value: 0 };
+        let riskScore = { label: 'Low Risk', color: '#4caf50', value: 20 };
         
         if (alertsResponse.status === 'fulfilled') {
           const alertsData = alertsResponse.value;
-          const alerts = alertsData?.result || alertsData?.alerts || (Array.isArray(alertsData) ? alertsData : []);
           
-          // Calculate risk score based on active alerts
-          const activeAlerts = alerts.filter(a => a.status === 'active' || !a.status);
-          const highPriorityAlerts = activeAlerts.filter(a => a.severity === 'high' || a.priority === 'high');
-          
-          if (highPriorityAlerts.length > 0) {
-            riskScore = { label: 'High Risk', color: '#f44336', value: Math.min(90, 50 + highPriorityAlerts.length * 10) };
-          } else if (activeAlerts.length > 0) {
-            riskScore = { label: 'Moderate Risk', color: '#e7b416', value: Math.min(70, 30 + activeAlerts.length * 5) };
+          // Check for blocked/error response with guard_info.check_result
+          if (alertsData && alertsData.blocked && alertsData.guard_info && alertsData.guard_info.check_result) {
+            const checkResult = alertsData.guard_info.check_result;
+            if (checkResult.success === false) {
+              // Access blocked by subscription plan - use default low risk
+              riskScore = { label: 'Low Risk', color: '#4caf50', value: 20 };
+            }
           } else {
-            riskScore = { label: 'Low Risk', color: '#4caf50', value: 20 };
+            const alerts = alertsData?.result || alertsData?.alerts || (Array.isArray(alertsData) ? alertsData : []);
+            
+            // Calculate risk score based on active alerts
+            const activeAlerts = alerts.filter(a => 
+              (a.status === 'active' || !a.status) && 
+              (a.resolved === false || !a.resolved)
+            );
+            const highPriorityAlerts = activeAlerts.filter(a => 
+              a.severity === 'high' || 
+              a.severity === 'critical' || 
+              a.priority === 'high' || 
+              a.priority === 'critical' ||
+              a.alert_type === 'CRITICAL' ||
+              a.alert_type === 'emergency' ||
+              a.alert_type === 'critical'
+            );
+            const mediumPriorityAlerts = activeAlerts.filter(a => 
+              (a.severity === 'medium' || a.priority === 'medium') && 
+              !highPriorityAlerts.includes(a)
+            );
+            
+            if (highPriorityAlerts.length > 0) {
+              riskScore = { 
+                label: 'High Risk', 
+                color: '#f44336', 
+                value: Math.min(95, 60 + Math.min(highPriorityAlerts.length * 8, 35))
+              };
+            } else if (mediumPriorityAlerts.length > 0 || activeAlerts.length > 2) {
+              riskScore = { 
+                label: 'Moderate Risk', 
+                color: '#e7b416', 
+                value: Math.min(65, 35 + Math.min(activeAlerts.length * 5, 30))
+              };
+            } else if (activeAlerts.length > 0) {
+              riskScore = { 
+                label: 'Low Risk', 
+                color: '#4caf50', 
+                value: Math.min(35, 20 + activeAlerts.length * 3)
+              };
+            }
           }
+        } else if (alertsResponse.status === 'rejected') {
+          // If alerts failed to load, keep default low risk
+          console.warn("Failed to load alerts for risk score calculation:", alertsResponse.reason);
         }
 
         // Calculate focus areas from health data
@@ -325,18 +390,54 @@ export default function DashboardHome(){
         ];
 
         if (healthDataArray.length > 0) {
-          // Calculate percentages based on data availability
-          const hasActivity = healthDataArray.some(d => d.weekly_activity_minutes > 0);
-          const hasVitals = healthDataArray.some(d => d.heart_rate > 0 || d.blood_pressure_systolic > 0);
-          const hasLabs = healthDataArray.some(d => d.fasting_glucose > 0 || d.body_temperature > 0);
-          const hasNutrition = healthDataArray.some(d => d.hydration_liters > 0);
-          const hasSleep = healthDataArray.some(d => d.sleep_duration > 0);
-
-          areas[0].value = hasActivity ? 30 : 0; // Lifestyle
-          areas[1].value = hasVitals ? 25 : 0; // Vitals
-          areas[2].value = hasLabs ? 20 : 0; // Labs
-          areas[3].value = hasNutrition ? 15 : 0; // Nutrition
-          areas[4].value = hasSleep ? 10 : 0; // Sleep
+          // Calculate percentages based on data availability and recency
+          const now = new Date();
+          const last30Days = healthDataArray.filter(d => {
+            const date = new Date(d.date || d.created_at || d.recorded_at);
+            const daysDiff = (now - date) / (1000 * 60 * 60 * 24);
+            return daysDiff <= 30;
+          });
+          
+          // Count how many records have each type of data
+          const activityCount = last30Days.filter(d => 
+            d.weekly_activity_minutes > 0 || d.daily_steps > 0 || d.activity_level > 0
+          ).length;
+          const vitalsCount = last30Days.filter(d => 
+            d.heart_rate > 0 || d.blood_pressure_systolic > 0 || d.blood_pressure_diastolic > 0
+          ).length;
+          const labsCount = last30Days.filter(d => 
+            d.fasting_glucose > 0 || d.body_temperature > 0 || d.cholesterol_total > 0
+          ).length;
+          const nutritionCount = last30Days.filter(d => 
+            d.hydration_liters > 0 || d.calories_consumed > 0
+          ).length;
+          const sleepCount = last30Days.filter(d => 
+            d.sleep_duration > 0 || d.sleep_quality > 0
+          ).length;
+          
+          const totalRecords = Math.max(last30Days.length, 1);
+          
+          // Calculate percentages based on data frequency (more records = higher percentage)
+          areas[0].value = Math.min(100, Math.round((activityCount / totalRecords) * 100)); // Lifestyle
+          areas[1].value = Math.min(100, Math.round((vitalsCount / totalRecords) * 100)); // Vitals
+          areas[2].value = Math.min(100, Math.round((labsCount / totalRecords) * 100)); // Labs
+          areas[3].value = Math.min(100, Math.round((nutritionCount / totalRecords) * 100)); // Nutrition
+          areas[4].value = Math.min(100, Math.round((sleepCount / totalRecords) * 100)); // Sleep
+          
+          // If no recent data, check all-time data
+          if (last30Days.length === 0) {
+            const hasActivity = healthDataArray.some(d => d.weekly_activity_minutes > 0 || d.daily_steps > 0);
+            const hasVitals = healthDataArray.some(d => d.heart_rate > 0 || d.blood_pressure_systolic > 0);
+            const hasLabs = healthDataArray.some(d => d.fasting_glucose > 0 || d.body_temperature > 0);
+            const hasNutrition = healthDataArray.some(d => d.hydration_liters > 0);
+            const hasSleep = healthDataArray.some(d => d.sleep_duration > 0);
+            
+            areas[0].value = hasActivity ? 20 : 0;
+            areas[1].value = hasVitals ? 20 : 0;
+            areas[2].value = hasLabs ? 15 : 0;
+            areas[3].value = hasNutrition ? 15 : 0;
+            areas[4].value = hasSleep ? 10 : 0;
+          }
         }
 
         // Load health trend data
@@ -353,15 +454,59 @@ export default function DashboardHome(){
             endDate: endDate.toISOString().split('T')[0]
           });
 
-          const trendData = trendResponse?.result || trendResponse?.data || [];
+          const trendData = trendResponse?.result || trendResponse?.data || trendResponse || [];
           if (Array.isArray(trendData) && trendData.length > 0) {
-            trend = trendData.slice(-12).map(item => {
-              const value = item.daily_value || item.weekly_value || item.monthly_value || item.value || 0;
-              return Math.min(100, Math.max(0, value));
+            // Get last 12 data points
+            const last12Weeks = trendData.slice(-12);
+            
+            // Normalize values to 0-100 scale for display
+            const values = last12Weeks.map(item => {
+              const rawValue = item.daily_value || item.weekly_value || item.monthly_value || item.value || item.average || 0;
+              return rawValue;
             });
+            
+            // Find min and max for normalization
+            const minValue = Math.min(...values.filter(v => v > 0));
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue || 1;
+            
+            // Normalize to 0-100 scale
+            trend = values.map(value => {
+              if (value <= 0) return 0;
+              const normalized = ((value - minValue) / range) * 100;
+              return Math.min(100, Math.max(0, Math.round(normalized)));
+            });
+            
+            // If we have less than 12 points, pad with zeros at the beginning
+            while (trend.length < 12) {
+              trend.unshift(0);
+            }
+          } else if (healthDataArray.length > 0) {
+            // Fallback: use health data to create a simple trend
+            const recentData = healthDataArray.slice(0, 12).reverse();
+            const heartRates = recentData
+              .map(d => d.heart_rate)
+              .filter(hr => hr > 0);
+            
+            if (heartRates.length > 0) {
+              const minHR = Math.min(...heartRates);
+              const maxHR = Math.max(...heartRates);
+              const range = maxHR - minHR || 1;
+              
+              trend = recentData.map(d => {
+                if (!d.heart_rate || d.heart_rate <= 0) return 0;
+                const normalized = ((d.heart_rate - minHR) / range) * 100;
+                return Math.min(100, Math.max(0, Math.round(normalized)));
+              });
+              
+              while (trend.length < 12) {
+                trend.push(0);
+              }
+            }
           }
         } catch (error) {
           console.error("Failed to load trend data:", error);
+          // Keep empty trend array, will show fallback message
         }
 
         // Generate recent activity from various sources
@@ -627,14 +772,14 @@ export default function DashboardHome(){
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div className="card" style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }} aria-label="Quick actions">
+      {/* Quick actions - Hidden */}
+      {/* <div className="card" style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }} aria-label="Quick actions">
         <span className="home-card-title" style={{ fontWeight:600 }}>Quick actions:</span>
         <Link className="btn outline small" to="/dashboard/reports" title="Create or download a report">Open Reports</Link>
         <Link className="btn outline small" to="/dashboard/profile" title="Review and edit your health data">Edit Health Data</Link>
         <Link className="btn outline small" to="/dashboard/goals" title="Add or update goals">Manage Goals</Link>
         <div className="home-tip-text" style={{ marginLeft:'auto', color:'var(--muted)', fontSize:12 }}>Use these to get value fast</div>
-      </div>
+      </div> */}
 
       {/* 2) Snapshot cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px,1fr))', gap:12 }}>
@@ -645,7 +790,7 @@ export default function DashboardHome(){
             <div className="home-card-text" style={{ color:'var(--muted)' }}>{dashboardData.riskScore.label}</div>
           </div>
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
-            <Link className="btn outline small" to="/dashboard/insights">View Insights</Link>
+            <Link className="btn outline small" to="/dashboard/insights?tab=alerts">View Insights</Link>
           </div>
         </div>
         <div className="card" style={{ display:'grid', gap:8 }}>
@@ -732,10 +877,14 @@ export default function DashboardHome(){
               <div style={{ color:'var(--muted)', fontSize:14 }}>Loading actions...</div>
             ) : dashboardData.actions.length > 0 ? (
               dashboardData.actions.map(a => (
-                <label key={a.id} className="checkbox" style={{ alignItems:'flex-start' }}>
-                  <input type="checkbox" checked={a.done} onChange={()=>toggleAction(a.id)} />
-                  <span className="home-action-text" style={{ textDecoration: a.done ? 'line-through' : 'none', fontSize:14 }}>{a.text}</span>
-                </label>
+                <div key={a.id} style={{ 
+                  padding: '8px 0',
+                  borderBottom: '1px solid var(--border)',
+                  fontSize: 14,
+                  color: 'var(--text)'
+                }}>
+                  <span className="home-action-text" style={{ fontSize: 14 }}>{a.text}</span>
+                </div>
               ))
             ) : (
               <div style={{ color:'var(--muted)', fontSize:14 }}>No actions yet. Create goals to see your action plan.</div>

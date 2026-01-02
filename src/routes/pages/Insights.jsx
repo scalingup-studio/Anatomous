@@ -5,9 +5,10 @@ import { InsightApi } from "../../api/insightApi";
 import { ComprehensiveAlertsApi } from "../../api/comprehensiveAlertsApi";
 import { UploadFileApi } from "../../api/uploadFileApi";
 import { TrendsApi } from "../../api/trendsApi";
+import { HealthApi } from "../../api/healthApi";
 import { useNotifications } from "../../api/NotificationContext";
 import { Modal } from "../../components/Modal";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { CUSTOM_ENDPOINTS } from "../../api/apiConfig";
 import useOpenAI from "../../hooks/useOpenAI";
 import { useTheme } from "../../contexts/ThemeContext.jsx";
@@ -1195,18 +1196,41 @@ function PreviousQueriesList({ hook }) {
   );
 }
 
+// Helper function to format metric name (remove underscores, capitalize)
+function formatMetricName(metric) {
+  return metric
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function RecentInsightsCard() {
+  const { isLight } = useTheme();
   const [metric, setMetric] = useState('heart_rate');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
+  const [expandedItems, setExpandedItems] = useState(new Set());
 
   const metrics = [
-    'heart_rate',
-    'blood_pressure',
-    'sleep_duration',
-    'blood_oxygen',
-    'body_temp'
+    { value: 'heart_rate', label: 'Heart Rate' },
+    { value: 'blood_pressure_systolic', label: 'Blood Pressure Systolic' },
+    { value: 'blood_pressure_diastolic', label: 'Blood Pressure Diastolic' },
+    { value: 'weekly_activity_minutes', label: 'Weekly Activity Minutes' },
+    { value: 'activity_level', label: 'Activity Level' },
+    { value: 'hydration_liters', label: 'Hydration Liters' },
+    { value: 'pulse_oximetry', label: 'Pulse Oximetry' },
+    { value: 'respiratory_rate', label: 'Respiratory Rate' },
+    { value: 'body_weight_trend', label: 'Body Weight Trend' },
+    { value: 'body_mass_index', label: 'Body Mass Index' },
+    { value: 'fasting_glucose', label: 'Fasting Glucose' },
+    { value: 'body_temperature', label: 'Body Temperature' },
+    { value: 'sleep_duration', label: 'Sleep Duration' },
+    { value: 'waist_circumference', label: 'Waist Circumference' },
+    { value: 'hrv', label: 'HRV' },
+    { value: 'mood', label: 'Mood' },
+    { value: 'stress_level', label: 'Stress Level' },
+    { value: 'daily_step_count', label: 'Daily Step Count' },
   ];
 
   const load = async () => {
@@ -1214,6 +1238,13 @@ function RecentInsightsCard() {
       setLoading(true);
       setError('');
       const res = await InsightApi.getRecentInsights(metric);
+      
+      // Handle case when API returns {"result":null}
+      if (res?.result === null || res?.result === undefined) {
+        setData(null);
+        return;
+      }
+      
       setData(res?.result || res);
     } catch (e) {
       setError(e?.message || 'Failed to load recent insights');
@@ -1241,31 +1272,178 @@ function RecentInsightsCard() {
 
   return (
     <div className="card" style={{ padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-        <h3 style={{ margin: 0 }}>Recent Insights</h3>
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Recent Insights</h3>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select value={metric} onChange={(e)=>setMetric(e.target.value)} style={{ padding: '6px 10px', background: 'rgba(17,17,17,.85)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
-            {metrics.map(m => (<option key={m} value={m}>{m}</option>))}
-          </select>
-          <button className="btn outline small" onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <select 
+              value={metric} 
+              onChange={(e)=>setMetric(e.target.value)} 
+              style={{ 
+                padding: '8px 32px 8px 12px', 
+                background: isLight ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17,17,17,.85)', 
+                border: '1px solid var(--border)', 
+                borderRadius: 8, 
+                color: 'var(--text)', 
+                fontSize: 13,
+                cursor: 'pointer',
+                minWidth: 180,
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none'
+              }}
+            >
+              {metrics.map(m => (<option key={m.value} value={m.value}>{m.label}</option>))}
+            </select>
+            <div style={{
+              position: 'absolute',
+              right: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+              color: 'var(--muted)',
+              fontSize: '12px'
+            }}>
+              ▼
+            </div>
+          </div>
+          <button 
+            className="btn outline small" 
+            onClick={load} 
+            disabled={loading}
+            style={{ 
+              padding: '8px 16px',
+              fontSize: 13
+            }}
+          >
+            {loading ? 'Loading…' : '🔄 Refresh'}
+          </button>
         </div>
       </div>
       {error ? (
-        <div style={{ color: 'var(--error)', fontSize: 12 }}>{error}</div>
+        <div style={{ color: 'var(--error)', fontSize: 12, padding: '12px' }}>{error}</div>
+      ) : loading ? (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          padding: '40px 20px',
+          color: 'var(--muted)',
+          fontSize: 14
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <div style={{ 
+              width: 32, 
+              height: 32, 
+              border: '3px solid var(--border)', 
+              borderTop: '3px solid var(--primary)', 
+              borderRadius: '50%', 
+              animation: 'spin 1s linear infinite' 
+            }}></div>
+            <span>Loading insights...</span>
+          </div>
+        </div>
       ) : items.length ? (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {items.map((it, idx) => (
-            <div key={idx} style={{ padding:12, border:'1px solid var(--border)', borderRadius:8 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                <div style={{ fontWeight:600 }}>Insight #{idx+1}{it.title ? ` — ${it.title}` : ''}</div>
-                {it.created ? (<div style={{ fontSize:12, color:'var(--muted)' }}>{new Date(it.created).toLocaleString()}</div>) : null}
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {items.map((it, idx) => {
+            const isExpanded = expandedItems.has(idx);
+            const maxLength = 200;
+            const shouldTruncate = it.body && it.body.length > maxLength;
+            const displayText = isExpanded || !shouldTruncate 
+              ? it.body 
+              : it.body.substring(0, maxLength) + '...';
+            
+            const toggleExpand = () => {
+              const newSet = new Set(expandedItems);
+              if (isExpanded) {
+                newSet.delete(idx);
+              } else {
+                newSet.add(idx);
+              }
+              setExpandedItems(newSet);
+            };
+
+            return (
+              <div 
+                key={idx} 
+                style={{ 
+                  padding: 16, 
+                  border: '1px solid var(--border)', 
+                  borderRadius: 12,
+                  background: isLight ? 'rgba(249, 250, 251, 0.5)' : 'rgba(17, 17, 17, 0.3)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10, gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ 
+                      fontWeight: 600, 
+                      fontSize: 15,
+                      marginBottom: 4,
+                      color: 'var(--text)'
+                    }}>
+                      {it.title || `Insight #${idx + 1}`}
+                    </div>
+                    {it.created && (
+                      <div style={{ 
+                        fontSize: 11, 
+                        color: 'var(--muted)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}>
+                        <span>📅</span>
+                        <span>{new Date(it.created).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ 
+                  fontSize: 14, 
+                  color: 'var(--text)',
+                  lineHeight: 1.6,
+                  marginBottom: shouldTruncate ? 10 : 0
+                }}>
+                  {displayText || '—'}
+                </div>
+                {shouldTruncate && (
+                  <button
+                    onClick={toggleExpand}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--primary)',
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      padding: '4px 0',
+                      textDecoration: 'underline',
+                      textUnderlineOffset: 2
+                    }}
+                  >
+                    {isExpanded ? 'Show less' : 'Read more'}
+                  </button>
+                )}
               </div>
-              <div style={{ fontSize:14, color:'var(--text)' }}>{it.body || '—'}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div style={{ fontSize: 14, color: 'var(--muted)' }}>No recent insight available for this metric.</div>
+        <div style={{ fontSize: 14, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
+          {loading ? 'Loading...' : 'No recent insights available for this metric.'}
+        </div>
       )}
     </div>
   );
@@ -1273,6 +1451,7 @@ function RecentInsightsCard() {
 
 function TrendsTab() {
   const { isLight } = useTheme();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [trends, setTrends] = useState(null);
@@ -1281,17 +1460,30 @@ function TrendsTab() {
   const [selectedPeriod, setSelectedPeriod] = useState("Overview");
   const { showNotification } = useNotifications();
   const { user } = useAuth();
+  const [expandedInsights, setExpandedInsights] = useState(new Set());
 
   // Recent insights for the selected metric (GET /insights_recent)
   const [recentLoading, setRecentLoading] = useState(false);
   const [recentError, setRecentError] = useState("");
   const [recentItems, setRecentItems] = useState([]);
 
+  // Vitals data state
+  const [vitalsLoading, setVitalsLoading] = useState(false);
+  const [latestVitals, setLatestVitals] = useState(null);
+  const [vitalsHistory, setVitalsHistory] = useState([]);
+
   const loadRecentInsights = async () => {
     try {
       setRecentLoading(true);
       setRecentError("");
       const res = await InsightApi.getRecentInsights(selectedMetric);
+      
+      // Handle case when API returns {"result":null}
+      if (res?.result === null || res?.result === undefined) {
+        setRecentItems([]);
+        return;
+      }
+      
       const raw = res?.result || res;
       const list = Array.isArray(raw)
         ? raw
@@ -1314,7 +1506,93 @@ function TrendsTab() {
 
   useEffect(() => { loadRecentInsights(); }, [selectedMetric]);
 
-  const metrics = ["heart_rate", "blood_pressure", "sleep_duration", "blood_oxygen", "body_temp"];
+  // Load latest vitals data
+  const loadVitals = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setVitalsLoading(true);
+      
+      // Get current month date range
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const startDate = firstDay.toISOString().split('T')[0];
+      const endDate = lastDay.toISOString().split('T')[0];
+      
+      const response = await HealthApi.getByUserId(user.id, { 
+        sort_date: 'desc',
+        start_date: startDate,
+        end_date: endDate
+      });
+      
+      const healthDataArray = response?.result || response?.health_data || (Array.isArray(response) ? response : []);
+      
+      if (healthDataArray.length > 0) {
+        // Get latest vitals
+        const latest = healthDataArray[0];
+        setLatestVitals({
+          heart_rate: latest.heart_rate || null,
+          blood_pressure_systolic: latest.blood_pressure_systolic || null,
+          blood_pressure_diastolic: latest.blood_pressure_diastolic || null,
+          body_weight: latest.body_weight || latest.weight_kg || null,
+          body_temperature: latest.body_temperature || null,
+          pulse_oximetry: latest.pulse_oximetry || null,
+          respiratory_rate: latest.respiratory_rate || null,
+          sleep_duration: latest.sleep_duration || null,
+        });
+        
+        // Get all entries for current month (filter by date and heart rate)
+        const monthData = healthDataArray.filter(item => {
+          if (!item.date) return false;
+          const itemDate = new Date(item.date);
+          return itemDate >= firstDay && itemDate <= lastDay && 
+                 item.heart_rate != null && item.heart_rate > 0;
+        });
+        
+        setVitalsHistory(monthData);
+      } else {
+        setLatestVitals(null);
+        setVitalsHistory([]);
+      }
+    } catch (error) {
+      console.error('Error loading vitals:', error);
+      setLatestVitals(null);
+      setVitalsHistory([]);
+    } finally {
+      setVitalsLoading(false);
+    }
+  };
+
+  // Load vitals on mount and when user changes
+  useEffect(() => {
+    if (user?.id) {
+      loadVitals();
+    }
+  }, [user?.id]);
+
+  const metrics = [
+    { value: 'heart_rate', label: 'Heart Rate' },
+    { value: 'blood_pressure_systolic', label: 'Blood Pressure Systolic' },
+    { value: 'blood_pressure_diastolic', label: 'Blood Pressure Diastolic' },
+    { value: 'weekly_activity_minutes', label: 'Weekly Activity Minutes' },
+    { value: 'activity_level', label: 'Activity Level' },
+    { value: 'hydration_liters', label: 'Hydration Liters' },
+    { value: 'pulse_oximetry', label: 'Pulse Oximetry' },
+    { value: 'respiratory_rate', label: 'Respiratory Rate' },
+    { value: 'body_weight_trend', label: 'Body Weight Trend' },
+    { value: 'body_mass_index', label: 'Body Mass Index' },
+    { value: 'fasting_glucose', label: 'Fasting Glucose' },
+    { value: 'body_temperature', label: 'Body Temperature' },
+    { value: 'sleep_duration', label: 'Sleep Duration' },
+    { value: 'waist_circumference', label: 'Waist Circumference' },
+    { value: 'hrv', label: 'HRV' },
+    { value: 'mood', label: 'Mood' },
+    { value: 'stress_level', label: 'Stress Level' },
+    { value: 'daily_step_count', label: 'Daily Step Count' },
+  ];
 
   // Helper function to get days in current month
   const getDaysInMonth = React.useCallback(() => {
@@ -1324,14 +1602,42 @@ function TrendsTab() {
     return new Date(year, month + 1, 0).getDate();
   }, []);
 
-  // Generate stable data for vitals graph (only once on mount)
-  const vitalsData = React.useMemo(() => 
-    [...Array(10)].map((_, i) => ({
-      height: 40 + i * 3 + Math.sin(i * 0.5) * 10,
-      value: `${Math.floor(60 + i * 2)}`,
-      label: `Day ${i + 1}`,
-    })), []
-  );
+  // Transform vitals history for graph display (monthly view)
+  const vitalsData = React.useMemo(() => {
+    const daysInMonth = getDaysInMonth();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    // Create a map of day -> heart rate from actual data
+    const dataMap = new Map();
+    vitalsHistory.forEach(item => {
+      if (item.date) {
+        try {
+          const itemDate = new Date(item.date);
+          const day = itemDate.getDate();
+          if (itemDate.getFullYear() === year && itemDate.getMonth() === month) {
+            dataMap.set(day, item.heart_rate || 0);
+          }
+        } catch (e) {
+          // Skip invalid dates
+        }
+      }
+    });
+    
+    // Create array for all days in month
+    const monthlyData = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const heartRate = dataMap.get(day) || 0;
+      monthlyData.push({
+        height: heartRate,
+        value: heartRate > 0 ? `${Math.floor(heartRate)}` : '0',
+        label: `${day}`,
+      });
+    }
+    
+    return monthlyData;
+  }, [vitalsHistory]);
 
   // Generate stable mock data for health trend (current month days)
   const daysInMonth = getDaysInMonth();
@@ -1533,49 +1839,189 @@ function TrendsTab() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         {/* Recent Insights (wired to API) */}
         <div className="card">
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h3 style={{ marginTop: 0 }}>Recent Insights</h3>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              <select value={selectedMetric} onChange={(e)=>setSelectedMetric(e.target.value)} style={{ padding: '6px 10px', background: isLight ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17,17,17,.85)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }}>
-                {metrics.map(m => (<option key={m} value={m}>{m}</option>))}
-              </select>
-              <button className="btn outline small" onClick={loadRecentInsights} disabled={recentLoading}>{recentLoading ? 'Loading…' : 'Refresh'}</button>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <select 
+                  value={selectedMetric} 
+                  onChange={(e)=>setSelectedMetric(e.target.value)} 
+                  style={{ 
+                    padding: '8px 32px 8px 12px', 
+                    background: isLight ? 'rgba(249, 250, 251, 0.8)' : 'rgba(17,17,17,.85)', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: 8, 
+                    color: 'var(--text)', 
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    minWidth: 180,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none'
+                  }}
+                >
+                  {metrics.map(m => (<option key={m.value} value={m.value}>{m.label}</option>))}
+                </select>
+                <div style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
+                  color: 'var(--muted)',
+                  fontSize: '12px'
+                }}>
+                  ▼
+                </div>
+              </div>
             </div>
           </div>
           {recentError ? (
-            <div style={{ color:'var(--error)', fontSize:12, marginTop:8 }}>{recentError}</div>
-          ) : (
+            <div style={{ color:'var(--error)', fontSize:12, marginTop:8, padding: '12px' }}>{recentError}</div>
+          ) : recentLoading ? (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              padding: '40px 20px',
+              marginTop: 12,
+              color: 'var(--muted)',
+              fontSize: 14
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <div style={{ 
+                  width: 32, 
+                  height: 32, 
+                  border: '3px solid var(--border)', 
+                  borderTop: '3px solid var(--primary)', 
+                  borderRadius: '50%', 
+                  animation: 'spin 1s linear infinite' 
+                }}></div>
+                <span>Loading insights...</span>
+              </div>
+            </div>
+          ) : recentItems.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-              {(recentItems.length ? recentItems.slice(0,4) : []).map((it, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: 12,
-                    background: isLight ? "rgba(0,186,206,0.08)" : "rgba(0,186,206,0.1)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    minHeight: 100,
-                  }}
-                >
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Insight #{idx+1}{it.title ? ` — ${it.title}` : ''}</div>
-                  <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                    {it.body || '—'}
-                  </div>
-                </div>
-              ))}
-              {(!recentItems.length) && [1,2,3,4].map((num) => (
-                <div key={`placeholder-${num}`} style={{ padding:12, background: isLight ? "rgba(0,186,206,0.08)" : "rgba(0,186,206,0.1)", border:"1px solid var(--border)", borderRadius:8, minHeight:100 }}>
-                  <div style={{ fontWeight:600, marginBottom:8 }}>Insight #{num}</div>
-                  <div style={{ fontSize:12, color:"var(--muted)" }}>No data yet.</div>
-                </div>
-              ))}
+              {recentItems.slice(0,4).map((it, idx) => {
+                  const isExpanded = expandedInsights.has(idx);
+                  const maxLength = 150;
+                  const shouldTruncate = it.body && it.body.length > maxLength;
+                  const displayText = isExpanded || !shouldTruncate 
+                    ? it.body 
+                    : it.body.substring(0, maxLength) + '...';
+                  
+                  const toggleExpand = () => {
+                    const newSet = new Set(expandedInsights);
+                    if (isExpanded) {
+                      newSet.delete(idx);
+                    } else {
+                      newSet.add(idx);
+                    }
+                    setExpandedInsights(newSet);
+                  };
+
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: 14,
+                        background: isLight ? "rgba(0,186,206,0.08)" : "rgba(0,186,206,0.1)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 10,
+                        minHeight: 100,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ 
+                        fontWeight: 600, 
+                        marginBottom: 8,
+                        fontSize: 14,
+                        color: 'var(--text)'
+                      }}>
+                        {it.title || `Insight #${idx+1}`}
+                      </div>
+                      {it.created && (
+                        <div style={{ 
+                          fontSize: 10, 
+                          color: "var(--muted)",
+                          marginBottom: 8,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}>
+                          <span>📅</span>
+                          <span>{new Date(it.created).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</span>
+                        </div>
+                      )}
+                      <div style={{ 
+                        fontSize: 12, 
+                        color: "var(--text)",
+                        lineHeight: 1.5,
+                        flex: 1,
+                        marginBottom: shouldTruncate ? 8 : 0
+                      }}>
+                        {displayText || '—'}
+                      </div>
+                      {shouldTruncate && (
+                        <button
+                          onClick={toggleExpand}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--primary)',
+                            cursor: 'pointer',
+                            fontSize: 11,
+                            fontWeight: 500,
+                            padding: '4px 0',
+                            textDecoration: 'underline',
+                            textUnderlineOffset: 2,
+                            alignSelf: 'flex-start'
+                          }}
+                        >
+                          {isExpanded ? 'Show less' : 'Read more'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          ) : (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px 20px', 
+              marginTop: 12,
+              color: 'var(--muted)', 
+              fontSize: 14 
+            }}>
+              No recent insights available for this metric.
             </div>
           )}
         </div>
 
         {/* Vitals */}
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Vitals</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h3 style={{ marginTop: 0, marginBottom: 4 }}>Vitals</h3>
+              <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>
+                {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </span>
+            </div>
+            {vitalsLoading && <span style={{ fontSize: 12, color: "var(--primary)" }}>Loading...</span>}
+          </div>
           <div style={{ marginTop: 12 }}>
             {/* Google Column Chart */}
             <GoogleColumnChart data={vitalsData} height={160} />
@@ -1583,21 +2029,46 @@ function TrendsTab() {
             {/* Vital stats */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {[
-                "Heart Rate: 72 bpm",
-                "Blood Pressure: 120/80",
-                "Weight: 70 kg",
-                "Body Temperature: 36.6°C",
-                "Blood Oxygen: 98%",
-                "Respiratory Rate: 16 bpm",
+                {
+                  label: "Heart Rate",
+                  value: latestVitals?.heart_rate ? `${latestVitals.heart_rate} bpm` : "—",
+                },
+                {
+                  label: "Blood Pressure",
+                  value: latestVitals?.blood_pressure_systolic && latestVitals?.blood_pressure_diastolic
+                    ? `${latestVitals.blood_pressure_systolic}/${latestVitals.blood_pressure_diastolic}`
+                    : "—",
+                },
+                {
+                  label: "Weight",
+                  value: latestVitals?.body_weight ? `${latestVitals.body_weight} kg` : "—",
+                },
+                {
+                  label: "Body Temperature",
+                  value: latestVitals?.body_temperature ? `${latestVitals.body_temperature}°C` : "—",
+                },
+                {
+                  label: "Blood Oxygen",
+                  value: latestVitals?.pulse_oximetry ? `${latestVitals.pulse_oximetry}%` : "—",
+                },
+                {
+                  label: "Respiratory Rate",
+                  value: latestVitals?.respiratory_rate ? `${latestVitals.respiratory_rate} bpm` : "—",
+                },
               ].map((vital, i) => (
                 <div key={i} style={{ fontSize: 13, display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--muted)" }}>{vital.split(":")[0]}:</span>
-                  <span>{vital.split(":")[1]}</span>
+                  <span style={{ color: "var(--muted)" }}>{vital.label}:</span>
+                  <span>{vital.value}</span>
                 </div>
               ))}
+              {!latestVitals && !vitalsLoading && (
+                <div style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic", textAlign: "center", padding: 8 }}>
+                  No vitals data available
+                </div>
+              )}
             </div>
 
-            <button className="btn outline" style={{ marginTop: 12, width: "100%" }}>
+            <button className="btn outline" style={{ marginTop: 12, width: "100%" }} onClick={() => navigate("/dashboard/profile?tab=health_data")}>
               New Entry
             </button>
           </div>
@@ -1612,25 +2083,42 @@ function TrendsTab() {
               {loading && <span style={{ fontSize: 12, color: "var(--primary)" }}>Loading...</span>}
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <select
-              value={selectedMetric}
-              onChange={(e) => setSelectedMetric(e.target.value)}
-              style={{
-                padding: "6px 12px",
-                background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                color: "var(--text)",
-                fontSize: 13,
-                minWidth: 140,
-              }}
-            >
-              {metrics.map((m) => (
-                <option key={m} value={m}>
-                  {m.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                </option>
-              ))}
-            </select>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <select
+                value={selectedMetric}
+                onChange={(e) => setSelectedMetric(e.target.value)}
+                style={{
+                  padding: "8px 32px 8px 12px",
+                  background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  color: "var(--text)",
+                  fontSize: 13,
+                  minWidth: 180,
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none'
+                }}
+              >
+                {metrics.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <div style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                color: 'var(--muted)',
+                fontSize: '12px'
+              }}>
+                ▼
+              </div>
+            </div>
             {["Overview", "Daily", "Monthly"].map((period) => (
               <button
                 key={period}
@@ -1975,7 +2463,19 @@ function UploadsTab() {
       );
       
       const response = await UploadFileApi.getUserFiles(user.id, filterParams);
-      setFiles(response.result || response || []);
+      const filesArray = response.result || response || [];
+      
+      // Sort files by date (newest first)
+      const sortedFiles = filesArray.sort((a, b) => {
+        const dateA = a.uploaded_at || a.created_at || a.date || '';
+        const dateB = b.uploaded_at || b.created_at || b.date || '';
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return new Date(dateB) - new Date(dateA);
+      });
+      
+      setFiles(sortedFiles);
     } catch (error) {
       console.error('Error loading files:', error);
       showNotification("Failed to load files", "error");

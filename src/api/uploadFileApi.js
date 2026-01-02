@@ -89,7 +89,28 @@ export const UploadFileApi = {
       if (filterParams.end_date) queryParams.append('end_date', filterParams.end_date);
       
       const url = `${CUSTOM_ENDPOINTS.uploudFile.getUserUploudFiles}?${queryParams.toString()}`;
-      return await authRequest(url);
+      const response = await authRequest(url);
+      
+      // Sort files by date (newest first)
+      const filesArray = response?.result || response || [];
+      if (Array.isArray(filesArray) && filesArray.length > 0) {
+        const sortedFiles = filesArray.sort((a, b) => {
+          const dateA = a.uploaded_at || a.created_at || a.date || '';
+          const dateB = b.uploaded_at || b.created_at || b.date || '';
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+          return new Date(dateB) - new Date(dateA);
+        });
+        
+        // Return response with sorted files
+        if (response?.result) {
+          return { ...response, result: sortedFiles };
+        }
+        return sortedFiles;
+      }
+      
+      return response;
     } catch (error) {
       console.error('Error getting user files:', error);
       throw error;

@@ -67,8 +67,20 @@ const MedicalRecordsPage = () => {
     if (!user?.id) return;
     
     try {
-      const files = await UploadFileApi.getUserFiles(user.id);
-      setUploadedFiles(files || []);
+      const response = await UploadFileApi.getUserFiles(user.id);
+      const filesArray = response?.result || response || [];
+      
+      // Sort files by date (newest first)
+      const sortedFiles = filesArray.sort((a, b) => {
+        const dateA = a.uploaded_at || a.created_at || a.date || '';
+        const dateB = b.uploaded_at || b.created_at || b.date || '';
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return new Date(dateB) - new Date(dateA);
+      });
+      
+      setUploadedFiles(sortedFiles);
     } catch (err) {
       console.error("❌ Failed to fetch files:", err);
       setUploadStatus('❌ Помилка завантаження списку файлів');
