@@ -134,9 +134,14 @@ function CurrentPlan() {
     sex_of_birth: "",
     height_cm: 0,
     weight_kg: 0,
+    height_type: "",
+    weight_type: "",
     role: "member",
     access_level: "full",
   });
+  const [familyHeightUnit, setFamilyHeightUnit] = React.useState('in');
+  const [familyWeightUnit, setFamilyWeightUnit] = React.useState('lb');
+  const [familyMembersData, setFamilyMembersData] = React.useState(null);
 
   const loadSubscription = React.useCallback(async () => {
     try {
@@ -208,6 +213,49 @@ function CurrentPlan() {
     }
   }, [showNotification]);
 
+  // Load family members data to check max_members and itemsTotal
+  const loadFamilyMembersData = React.useCallback(async () => {
+    try {
+      const res = await SubscriptionApi.getFamilyMembers({ 
+        status: "active", 
+        include_profiles: true, 
+        per_page: 20 
+      });
+      const base = res?.result || res || {};
+      
+      // Обчислюємо itemsTotal - пріоритет масиву items
+      let itemsTotal = 0;
+      if (Array.isArray(base.items)) {
+        // Якщо є масив items, використовуємо його довжину
+        itemsTotal = base.items.length;
+      } else if (base.itemsTotal !== undefined && base.itemsTotal !== null) {
+        // Якщо itemsTotal вказано явно, використовуємо його
+        itemsTotal = base.itemsTotal;
+      } else if (Array.isArray(base)) {
+        // Якщо сам base є масивом
+        itemsTotal = base.length;
+      }
+      
+      const data = {
+        max_members: base.max_members || null,
+        itemsTotal: itemsTotal
+      };
+      
+      // Логування для діагностики
+      console.log('Family members data loaded:', {
+        max_members: data.max_members,
+        itemsTotal: data.itemsTotal,
+        itemsLength: Array.isArray(base.items) ? base.items.length : 'N/A',
+        rawResponse: base
+      });
+      
+      setFamilyMembersData(data);
+    } catch (err) {
+      console.error("Failed to load family members data:", err);
+      setFamilyMembersData(null);
+    }
+  }, []);
+
   // Load plans to get features
   const loadPlans = React.useCallback(async () => {
     try {
@@ -223,7 +271,8 @@ function CurrentPlan() {
   React.useEffect(() => {
     loadSubscription();
     loadPlans();
-  }, [loadSubscription, loadPlans]);
+    loadFamilyMembersData();
+  }, [loadSubscription, loadPlans, loadFamilyMembersData]);
 
   // Оновлюємо дані при фокусі на вкладці (якщо користувач повернувся на цю вкладку)
   React.useEffect(() => {
@@ -585,6 +634,7 @@ function CurrentPlan() {
       setFamilySaving(true);
 
       const payload = {
+        name: "Second",
         family_member_name: familyForm.family_member_name || `${familyForm.first_name} ${familyForm.last_name}`.trim(),
         first_name: familyForm.first_name || null,
         last_name: familyForm.last_name || null,
@@ -592,6 +642,8 @@ function CurrentPlan() {
         sex_of_birth: familyForm.sex_of_birth || null,
         height_cm: Number(familyForm.height_cm) || 0,
         weight_kg: Number(familyForm.weight_kg) || 0,
+        height_type: familyHeightUnit || "",
+        weight_type: familyWeightUnit || "",
         role: familyForm.role || "member",
         access_level: familyForm.access_level || "full",
       };
@@ -601,6 +653,8 @@ function CurrentPlan() {
 
       // Refresh subscription limits (familyUsed/familyMax, etc.)
       await loadSubscription();
+      // Refresh family members data to update max_members and itemsTotal
+      await loadFamilyMembersData();
 
       setFamilyModalOpen(false);
       setFamilyForm({
@@ -611,9 +665,13 @@ function CurrentPlan() {
         sex_of_birth: "",
         height_cm: 0,
         weight_kg: 0,
+        height_type: "",
+        weight_type: "",
         role: "member",
         access_level: "full",
       });
+      setFamilyHeightUnit('in');
+      setFamilyWeightUnit('lb');
     } catch (error) {
       console.error("Failed to create family member:", error);
       showNotification(
@@ -902,15 +960,50 @@ function CurrentPlan() {
       </div>
 
       <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center', flexWrap:'wrap' }}>
-        {isFamilyPlan && (
-          <button
-            className="btn secondary"
-            onClick={() => setFamilyModalOpen(true)}
-            style={{ fontSize: 12, padding: '6px 12px', marginRight: 'auto', whiteSpace:'nowrap' }}
-          >
-            Add family profile
-          </button>
-        )}
+        {isFamilyPlan && (() => {
+          // Перевірка 1: дані з API /family/members (пріоритет)
+          if (familyMembersData) {
+            const maxMembers = Number(familyMembersData.max_members);
+            const itemsTotal = Number(familyMembersData.itemsTotal);
+            
+            // Якщо обидва значення валідні числа і itemsTotal >= max_members, приховуємо
+            if (!isNaN(maxMembers) && !isNaN(itemsTotal) && itemsTotal >= maxMembers) {
+              console.log('Hiding button: itemsTotal >= max_members', {
+                itemsTotal,
+                max_members: maxMembers,
+                familyMembersData
+              });
+              return null;
+            }
+          }
+          
+          // Перевірка 2: дані з subscription (fallback)
+          const familyMax = Number(active.limits.familyMax) || 0;
+          const familyUsed = Number(active.limits.familyUsed) || 0;
+          
+          if (familyMax > 0 && familyUsed >= familyMax) {
+            console.log('Hiding button: familyUsed >= familyMax', {
+              familyUsed,
+              familyMax
+            });
+            return null;
+          }
+          
+          // Якщо обидві перевірки пройдені, показуємо кнопку
+          console.log('Showing button', {
+            familyMembersData,
+            activeLimits: { familyUsed, familyMax }
+          });
+          return (
+            <button
+              className="btn secondary"
+              onClick={() => setFamilyModalOpen(true)}
+              style={{ fontSize: 12, padding: '6px 12px', marginRight: 'auto', whiteSpace:'nowrap' }}
+            >
+              Add family profile
+            </button>
+          );
+        })()}
         {canCancelSubscription && (
           <button
             className="btn outline"
@@ -1016,20 +1109,10 @@ function CurrentPlan() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div style={{ display: "grid", gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 600 }}>Date of birth</label>
-              <input
-                type="date"
-                value={familyForm.dob}
-                onChange={(e) => handleFamilyInputChange("dob", e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "transparent",
-                  color: "var(--text)",
-                  fontSize: 13,
-                  fontFamily: "inherit",
-                }}
+              <DatePicker
+                value={familyForm.dob || ""}
+                onChange={(val) => handleFamilyInputChange("dob", val)}
+                placeholder="MM/DD/YYYY"
               />
             </div>
             <div style={{ display: "grid", gap: 6 }}>
@@ -1058,42 +1141,224 @@ function CurrentPlan() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div style={{ display: "grid", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600 }}>Height (cm)</label>
-              <input
-                type="number"
-                min="0"
-                value={familyForm.height_cm}
-                onChange={(e) => handleFamilyInputChange("height_cm", e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "transparent",
-                  color: "var(--text)",
-                  fontSize: 13,
-                  fontFamily: "inherit",
-                }}
-              />
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Height</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={familyForm.height_cm || ""}
+                  onChange={(e) => handleFamilyInputChange("height_cm", e.target.value)}
+                  placeholder={familyHeightUnit === 'cm' ? 'e.g. 175' : 'e.g. 69'}
+                  style={{
+                    flex: 1,
+                    padding: 8,
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "transparent",
+                    color: "var(--text)",
+                    fontSize: 13,
+                    fontFamily: "inherit",
+                  }}
+                />
+                <div style={{ 
+                  display: 'flex', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newUnit = 'cm';
+                      const h = parseFloat(familyForm.height_cm);
+                      if (!isNaN(h) && h > 0) {
+                        let newValue = h;
+                        if (familyHeightUnit === 'in' && newUnit === 'cm') {
+                          newValue = parseFloat((h * 2.54).toFixed(1));
+                        }
+                        handleFamilyInputChange("height_cm", newValue.toString());
+                      }
+                      setFamilyHeightUnit(newUnit);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: familyHeightUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                      color: familyHeightUnit === 'cm' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      borderRight: '1px solid var(--border)',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (familyHeightUnit !== 'cm') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (familyHeightUnit !== 'cm') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    cm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newUnit = 'in';
+                      const h = parseFloat(familyForm.height_cm);
+                      if (!isNaN(h) && h > 0) {
+                        let newValue = h;
+                        if (familyHeightUnit === 'cm' && newUnit === 'in') {
+                          newValue = parseFloat((h / 2.54).toFixed(1));
+                        }
+                        handleFamilyInputChange("height_cm", newValue.toString());
+                      }
+                      setFamilyHeightUnit(newUnit);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: familyHeightUnit === 'in' ? 'var(--primary)' : 'transparent',
+                      color: familyHeightUnit === 'in' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (familyHeightUnit !== 'in') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (familyHeightUnit !== 'in') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    in
+                  </button>
+                </div>
+              </div>
             </div>
             <div style={{ display: "grid", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600 }}>Weight (kg)</label>
-              <input
-                type="number"
-                min="0"
-                value={familyForm.weight_kg}
-                onChange={(e) => handleFamilyInputChange("weight_kg", e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                  background: "transparent",
-                  color: "var(--text)",
-                  fontSize: 13,
-                  fontFamily: "inherit",
-                }}
-              />
+              <label style={{ fontSize: 13, fontWeight: 600 }}>Weight</label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={familyForm.weight_kg || ""}
+                  onChange={(e) => handleFamilyInputChange("weight_kg", e.target.value)}
+                  placeholder={familyWeightUnit === 'kg' ? 'e.g. 70' : 'e.g. 154'}
+                  style={{
+                    flex: 1,
+                    padding: 8,
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "transparent",
+                    color: "var(--text)",
+                    fontSize: 13,
+                    fontFamily: "inherit",
+                  }}
+                />
+                <div style={{ 
+                  display: 'flex', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '6px',
+                  overflow: 'hidden',
+                  backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newUnit = 'kg';
+                      const w = parseFloat(familyForm.weight_kg);
+                      if (!isNaN(w) && w > 0) {
+                        let newValue = w;
+                        if (familyWeightUnit === 'lb' && newUnit === 'kg') {
+                          newValue = parseFloat((w / 2.20462).toFixed(1));
+                        }
+                        handleFamilyInputChange("weight_kg", newValue.toString());
+                      }
+                      setFamilyWeightUnit(newUnit);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: familyWeightUnit === 'kg' ? 'var(--primary)' : 'transparent',
+                      color: familyWeightUnit === 'kg' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      borderRight: '1px solid var(--border)',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (familyWeightUnit !== 'kg') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (familyWeightUnit !== 'kg') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    kg
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newUnit = 'lb';
+                      const w = parseFloat(familyForm.weight_kg);
+                      if (!isNaN(w) && w > 0) {
+                        let newValue = w;
+                        if (familyWeightUnit === 'kg' && newUnit === 'lb') {
+                          newValue = parseFloat((w * 2.20462).toFixed(1));
+                        }
+                        handleFamilyInputChange("weight_kg", newValue.toString());
+                      }
+                      setFamilyWeightUnit(newUnit);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      backgroundColor: familyWeightUnit === 'lb' ? 'var(--primary)' : 'transparent',
+                      color: familyWeightUnit === 'lb' ? '#fff' : 'var(--text)',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      transition: 'all 0.2s ease',
+                      minWidth: '44px',
+                      textAlign: 'center'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (familyWeightUnit !== 'lb') {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (familyWeightUnit !== 'lb') {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    lb
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -8,6 +8,7 @@ import { ProfilesApi } from "../api/profilesApi.js";
 import { SubscriptionApi } from "../api/subscriptionApi.js";
 import { hasFeatureAccess } from "../utils/subscriptionUtils.js";
 import { ThemeToggle } from "../components/ThemeToggle.jsx";
+import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal.jsx";
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -206,6 +207,10 @@ function UserSummaryAndLogout({ onLogout }) {
   const [familyLoading, setFamilyLoading] = React.useState(false);
   const [activeFamilyId, setActiveFamilyId] = React.useState(null);
   const [primaryFamilyId, setPrimaryFamilyId] = React.useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [memberToDelete, setMemberToDelete] = React.useState(null);
+  const [deleting, setDeleting] = React.useState(false);
+  const { showSuccess, showError } = useNotifications();
 
   // Helper to extract a usable URL from various shapes
   const getPhotoUrl = (obj) => {
@@ -275,7 +280,45 @@ function UserSummaryAndLogout({ onLogout }) {
           null;
         if (primary?.id) {
           setPrimaryFamilyId(primary.id);
-          setActiveFamilyId(primary.id);
+        }
+        
+        // Встановлюємо активного користувача:
+        // 1. Спочатку перевіряємо localStorage
+        // 2. Якщо немає в localStorage, перевіряємо, чи поточний користувач відповідає якомусь члену сім'ї
+        // 3. Якщо нічого не знайдено, встановлюємо primary
+        try {
+          const stored = localStorage.getItem("active_family_member_id");
+          if (stored && stored.trim() !== "") {
+            // Перевіряємо, чи збережений ID існує в списку членів сім'ї
+            const storedMember = list.find((m) => {
+              const switchId = m.family_member_id || m.profile_id || m.id;
+              return String(switchId) === String(stored);
+            });
+            if (storedMember) {
+              setActiveFamilyId(stored);
+            } else {
+              // Якщо збережений ID не знайдено, встановлюємо primary
+              setActiveFamilyId(primary?.id || null);
+            }
+          } else {
+            // Якщо немає в localStorage, перевіряємо, чи поточний користувач відповідає якомусь члену сім'ї
+            const currentUserMember = list.find((m) => {
+              const switchId = m.family_member_id || m.profile_id || m.id;
+              return String(switchId) === String(user.id) || 
+                     String(m.profile_id) === String(user.id) ||
+                     String(m.user_id) === String(user.id);
+            });
+            if (currentUserMember) {
+              const switchId = currentUserMember.family_member_id || currentUserMember.profile_id || currentUserMember.id;
+              setActiveFamilyId(String(switchId));
+            } else {
+              // Якщо нічого не знайдено, встановлюємо primary
+              setActiveFamilyId(primary?.id || null);
+            }
+          }
+        } catch (err) {
+          // Якщо помилка з localStorage, встановлюємо primary
+          setActiveFamilyId(primary?.id || null);
         }
       } catch (err) {
         console.error("Failed to load family members:", err);
@@ -298,9 +341,10 @@ function UserSummaryAndLogout({ onLogout }) {
       try {
       } catch {}
       await SubscriptionApi.switchFamilyMember(idToSend);
-      setActiveFamilyId(memberId || primaryFamilyId || null);
+      const newActiveId = memberId || primaryFamilyId || null;
+      setActiveFamilyId(newActiveId);
       try {
-        localStorage.setItem("active_family_member_id", memberId ? String(memberId) : "");
+        localStorage.setItem("active_family_member_id", newActiveId ? String(newActiveId) : "");
       } catch {}
       // Після успішного перемикання повністю перезавантажуємо сторінку,
       // щоб усі дані/контексти оновилися під новий профіль
@@ -314,14 +358,27 @@ function UserSummaryAndLogout({ onLogout }) {
     }
   };
 
-  React.useEffect(() => {
+  const handleDeleteMember = async () => {
+    if (!memberToDelete?.id) return;
+    
     try {
-      const stored = localStorage.getItem("active_family_member_id");
-      if (stored) {
-        setActiveFamilyId(stored);
-      }
-    } catch {}
-  }, []);
+      setDeleting(true);
+      await SubscriptionApi.removeFamilyMember(memberToDelete.id);
+      showSuccess("Family member deleted successfully");
+      
+      setDeleteModalOpen(false);
+      setMemberToDelete(null);
+      
+      // Перезавантажуємо сторінку після успішного видалення
+      try {
+        window.location.reload();
+      } catch {}
+    } catch (err) {
+      console.error("Failed to delete family member:", err);
+      showError(err?.message || "Failed to delete family member. Please try again.");
+      setDeleting(false);
+    }
+  };
 
   const activeProfileLabel = React.useMemo(() => {
     if (!hasFamilySharing) return null;
@@ -338,6 +395,7 @@ function UserSummaryAndLogout({ onLogout }) {
     });
     if (!m) return "You (primary)";
     return (
+      m.name ||
       m.family_member_name ||
       [m.first_name, m.last_name].filter(Boolean).join(" ") ||
       "Family member"
@@ -360,10 +418,24 @@ function UserSummaryAndLogout({ onLogout }) {
         <div style={{ minWidth:0 }}>
           <div style={{ fontWeight:600, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
             {(() => {
-              const first = (user?.first_name || user?.firstName || user?.name || profileData?.first_name || profileData?.firstName || '').toString();
-              const lastInitial = ((user?.last_name || user?.lastName || profileData?.last_name || profileData?.lastName || '')?.[0] || '').toString();
-              if (!first) return '';
-              return `${first}${lastInitial ? ` ${lastInitial}.` : ''}`;
+              const first = (user?.first_name || user?.firstName || profileData?.first_name || profileData?.firstName || '').toString();
+              const last = (user?.last_name || user?.lastName || profileData?.last_name || profileData?.lastName || '').toString();
+              const fullName = (user?.name || profileData?.name || '').toString();
+              
+              // Якщо є first_name та last_name, показуємо їх
+              if (first && last) {
+                return `${first} ${last}`;
+              }
+              // Якщо є тільки first_name
+              if (first) {
+                return first;
+              }
+              // Якщо є повне ім'я
+              if (fullName) {
+                return fullName;
+              }
+              // Якщо немає імені, показуємо email або "User"
+              return user?.email || profileData?.email || 'User';
             })()}
           </div>
           <div style={{ fontSize:12, color:'#666', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
@@ -382,18 +454,18 @@ function UserSummaryAndLogout({ onLogout }) {
           <div style={{ display:"grid", gap:4 }}>
             <button
               type="button"
-              className={`btn outline small ${!activeFamilyId || activeFamilyId === String(primaryFamilyId) ? "active" : ""}`}
+              className={`btn outline small ${!activeFamilyId || (primaryFamilyId && String(activeFamilyId) === String(primaryFamilyId)) ? "active" : ""}`}
               onClick={() => handleSwitchMember(null)}
               disabled={familyLoading}
               style={{
                 justifyContent: "space-between",
                 display: "flex",
                 background:
-                  !activeFamilyId || activeFamilyId === String(primaryFamilyId)
+                  !activeFamilyId || (primaryFamilyId && String(activeFamilyId) === String(primaryFamilyId))
                     ? "rgba(0, 186, 206, 0.08)"
                     : "transparent",
                 borderColor:
-                  !activeFamilyId || activeFamilyId === String(primaryFamilyId)
+                  !activeFamilyId || (primaryFamilyId && String(activeFamilyId) === String(primaryFamilyId))
                     ? "var(--primary)"
                     : "var(--border, #ececec)",
               }}
@@ -402,6 +474,7 @@ function UserSummaryAndLogout({ onLogout }) {
             </button>
             {familyMembers.map((member) => {
               const name =
+                member.name ||
                 member.family_member_name ||
                 [member.first_name, member.last_name].filter(Boolean).join(" ") ||
                 "Family member";
@@ -409,29 +482,84 @@ function UserSummaryAndLogout({ onLogout }) {
                 member.family_member_id ||
                 member.profile_id ||
                 member.id;
-              if (switchId === primaryFamilyId) return null;
+              // Пропускаємо primary користувача, він вже відображається окремо
+              if (switchId && primaryFamilyId && String(switchId) === String(primaryFamilyId)) return null;
+              
+              // Перевіряємо, чи цей член сім'ї зараз активний
+              const isActive = activeFamilyId && switchId && String(activeFamilyId) === String(switchId);
+              
+              // Перевіряємо, чи можна видалити (role === "member")
+              const canDelete = member.role === "member";
+              const memberIdToDelete = member.family_member_id || member.id;
+              
               return (
-                <button
+                <div
                   key={member.id || switchId}
-                  type="button"
-                  className={`btn outline small ${activeFamilyId === String(switchId) ? "active" : ""}`}
-                  onClick={() => handleSwitchMember(switchId)}
-                  disabled={familyLoading}
                   style={{
-                    justifyContent: "space-between",
                     display: "flex",
-                    background:
-                      activeFamilyId === String(switchId)
-                        ? "rgba(0, 186, 206, 0.08)"
-                        : "transparent",
-                    borderColor:
-                      activeFamilyId === String(switchId)
-                        ? "var(--primary)"
-                        : "var(--border, #ececec)",
+                    alignItems: "center",
+                    gap: 4,
                   }}
                 >
-                  <span>{name}</span>
-                </button>
+                  <button
+                    type="button"
+                    className={`btn outline small ${isActive ? "active" : ""}`}
+                    onClick={() => handleSwitchMember(switchId)}
+                    disabled={familyLoading}
+                    style={{
+                      flex: 1,
+                      justifyContent: "space-between",
+                      display: "flex",
+                      background:
+                        isActive
+                          ? "rgba(0, 186, 206, 0.08)"
+                          : "transparent",
+                      borderColor:
+                        isActive
+                          ? "var(--primary)"
+                          : "var(--border, #ececec)",
+                    }}
+                  >
+                    <span>{name}</span>
+                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMemberToDelete({ id: memberIdToDelete, name });
+                        setDeleteModalOpen(true);
+                      }}
+                      disabled={familyLoading || deleting}
+                      style={{
+                        padding: "4px 8px",
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--error, #dc2626)",
+                        cursor: familyLoading || deleting ? "not-allowed" : "pointer",
+                        fontSize: "14px",
+                        opacity: familyLoading || deleting ? 0.5 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "opacity 0.2s ease",
+                      }}
+                      title="Delete family member"
+                      onMouseEnter={(e) => {
+                        if (!familyLoading && !deleting) {
+                          e.currentTarget.style.opacity = "0.8";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!familyLoading && !deleting) {
+                          e.currentTarget.style.opacity = "1";
+                        }
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               );
             })}
             {familyLoading && (
@@ -441,6 +569,22 @@ function UserSummaryAndLogout({ onLogout }) {
         </div>
       )}
       <button className="btn outline" style={{ width:'100%' }} onClick={onLogout}>Log out</button>
+      
+      <ConfirmDeleteModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          if (!deleting) {
+            setDeleteModalOpen(false);
+            setMemberToDelete(null);
+          }
+        }}
+        onConfirm={handleDeleteMember}
+        title="Delete Family Member"
+        message={`Are you sure you want to delete "${memberToDelete?.name || 'this family member'}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        isLoading={deleting}
+      />
     </div>
   );
 }

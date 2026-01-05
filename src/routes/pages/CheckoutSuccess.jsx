@@ -200,18 +200,13 @@ export default function CheckoutSuccess() {
             )}
             {(subscriptionDetails.amount || subscriptionDetails.amount_total) && (
               <div style={{ marginBottom: 4 }}>
-                <strong>Amount:</strong>{" "}
+                <strong>Quantity:</strong>{" "}
                 {(() => {
                   const amount =
                     subscriptionDetails.amount ??
                     subscriptionDetails.amount_total;
-                  const currency =
-                    (subscriptionDetails.currency || "usd").toUpperCase();
-                  const normalized =
-                    typeof amount === "number"
-                      ? (amount / 100).toFixed(2)
-                      : amount;
-                  return `${normalized} ${currency}`;
+                  // Якщо це кількість, не ділимо на 100 і не додаємо валюту
+                  return typeof amount === "number" ? amount : amount;
                 })()}
               </div>
             )}

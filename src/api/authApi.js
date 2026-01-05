@@ -162,6 +162,11 @@ export const AuthApi = {
         ip_address: await getIPAddress()
       };
 
+      // Add promo_code if provided
+      if (userData.promo_code) {
+        requestData.promo_code = userData.promo_code;
+      }
+
       const response = await request(CUSTOM_ENDPOINTS.auth.signup, { 
         method: "POST", 
         body: requestData 

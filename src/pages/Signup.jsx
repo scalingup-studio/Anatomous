@@ -12,6 +12,7 @@ export function SignupPage({ onClose, initialPlan }) {
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [promoCode, setPromoCode] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
   const [terms, setTerms] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -58,7 +59,8 @@ export function SignupPage({ onClose, initialPlan }) {
       if (signup) {
         const res = await signup(email, password, {
           firstName,
-          lastName
+          lastName,
+          promo_code: promoCode || undefined
         });
         if (!res?.success) throw new Error(res?.error || "Signup failed");
         // SECURITY: Commented to prevent sensitive signup data leakage
@@ -70,6 +72,7 @@ export function SignupPage({ onClose, initialPlan }) {
           lastName,
           email,
           password,
+          promo_code: promoCode || undefined
         });
         console.log('📝 Signup response data (fallback):', data);
         // Auth state is handled in AuthContext path; if context is missing,
@@ -131,6 +134,11 @@ export function SignupPage({ onClose, initialPlan }) {
           <label htmlFor="signupPassword">Password</label>
           <input id="signupPassword" type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="Create a password" required />
           <button type="button" className="toggle-visibility" aria-label="Toggle password visibility" onClick={() => setShowPassword(s => !s)}>{showPassword ? "Hide" : "Show"}</button>
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="promoCode">Promo code (optional)</label>
+          <input id="promoCode" type="text" value={promoCode} onChange={e => setPromoCode(e.target.value)} placeholder="Enter promo code" />
         </div>
 
         <label className="checkbox" style={{ marginBottom: 12 }}>
