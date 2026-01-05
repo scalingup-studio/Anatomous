@@ -225,19 +225,22 @@ function CurrentPlan() {
       
       // Обчислюємо itemsTotal - пріоритет масиву items
       let itemsTotal = 0;
-      if (Array.isArray(base.items)) {
+      if (base.itemsTotal !== undefined && base.itemsTotal !== null) {
+        // Якщо itemsTotal вказано явно, використовуємо його (найточніше)
+        itemsTotal = base.itemsTotal;
+      } else if (Array.isArray(base.items)) {
         // Якщо є масив items, використовуємо його довжину
         itemsTotal = base.items.length;
-      } else if (base.itemsTotal !== undefined && base.itemsTotal !== null) {
-        // Якщо itemsTotal вказано явно, використовуємо його
-        itemsTotal = base.itemsTotal;
       } else if (Array.isArray(base)) {
         // Якщо сам base є масивом
         itemsTotal = base.length;
       }
       
+      // max_members може бути в family_info або в корені
+      const maxMembers = base.family_info?.max_members || base.max_members || null;
+      
       const data = {
-        max_members: base.max_members || null,
+        max_members: maxMembers,
         itemsTotal: itemsTotal
       };
       
@@ -246,6 +249,7 @@ function CurrentPlan() {
         max_members: data.max_members,
         itemsTotal: data.itemsTotal,
         itemsLength: Array.isArray(base.items) ? base.items.length : 'N/A',
+        family_info: base.family_info,
         rawResponse: base
       });
       
@@ -655,6 +659,30 @@ function CurrentPlan() {
       await loadSubscription();
       // Refresh family members data to update max_members and itemsTotal
       await loadFamilyMembersData();
+      
+      // Додаткова затримка для оновлення UI
+      setTimeout(async () => {
+        await loadFamilyMembersData();
+        // Перевіряємо, чи досягнуто максимум, і якщо так - перезавантажуємо сторінку
+        const updatedData = await SubscriptionApi.getFamilyMembers({ 
+          status: "active", 
+          include_profiles: true, 
+          per_page: 20 
+        });
+        const base = updatedData?.result || updatedData || {};
+        let itemsTotal = 0;
+        if (Array.isArray(base.items)) {
+          itemsTotal = base.items.length;
+        } else if (base.itemsTotal !== undefined && base.itemsTotal !== null) {
+          itemsTotal = base.itemsTotal;
+        }
+        const maxMembers = base.max_members;
+        
+        if (maxMembers && itemsTotal >= maxMembers) {
+          // Якщо досягнуто максимум, перезавантажуємо сторінку для оновлення UI
+          window.location.reload();
+        }
+      }, 1000);
 
       setFamilyModalOpen(false);
       setFamilyForm({
@@ -961,39 +989,53 @@ function CurrentPlan() {
 
       <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center', flexWrap:'wrap' }}>
         {isFamilyPlan && (() => {
+          let shouldHide = false;
+          
           // Перевірка 1: дані з API /family/members (пріоритет)
-          if (familyMembersData) {
+          if (familyMembersData && 
+              familyMembersData.max_members != null && 
+              familyMembersData.itemsTotal != null) {
             const maxMembers = Number(familyMembersData.max_members);
             const itemsTotal = Number(familyMembersData.itemsTotal);
             
-            // Якщо обидва значення валідні числа і itemsTotal >= max_members, приховуємо
+            // Приховуємо тільки якщо itemsTotal >= max_members (досягнуто максимум)
             if (!isNaN(maxMembers) && !isNaN(itemsTotal) && itemsTotal >= maxMembers) {
               console.log('Hiding button: itemsTotal >= max_members', {
                 itemsTotal,
                 max_members: maxMembers,
                 familyMembersData
               });
-              return null;
+              shouldHide = true;
+            } else {
+              console.log('Showing button: itemsTotal < max_members', {
+                itemsTotal,
+                max_members: maxMembers,
+                familyMembersData
+              });
+            }
+          } else {
+            console.log('Family members data not loaded or incomplete:', familyMembersData);
+          }
+          
+          // Перевірка 2: дані з subscription (fallback, якщо API дані не завантажені)
+          if (!shouldHide && active.limits.familyMax > 0) {
+            const familyMax = Number(active.limits.familyMax);
+            const familyUsed = Number(active.limits.familyUsed);
+            
+            if (!isNaN(familyMax) && !isNaN(familyUsed) && familyUsed >= familyMax) {
+              console.log('Hiding button: familyUsed >= familyMax', {
+                familyUsed,
+                familyMax
+              });
+              shouldHide = true;
             }
           }
           
-          // Перевірка 2: дані з subscription (fallback)
-          const familyMax = Number(active.limits.familyMax) || 0;
-          const familyUsed = Number(active.limits.familyUsed) || 0;
-          
-          if (familyMax > 0 && familyUsed >= familyMax) {
-            console.log('Hiding button: familyUsed >= familyMax', {
-              familyUsed,
-              familyMax
-            });
+          // Якщо не потрібно приховувати, показуємо кнопку
+          if (shouldHide) {
             return null;
           }
           
-          // Якщо обидві перевірки пройдені, показуємо кнопку
-          console.log('Showing button', {
-            familyMembersData,
-            activeLimits: { familyUsed, familyMax }
-          });
           return (
             <button
               className="btn secondary"
