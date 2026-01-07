@@ -68,6 +68,8 @@ export default function DashboardProfile() {
   const [glucoseType, setGlucoseType] = useState('fasting'); // 'fasting', 'random', 'post-meal'
   const [bmiHoveredCategory, setBmiHoveredCategory] = useState(null);
   const [bmiTooltipPosition, setBmiTooltipPosition] = useState({ x: 0, y: 0 });
+  const [hydrationInputValue, setHydrationInputValue] = useState(''); // Local state for hydration input display
+  const hydrationInputRef = useRef(null); // Ref to track if hydration input is focused
 
   useEffect(() => {
     const t = String(searchParams.get('tab') || '').toLowerCase();
@@ -498,6 +500,24 @@ export default function DashboardProfile() {
     
     showSuccess(`${category.replace('_', ' ')} added successfully!`);
   };
+
+  // Sync hydration input display value with healthData (only when input is not focused)
+  useEffect(() => {
+    // Don't update if user is currently typing in the input
+    if (hydrationInputRef.current === document.activeElement) {
+      return;
+    }
+    
+    if (healthData.hydration_liters === '' || healthData.hydration_liters === null || healthData.hydration_liters === undefined) {
+      setHydrationInputValue('');
+    } else {
+      const displayValue = waterUnit === 'oz' 
+        ? litersToOz(parseFloat(healthData.hydration_liters))
+        : parseFloat(healthData.hydration_liters);
+      // Convert to string without forcing decimal places
+      setHydrationInputValue(displayValue.toString());
+    }
+  }, [healthData.hydration_liters, waterUnit]);
 
   // Health Data functions
   const handleHealthDataChange = (field, value) => {
@@ -938,6 +958,7 @@ export default function DashboardProfile() {
       setWaistUnit('in');
       setWaterUnit('oz');
       setGlucoseType('fasting');
+      setHydrationInputValue(''); // Reset hydration input display value
 
       showSuccess('Health data saved successfully!');
       setIsHealthDataModalOpen(false); // Close modal after successful save
@@ -2289,6 +2310,16 @@ const calculateAgeFromDOB = (dob) => {
       
       {/* Tabs */}
       <style>{`
+        /* Hide spinner buttons for number inputs */
+        .no-spinner::-webkit-inner-spin-button,
+        .no-spinner::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .no-spinner {
+          -moz-appearance: textfield;
+        }
+        
         .profile-tabs-container {
           display: flex;
           gap: 8px;
@@ -2550,6 +2581,16 @@ const calculateAgeFromDOB = (dob) => {
           .health-item-card {
             padding: 8px 10px !important;
           }
+        }
+        
+        /* Hide spinner buttons for number inputs */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
         }
       `}</style>
       <div className="profile-tabs-container">
@@ -5565,17 +5606,15 @@ const calculateAgeFromDOB = (dob) => {
                       <div style={{ display: 'flex', gap: '8px',      alignItems: 'center',
                           justifyContent: 'center', }}>
                       <input 
+                        ref={hydrationInputRef}
                         type="number" 
                         step="0.1"
-                          value={
-                            healthData.hydration_liters 
-                              ? (waterUnit === 'oz' 
-                                  ? litersToOz(parseFloat(healthData.hydration_liters)).toFixed(1)
-                                  : parseFloat(healthData.hydration_liters).toFixed(1))
-                              : ''
-                          } 
+                          value={hydrationInputValue}
                           onChange={(e) => {
                             const inputValue = e.target.value;
+                            // Update local display value immediately
+                            setHydrationInputValue(inputValue);
+                            
                             if (inputValue === '') {
                               handleHealthDataChange('hydration_liters', '');
                             } else {
@@ -5587,10 +5626,32 @@ const calculateAgeFromDOB = (dob) => {
                               }
                             }
                           }}
+                          onBlur={(e) => {
+                            // Format value to 1 decimal place when user leaves the field (optional)
+                            const inputValue = e.target.value;
+                            if (inputValue !== '' && !isNaN(parseFloat(inputValue))) {
+                              const numValue = parseFloat(inputValue);
+                              const formattedValue = numValue.toFixed(1);
+                              setHydrationInputValue(formattedValue);
+                            }
+                          }}
+                          onWheel={(e) => {
+                            // Prevent value change when scrolling - block the event completely
+                            e.preventDefault();
+                            e.stopPropagation();
+                            e.currentTarget.blur();
+                          }}
                           placeholder={waterUnit === 'oz' ? "64" : "2.0"}
                           min="0"
                           max={waterUnit === 'oz' ? "1000" : "30"}
-                          style={{ flex: 1 }}
+                          style={{ 
+                            flex: 1,
+                            // Hide spinner buttons in all browsers
+                            MozAppearance: 'textfield',
+                            WebkitAppearance: 'none',
+                            appearance: 'none'
+                          }}
+                          className="no-spinner"
                         />
                         <div style={{ 
                           display: 'flex', 
