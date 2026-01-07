@@ -416,8 +416,6 @@ function HistoryTab() {
     end_date: "" 
   });
   const [loading, setLoading] = React.useState(false);
-  // Захист від подвійного виклику useEffect в React StrictMode
-  const hasLoadedRef = React.useRef(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -426,9 +424,11 @@ function HistoryTab() {
       const params = {};
       
       // Status передається тільки якщо обраний (не "all")
-      // API accepts: "completed" or "archived"
+      // По дефолту (status === "all") нічого не передаємо
+      // API expects: "completed" or "archived" (lowercase)
       if (filters.status && filters.status !== "all") {
-        params.status = filters.status; // "completed" or "archived" - передаємо напряму
+        // Convert to lowercase for API
+        params.status = filters.status.toLowerCase();
       }
       
       if (filters.start_date && filters.start_date.trim() !== "") {
@@ -442,6 +442,9 @@ function HistoryTab() {
       if (filters.type && filters.type.trim() !== "") {
         params.type = filters.type;
       }
+      
+      // Debug: log params being sent
+      console.log('🔍 Goals History API call with params:', params);
       
       // Make single API call with all filters
       const res = await GoalsApi.getHistory(params);
@@ -465,9 +468,8 @@ function HistoryTab() {
     }
   }, [filters, addNotification]);
 
+  // Load data when filters change
   React.useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
     load();
   }, [load]);
 
