@@ -80,7 +80,7 @@ function AppRouter() {
     }
   } catch {}
   return (
-    <HashRouter future={{ v7_relativeSplatPath: true }}>
+    <HashRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
       <Routes>
         {/* Public pages */}
         <Route path="/login" element={<LoginPage />} />
@@ -183,7 +183,15 @@ function DashboardGuard({ children }) {
   return children;
 }
 // 🔒 Wrap entire app in AuthProvider, NotificationProvider, and ThemeProvider
-ReactDOM.createRoot(document.getElementById("root")).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+// Створюємо root один раз (React автоматично обробляє HMR)
+const root = ReactDOM.createRoot(rootElement);
+
+root.render(
   <ThemeProvider>
     <AuthProvider>
       <NotificationProvider>

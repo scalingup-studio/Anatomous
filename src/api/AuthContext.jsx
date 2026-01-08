@@ -427,11 +427,26 @@ export function AuthProvider({ children }) {
   // ✅ Inactivity timer handler - викликається при 15 хвилинах неактивності
   // Використовуємо ref для authToken, щоб уникнути перезапуску таймера при оновленні токена
   const authTokenRef = React.useRef(authToken);
+  const isUnmountingRef = React.useRef(false);
+  
   React.useEffect(() => {
     authTokenRef.current = authToken;
   }, [authToken]);
 
+  // Встановлюємо прапорець при unmount
+  React.useEffect(() => {
+    return () => {
+      isUnmountingRef.current = true;
+    };
+  }, []);
+
   const handleInactivity = useCallback(async () => {
+    // Перевіряємо, чи компонент не розмонтовується
+    if (isUnmountingRef.current) {
+      console.log('⏰ Inactivity timer triggered but component is unmounting');
+      return;
+    }
+
     // Перевіряємо, чи користувач все ще авторизований (використовуємо ref для актуального значення)
     if (!authTokenRef.current) {
       console.log('⏰ Inactivity timer triggered but user already logged out');
@@ -449,6 +464,11 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Error during inactivity logout:', error);
     } finally {
+      // Перевіряємо, чи компонент не розмонтовується перед оновленням стану
+      if (isUnmountingRef.current) {
+        return;
+      }
+
       // Очищаємо стан авторизації
       setAuthToken(null);
       setUser(null);
@@ -462,23 +482,26 @@ export function AuthProvider({ children }) {
       
       // Перенаправляємо на сторінку логіну
       // Використовуємо window.location для редіректу, оскільки ми в контексті
-      try {
-        const currentPath = window.location.hash || window.location.pathname || '';
-        // Не перенаправляємо, якщо вже на публічних сторінках
-        if (!currentPath.includes('/login') && 
-            !currentPath.includes('/signup') && 
-            !currentPath.includes('/shared-reports/') &&
-            !currentPath.includes('/reset-password')) {
-          // Використовуємо replace для уникнення додавання в історію браузера
-          if (window.location.hash) {
-            window.location.hash = '/login';
-          } else {
-            window.location.href = window.location.origin + window.location.pathname + '#/login';
+      // Використовуємо setTimeout для уникнення проблем з unmount під час redirect
+      setTimeout(() => {
+        try {
+          const currentPath = window.location.hash || window.location.pathname || '';
+          // Не перенаправляємо, якщо вже на публічних сторінках
+          if (!currentPath.includes('/login') && 
+              !currentPath.includes('/signup') && 
+              !currentPath.includes('/shared-reports/') &&
+              !currentPath.includes('/reset-password')) {
+            // Використовуємо replace для уникнення додавання в історію браузера
+            if (window.location.hash) {
+              window.location.hash = '/login';
+            } else {
+              window.location.href = window.location.origin + window.location.pathname + '#/login';
+            }
           }
+        } catch (redirectError) {
+          console.error('Error redirecting to login:', redirectError);
         }
-      } catch (redirectError) {
-        console.error('Error redirecting to login:', redirectError);
-      }
+      }, 0);
     }
   }, []); // Порожній масив залежностей, використовуємо ref для authToken
 
@@ -491,7 +514,7 @@ export function AuthProvider({ children }) {
   
   useInactivityTimer(
     authToken ? handleInactivity : null, // Тільки якщо є токен
-    15, // 15 хвилин
+    1, // 15 хвилин
     inactivityEvents // Стабільний масив подій
   );
 
