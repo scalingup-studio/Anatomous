@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { AuthApi } from "./authApi.js";
 import { AccountApi } from "./accountApi.js";
+import { useInactivityTimer } from "../hooks/useInactivityTimer.js";
+import { tokenManager } from "./tokenManager.js";
 
 const AuthContext = createContext(null);
 
@@ -421,6 +423,77 @@ export function AuthProvider({ children }) {
       return true; // If the check fails, we assume it will expire
     }
   };
+
+  // ✅ Inactivity timer handler - викликається при 15 хвилинах неактивності
+  // Використовуємо ref для authToken, щоб уникнути перезапуску таймера при оновленні токена
+  const authTokenRef = React.useRef(authToken);
+  React.useEffect(() => {
+    authTokenRef.current = authToken;
+  }, [authToken]);
+
+  const handleInactivity = useCallback(async () => {
+    // Перевіряємо, чи користувач все ще авторизований (використовуємо ref для актуального значення)
+    if (!authTokenRef.current) {
+      console.log('⏰ Inactivity timer triggered but user already logged out');
+      return;
+    }
+
+    console.log('⏰ User inactive for 15 minutes, logging out...');
+    
+    try {
+      // Очищаємо токен через tokenManager
+      tokenManager.clearToken();
+      
+      // Викликаємо logout через AuthApi
+      await AuthApi.logout();
+    } catch (error) {
+      console.error('Error during inactivity logout:', error);
+    } finally {
+      // Очищаємо стан авторизації
+      setAuthToken(null);
+      setUser(null);
+      setIsNewUser(false);
+      authTokenRef.current = null;
+      
+      try {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+      } catch {}
+      
+      // Перенаправляємо на сторінку логіну
+      // Використовуємо window.location для редіректу, оскільки ми в контексті
+      try {
+        const currentPath = window.location.hash || window.location.pathname || '';
+        // Не перенаправляємо, якщо вже на публічних сторінках
+        if (!currentPath.includes('/login') && 
+            !currentPath.includes('/signup') && 
+            !currentPath.includes('/shared-reports/') &&
+            !currentPath.includes('/reset-password')) {
+          // Використовуємо replace для уникнення додавання в історію браузера
+          if (window.location.hash) {
+            window.location.hash = '/login';
+          } else {
+            window.location.href = window.location.origin + window.location.pathname + '#/login';
+          }
+        }
+      } catch (redirectError) {
+        console.error('Error redirecting to login:', redirectError);
+      }
+    }
+  }, []); // Порожній масив залежностей, використовуємо ref для authToken
+
+  // ✅ Відслідковування неактивності користувача (тільки для авторизованих користувачів)
+  // Використовуємо useMemo для стабільного масиву подій
+  const inactivityEvents = React.useMemo(() => 
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart', 'mousedown', 'keypress'],
+    []
+  );
+  
+  useInactivityTimer(
+    authToken ? handleInactivity : null, // Тільки якщо є токен
+    15, // 15 хвилин
+    inactivityEvents // Стабільний масив подій
+  );
 
   const value = {
     // State

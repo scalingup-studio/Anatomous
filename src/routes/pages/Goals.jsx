@@ -653,6 +653,15 @@ function HistoryTab() {
                       <span>{g.type}</span>
                     </div>
                   )}
+                  {(() => {
+                    const created = g.created_at || g.createdAt || g.created || g.created_date;
+                    return created ? (
+                      <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ opacity: 0.7 }}>📝</span>
+                        <span>Created: {formatDate(created)}</span>
+                      </div>
+                    ) : null;
+                  })()}
                   {g.target_date && (
                     <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ opacity: 0.7 }}>🎯</span>
