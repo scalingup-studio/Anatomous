@@ -157,6 +157,7 @@ export default function DashboardProfile() {
     body_weight: '',
     body_mass_index: '',
     blood_glucose: '',
+    blood_type: '',
     body_temperature: '',
     sleep_duration: '',
     sleep_quality: '',
@@ -518,6 +519,27 @@ export default function DashboardProfile() {
       setHydrationInputValue(displayValue.toString());
     }
   }, [healthData.hydration_liters, waterUnit]);
+
+  // Add wheel event listener to hydration input to prevent value change on scroll
+  useEffect(() => {
+    const inputElement = hydrationInputRef.current;
+    if (!inputElement) return;
+
+    const handleWheel = (e) => {
+      // Prevent value change when scrolling - block the event completely
+      e.preventDefault();
+      e.stopPropagation();
+      inputElement.blur();
+    };
+
+    // Add event listener with { passive: false } to allow preventDefault
+    inputElement.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      inputElement.removeEventListener('wheel', handleWheel);
+    };
+  }, []);
+
 
   // Health Data functions
   const handleHealthDataChange = (field, value) => {
@@ -889,6 +911,9 @@ export default function DashboardProfile() {
           blood_glucose: parseFloat(healthData.blood_glucose),
           blood_glucose_unit: glucoseType || 'fasting'
         }),
+        ...(healthData.blood_type && healthData.blood_type.trim() !== '' && { 
+          blood_type: healthData.blood_type
+        }),
         ...(healthData.body_temperature && healthData.body_temperature.trim() !== '' && {
           body_temperature: parseFloat(healthData.body_temperature),
           body_temperature_unit: temperatureUnit || 'F'
@@ -917,6 +942,8 @@ export default function DashboardProfile() {
         return;
       }
 
+      // Log request body to console
+      console.log('Save Health Data - Request Body:', healthDataPayload);
 
       // Call API endpoint using HealthApi
       const response = await HealthApi.create(healthDataPayload);
@@ -943,6 +970,7 @@ export default function DashboardProfile() {
         body_weight: '',
         body_mass_index: '',
         blood_glucose: '',
+        blood_type: '',
         body_temperature: '',
         sleep_duration: '',
         sleep_quality: '',
@@ -1134,6 +1162,22 @@ export default function DashboardProfile() {
       displayWaist = cmToIn(parseFloat(displayWaist)).toFixed(1);
     }
     
+    // Handle hydration_liters: API may return value in ounces or liters
+    // We always store in liters in healthData, so convert if needed
+    let hydrationLitersValue = record.hydration_liters;
+    if (hydrationLitersValue !== null && hydrationLitersValue !== undefined && hydrationLitersValue !== '') {
+      const hydrationNum = parseFloat(hydrationLitersValue);
+      if (!isNaN(hydrationNum)) {
+        // If API returned value in ounces, convert to liters for storage
+        if (recordHydrationUnit === 'ounces' || recordHydrationUnit === 'oz') {
+          hydrationLitersValue = ozToLiters(hydrationNum);
+        } else {
+          // Already in liters, use as-is
+          hydrationLitersValue = hydrationNum;
+        }
+      }
+    }
+    
     // Handle HRV: API returns HRV (uppercase), but we use hrv in state
     const hrvValue = record.HRV !== undefined && record.HRV !== null 
       ? record.HRV 
@@ -1188,12 +1232,47 @@ export default function DashboardProfile() {
       weekly_activity_minutes: toFormValue(record.weekly_activity_minutes),
       activity_level: toFormValue(record.activity_level),
       visibility_scope: record.visibility_scope || 'private',
-      hydration_liters: toFormValue(record.hydration_liters),
+      hydration_liters: toFormValue(hydrationLitersValue),
       pulse_oximetry: toFormValue(record.pulse_oximetry),
       respiratory_rate: toFormValue(record.respiratory_rate),
       body_weight: displayWeight,
       body_mass_index: calculatedBMI !== null ? calculatedBMI.toFixed(1) : toFormValue(record.body_mass_index),
       blood_glucose: toFormValue(record.blood_glucose) || toFormValue(record.fasting_glucose),
+      blood_type: (() => {
+        // Convert old format (A+, A-, etc.) to new format (A+ / A−, etc.)
+        const bloodType = record.blood_type || '';
+        if (!bloodType) return '';
+        
+        // Map old values to new format
+        const bloodTypeMap = {
+          'A+': 'A+ / A−',
+          'A-': 'A+ / A−',
+          'A−': 'A+ / A−',
+          'B+': 'B+ / B−',
+          'B-': 'B+ / B−',
+          'B−': 'B+ / B−',
+          'AB+': 'AB+ / AB−',
+          'AB-': 'AB+ / AB−',
+          'AB−': 'AB+ / AB−',
+          'O+': 'O+ / O−',
+          'O-': 'O+ / O−',
+          'O−': 'O+ / O−',
+          'Unknown': 'Unknown / Prefer not to say',
+          'Prefer not to say': 'Unknown / Prefer not to say'
+        };
+        
+        // If already in new format, return as is
+        const newFormatValues = ['A+ / A−', 'B+ / B−', 'AB+ / AB−', 'O+ / O−', 'Unknown / Prefer not to say'];
+        if (newFormatValues.includes(bloodType)) {
+          console.log('🔍 Blood Type (new format):', bloodType);
+          return bloodType;
+        }
+        
+        // Convert old format to new
+        const converted = bloodTypeMap[bloodType] || bloodType;
+        console.log('🔍 Blood Type converted:', bloodType, '→', converted);
+        return converted;
+      })(),
       body_temperature: record.body_temperature !== null && record.body_temperature !== undefined 
         ? record.body_temperature.toString() 
         : '',
@@ -1354,6 +1433,9 @@ export default function DashboardProfile() {
           blood_glucose: parseFloat(healthData.blood_glucose),
           blood_glucose_unit: glucoseType || 'fasting'
         }),
+        ...(healthData.blood_type && healthData.blood_type.trim() !== '' && { 
+          blood_type: healthData.blood_type
+        }),
         ...(healthData.body_temperature && healthData.body_temperature.trim() !== '' && {
           body_temperature: parseFloat(healthData.body_temperature),
           body_temperature_unit: temperatureUnit || 'F'
@@ -1375,6 +1457,8 @@ export default function DashboardProfile() {
         ...(healthData.visibility_scope && { visibility_scope: healthData.visibility_scope }),
       };
 
+      // Log request body to console
+      console.log('Update Health Data - Request Body:', healthDataPayload);
 
       await HealthApi.updateRecord(user.id, editingRecord.id, healthDataPayload);
       showSuccess('Health data updated successfully!');
@@ -1401,6 +1485,7 @@ export default function DashboardProfile() {
         body_weight: '',
         body_mass_index: '',
         blood_glucose: '',
+        blood_type: '',
         body_temperature: '',
         sleep_duration: '',
         sleep_quality: '',
@@ -2750,46 +2835,6 @@ const calculateAgeFromDOB = (dob) => {
                       <button
                         type="button"
                         onClick={() => {
-                          const newUnit = 'cm';
-                          const h = parseFloat(formValues.height_cm);
-                          if (!isNaN(h) && h > 0) {
-                            let newValue = h;
-                            if (heightUnit === 'in' && newUnit === 'cm') {
-                              newValue = parseFloat((h * 2.54).toFixed(1));
-                            }
-                            setFormValues(prev => ({ ...prev, height_cm: newValue.toString() }));
-                          }
-                          setHeightUnit(newUnit);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          border: 'none',
-                          backgroundColor: heightUnit === 'cm' ? 'var(--primary)' : 'transparent',
-                          color: heightUnit === 'cm' ? '#fff' : 'var(--text)',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          transition: 'all 0.2s ease',
-                          borderRight: '1px solid var(--border)',
-                          minWidth: '44px',
-                          textAlign: 'center'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (heightUnit !== 'cm') {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (heightUnit !== 'cm') {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }}
-                      >
-                        cm
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
                           const newUnit = 'in';
                       const h = parseFloat(formValues.height_cm);
                       if (!isNaN(h) && h > 0) {
@@ -2810,6 +2855,7 @@ const calculateAgeFromDOB = (dob) => {
                           fontSize: '14px',
                           fontWeight: 500,
                           transition: 'all 0.2s ease',
+                          borderRight: '1px solid var(--border)',
                           minWidth: '44px',
                           textAlign: 'center'
                         }}
@@ -2826,6 +2872,45 @@ const calculateAgeFromDOB = (dob) => {
                       >
                         in
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newUnit = 'cm';
+                          const h = parseFloat(formValues.height_cm);
+                          if (!isNaN(h) && h > 0) {
+                            let newValue = h;
+                            if (heightUnit === 'in' && newUnit === 'cm') {
+                              newValue = parseFloat((h * 2.54).toFixed(1));
+                            }
+                            setFormValues(prev => ({ ...prev, height_cm: newValue.toString() }));
+                          }
+                          setHeightUnit(newUnit);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          border: 'none',
+                          backgroundColor: heightUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                          color: heightUnit === 'cm' ? '#fff' : 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s ease',
+                          minWidth: '44px',
+                          textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (heightUnit !== 'cm') {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (heightUnit !== 'cm') {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        cm
+                      </button>
                     </div>
                   </div>
                 </label>
@@ -2840,46 +2925,6 @@ const calculateAgeFromDOB = (dob) => {
                       overflow: 'hidden',
                       backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
                     }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newUnit = 'kg';
-                          const w = parseFloat(formValues.weight_kg);
-                          if (!isNaN(w) && w > 0) {
-                            let newValue = w;
-                            if (weightUnit === 'lb' && newUnit === 'kg') {
-                              newValue = parseFloat((w / 2.20462).toFixed(1));
-                            }
-                            setFormValues(prev => ({ ...prev, weight_kg: newValue.toString() }));
-                          }
-                          setWeightUnit(newUnit);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          border: 'none',
-                          backgroundColor: weightUnit === 'kg' ? 'var(--primary)' : 'transparent',
-                          color: weightUnit === 'kg' ? '#fff' : 'var(--text)',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          transition: 'all 0.2s ease',
-                          borderRight: '1px solid var(--border)',
-                          minWidth: '44px',
-                          textAlign: 'center'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (weightUnit !== 'kg') {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (weightUnit !== 'kg') {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }}
-                      >
-                        kg
-                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -2903,6 +2948,7 @@ const calculateAgeFromDOB = (dob) => {
                           fontSize: '14px',
                           fontWeight: 500,
                           transition: 'all 0.2s ease',
+                          borderRight: '1px solid var(--border)',
                           minWidth: '44px',
                           textAlign: 'center'
                         }}
@@ -2918,6 +2964,45 @@ const calculateAgeFromDOB = (dob) => {
                         }}
                       >
                         lb
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newUnit = 'kg';
+                          const w = parseFloat(formValues.weight_kg);
+                          if (!isNaN(w) && w > 0) {
+                            let newValue = w;
+                            if (weightUnit === 'lb' && newUnit === 'kg') {
+                              newValue = parseFloat((w / 2.20462).toFixed(1));
+                            }
+                            setFormValues(prev => ({ ...prev, weight_kg: newValue.toString() }));
+                          }
+                          setWeightUnit(newUnit);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          border: 'none',
+                          backgroundColor: weightUnit === 'kg' ? 'var(--primary)' : 'transparent',
+                          color: weightUnit === 'kg' ? '#fff' : 'var(--text)',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          transition: 'all 0.2s ease',
+                          minWidth: '44px',
+                          textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (weightUnit !== 'kg') {
+                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (weightUnit !== 'kg') {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        kg
                       </button>
                     </div>
                   </div>
@@ -4976,17 +5061,44 @@ const calculateAgeFromDOB = (dob) => {
                   <button 
                     className="btn primary" 
                     onClick={() => {
-                      // Reset form to current datetime when opening for new record
+                      // Reset form completely before opening for new record
                       const now = new Date();
                       const year = now.getFullYear();
                       const month = String(now.getMonth() + 1).padStart(2, '0');
                       const day = String(now.getDate()).padStart(2, '0');
                       const hours = String(now.getHours()).padStart(2, '0');
                       const minutes = String(now.getMinutes()).padStart(2, '0');
-                      setHealthData(prev => ({
-                        ...prev,
-                        date: `${year}-${month}-${day}T${hours}:${minutes}`
-                      }));
+                      setHealthData({
+                        date: `${year}-${month}-${day}T${hours}:${minutes}`,
+                        heart_rate: '',
+                        blood_pressure_systolic: '',
+                        blood_pressure_diastolic: '',
+                        weekly_activity_minutes: '',
+                        activity_level: '',
+                        visibility_scope: 'private',
+                        hydration_liters: '',
+                        pulse_oximetry: '',
+                        respiratory_rate: '',
+                        body_weight: '',
+                        body_mass_index: '',
+                        blood_glucose: '',
+                        blood_type: '',
+                        body_temperature: '',
+                        sleep_duration: '',
+                        sleep_quality: '',
+                        waist_circumference: '',
+                        hrv: '',
+                        mood: '',
+                        stress_level: '',
+                        daily_step_count: ''
+                      });
+                      // Reset units to defaults
+                      setTemperatureUnit('F');
+                      setHealthDataWeightUnit('lb');
+                      setWaistUnit('in');
+                      setWaterUnit('oz');
+                      setGlucoseType('fasting');
+                      setHydrationInputValue('');
                       setEditingRecord(null);
                       setIsHealthDataModalOpen(true);
                     }}
@@ -5245,35 +5357,6 @@ const calculateAgeFromDOB = (dob) => {
                         }}>
                           <button
                             type="button"
-                            onClick={() => handleTemperatureUnitChange('C')}
-                            style={{
-                              padding: '8px 12px',
-                              border: 'none',
-                              backgroundColor: temperatureUnit === 'C' ? 'var(--primary)' : 'transparent',
-                              color: temperatureUnit === 'C' ? '#fff' : 'var(--text)',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              fontWeight: 500,
-                              transition: 'all 0.2s ease',
-                              borderRight: '1px solid var(--border)',
-                              minWidth: '44px',
-                              textAlign: 'center'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (temperatureUnit !== 'C') {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (temperatureUnit !== 'C') {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }
-                            }}
-                          >
-                            °C
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleTemperatureUnitChange('F')}
                             style={{
                               padding: '8px 12px',
@@ -5284,6 +5367,7 @@ const calculateAgeFromDOB = (dob) => {
                               fontSize: '14px',
                               fontWeight: 500,
                               transition: 'all 0.2s ease',
+                              borderRight: '1px solid var(--border)',
                               minWidth: '44px',
                               textAlign: 'center'
                             }}
@@ -5299,6 +5383,34 @@ const calculateAgeFromDOB = (dob) => {
                             }}
                           >
                             °F
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTemperatureUnitChange('C')}
+                            style={{
+                              padding: '8px 12px',
+                              border: 'none',
+                              backgroundColor: temperatureUnit === 'C' ? 'var(--primary)' : 'transparent',
+                              color: temperatureUnit === 'C' ? '#fff' : 'var(--text)',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              minWidth: '44px',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (temperatureUnit !== 'C') {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (temperatureUnit !== 'C') {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            °C
                           </button>
                         </div>
                       </div>
@@ -5364,35 +5476,6 @@ const calculateAgeFromDOB = (dob) => {
                         }}>
                           <button
                             type="button"
-                            onClick={() => handleWeightUnitChange('kg')}
-                            style={{
-                              padding: '8px 12px',
-                              border: 'none',
-                              backgroundColor: healthDataWeightUnit === 'kg' ? 'var(--primary)' : 'transparent',
-                              color: healthDataWeightUnit === 'kg' ? '#fff' : 'var(--text)',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              fontWeight: 500,
-                              transition: 'all 0.2s ease',
-                              borderRight: '1px solid var(--border)',
-                              minWidth: '44px',
-                              textAlign: 'center'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (healthDataWeightUnit !== 'kg') {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (healthDataWeightUnit !== 'kg') {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }
-                            }}
-                          >
-                            kg
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleWeightUnitChange('lb')}
                             style={{
                               padding: '8px 12px',
@@ -5403,6 +5486,7 @@ const calculateAgeFromDOB = (dob) => {
                               fontSize: '14px',
                               fontWeight: 500,
                               transition: 'all 0.2s ease',
+                              borderRight: '1px solid var(--border)',
                               minWidth: '44px',
                               textAlign: 'center'
                             }}
@@ -5418,6 +5502,34 @@ const calculateAgeFromDOB = (dob) => {
                             }}
                           >
                             lb
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleWeightUnitChange('kg')}
+                            style={{
+                              padding: '8px 12px',
+                              border: 'none',
+                              backgroundColor: healthDataWeightUnit === 'kg' ? 'var(--primary)' : 'transparent',
+                              color: healthDataWeightUnit === 'kg' ? '#fff' : 'var(--text)',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              minWidth: '44px',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (healthDataWeightUnit !== 'kg') {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (healthDataWeightUnit !== 'kg') {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            kg
                           </button>
                         </div>
                       </div>
@@ -5466,35 +5578,6 @@ const calculateAgeFromDOB = (dob) => {
                         }}>
                           <button
                             type="button"
-                            onClick={() => handleWaistUnitChange('cm')}
-                            style={{
-                              padding: '8px 12px',
-                              border: 'none',
-                              backgroundColor: waistUnit === 'cm' ? 'var(--primary)' : 'transparent',
-                              color: waistUnit === 'cm' ? '#fff' : 'var(--text)',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              fontWeight: 500,
-                              transition: 'all 0.2s ease',
-                              borderRight: '1px solid var(--border)',
-                              minWidth: '44px',
-                              textAlign: 'center'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (waistUnit !== 'cm') {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (waistUnit !== 'cm') {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }
-                            }}
-                          >
-                            cm
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleWaistUnitChange('in')}
                             style={{
                               padding: '8px 12px',
@@ -5505,6 +5588,7 @@ const calculateAgeFromDOB = (dob) => {
                               fontSize: '14px',
                               fontWeight: 500,
                               transition: 'all 0.2s ease',
+                              borderRight: '1px solid var(--border)',
                               minWidth: '44px',
                               textAlign: 'center'
                             }}
@@ -5520,6 +5604,34 @@ const calculateAgeFromDOB = (dob) => {
                             }}
                           >
                             in
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleWaistUnitChange('cm')}
+                            style={{
+                              padding: '8px 12px',
+                              border: 'none',
+                              backgroundColor: waistUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                              color: waistUnit === 'cm' ? '#fff' : 'var(--text)',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s ease',
+                              minWidth: '44px',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (waistUnit !== 'cm') {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (waistUnit !== 'cm') {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            cm
                           </button>
                         </div>
                       </div>
@@ -5634,12 +5746,6 @@ const calculateAgeFromDOB = (dob) => {
                               const formattedValue = numValue.toFixed(1);
                               setHydrationInputValue(formattedValue);
                             }
-                          }}
-                          onWheel={(e) => {
-                            // Prevent value change when scrolling - block the event completely
-                            e.preventDefault();
-                            e.stopPropagation();
-                            e.currentTarget.blur();
                           }}
                           placeholder={waterUnit === 'oz' ? "64" : "2.0"}
                           min="0"
@@ -5779,6 +5885,26 @@ const calculateAgeFromDOB = (dob) => {
                           <option value="post-meal">Post-Meal</option>
                         </select>
                       </div>
+                    </label>
+                    {/* Blood Type */}
+                    <label className="form-field">
+                      <span>Blood Type</span>
+                      <select 
+                        value={healthData.blood_type || ''} 
+                        onChange={(e) => {
+                          //console.log('🔍 Blood Type selected:', e.target.value);
+                          handleHealthDataChange('blood_type', e.target.value);
+                        }}
+                      >
+                        <option value="">Select Blood Type</option>
+                        <option value="A+ / A−">A+ / A−</option>
+                        <option value="B+ / B−">B+ / B−</option>
+                        <option value="AB+ / AB−">AB+ / AB−</option>
+                        <option value="O+ / O−">O+ / O−</option>
+                        <option value="Unknown / Prefer not to say">Unknown / Prefer not to say</option>
+                      </select>
+                     
+                    
                     </label>
                     {/* Visibility Scope */}
                     <label className="form-field">

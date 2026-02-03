@@ -9,11 +9,16 @@ import { useEffect, useRef, useCallback } from 'react';
  * @param {Array} events - Масив подій для відслідковування (за замовчуванням: mousemove, keydown, click, scroll, touchstart)
  */
 export function useInactivityTimer(onInactive, timeoutMinutes = 15, events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']) {
+  // Логуємо отриманий параметр для діагностики
+  // console.log('🔧 useInactivityTimer called with timeoutMinutes:', timeoutMinutes);
+  
   const timeoutRef = useRef(null);
   const onInactiveRef = useRef(onInactive);
   const eventsRef = useRef(events);
   const isMountedRef = useRef(true);
-  const timeoutMs = timeoutMinutes * 60 * 1000; // Конвертуємо хвилини в мілісекунди
+  const timeoutMsRef = useRef(timeoutMinutes * 60 * 1000);
+  const handleActivityRef = useRef(null);
+  const resetTimerRef = useRef(null);
 
   // Оновлюємо refs при зміні
   useEffect(() => {
@@ -24,6 +29,10 @@ export function useInactivityTimer(onInactive, timeoutMinutes = 15, events = ['m
     eventsRef.current = events;
   }, [events]);
 
+  useEffect(() => {
+    timeoutMsRef.current = timeoutMinutes * 60 * 1000;
+  }, [timeoutMinutes]);
+
   // Встановлюємо isMountedRef при mount/unmount
   useEffect(() => {
     isMountedRef.current = true;
@@ -32,8 +41,8 @@ export function useInactivityTimer(onInactive, timeoutMinutes = 15, events = ['m
     };
   }, []);
 
-  // Функція для скидання таймера
-  const resetTimer = useCallback(() => {
+  // Функція для скидання таймера - зберігаємо в ref для стабільності
+  resetTimerRef.current = () => {
     // Перевіряємо, чи компонент все ще змонтований
     if (!isMountedRef.current) {
       return;
@@ -45,14 +54,15 @@ export function useInactivityTimer(onInactive, timeoutMinutes = 15, events = ['m
       timeoutRef.current = null;
     }
 
-    // Встановлюємо новий таймер
+    // Встановлюємо новий таймер з актуальним значенням timeoutMs
     timeoutRef.current = setTimeout(() => {
       // Перевіряємо, чи компонент все ще змонтований перед викликом callback
       if (isMountedRef.current && onInactiveRef.current) {
+         // console.log('⏰ Inactivity timeout reached, calling callback');
         onInactiveRef.current();
       }
-    }, timeoutMs);
-  }, [timeoutMs]);
+    }, timeoutMsRef.current);
+  };
 
   useEffect(() => {
     // Починаємо відслідковування тільки якщо є callback
@@ -70,40 +80,42 @@ export function useInactivityTimer(onInactive, timeoutMinutes = 15, events = ['m
       return;
     }
 
-    console.log('⏰ Inactivity timer started:', timeoutMinutes, 'minutes');
+    //console.log('⏰ Inactivity timer started:', timeoutMinutes, 'minutes');
     
+    // Створюємо стабільний обробник подій і зберігаємо в ref
+    handleActivityRef.current = (event) => {
+      // Перевіряємо, чи компонент все ще змонтований
+      if (isMountedRef.current && resetTimerRef.current) {
+        resetTimerRef.current();
+      }
+    };
+
     // Встановлюємо початковий таймер
-    resetTimer();
+    if (resetTimerRef.current) {
+      resetTimerRef.current();
+    }
 
     // Додаємо обробники подій для всіх вказаних подій
     const eventOptions = { passive: true, capture: true };
     
-    // Створюємо стабільний обробник подій
-    const handleActivity = () => {
-      // Перевіряємо, чи компонент все ще змонтований
-      if (isMountedRef.current) {
-        resetTimer();
-      }
-    };
-
     // Зберігаємо поточні події для cleanup
     const currentEvents = [...eventsRef.current];
     
     // Додаємо обробники подій
     currentEvents.forEach(eventName => {
       try {
-        window.addEventListener(eventName, handleActivity, eventOptions);
-        document.addEventListener(eventName, handleActivity, eventOptions);
+        window.addEventListener(eventName, handleActivityRef.current, eventOptions);
+        document.addEventListener(eventName, handleActivityRef.current, eventOptions);
       } catch (error) {
         console.warn(`Failed to add event listener for ${eventName}:`, error);
       }
     });
 
-    console.log('👂 Listening to events:', currentEvents);
+    //console.log('👂 Listening to events:', currentEvents);
 
     // Очищення при розмонтуванні
     return () => {
-      console.log('🛑 Inactivity timer stopped');
+     // console.log('🛑 Inactivity timer stopped');
       
       // Позначаємо, що компонент розмонтовується
       isMountedRef.current = false;
@@ -115,22 +127,26 @@ export function useInactivityTimer(onInactive, timeoutMinutes = 15, events = ['m
       }
       
       // Видаляємо обробники подій з безпечною обробкою помилок
-      currentEvents.forEach(eventName => {
-        try {
-          window.removeEventListener(eventName, handleActivity, eventOptions);
-          document.removeEventListener(eventName, handleActivity, eventOptions);
-        } catch (error) {
-          // Ігноруємо помилки видалення обробників (можливо вже видалені)
-          // Не логуємо, щоб не засмічувати консоль
-        }
-      });
+      if (handleActivityRef.current) {
+        currentEvents.forEach(eventName => {
+          try {
+            window.removeEventListener(eventName, handleActivityRef.current, eventOptions);
+            document.removeEventListener(eventName, handleActivityRef.current, eventOptions);
+          } catch (error) {
+            // Ігноруємо помилки видалення обробників (можливо вже видалені)
+            // Не логуємо, щоб не засмічувати консоль
+          }
+        });
+      }
     };
-  }, [onInactive, resetTimer, timeoutMinutes]); // events використовується через ref
+  }, [onInactive]); // Видалено resetTimer та timeoutMinutes - використовуються через refs
 
   // Функція для ручного скидання таймера (можна використовувати ззовні)
   const reset = useCallback(() => {
-    resetTimer();
-  }, [resetTimer]);
+    if (resetTimerRef.current) {
+      resetTimerRef.current();
+    }
+  }, []);
 
   return { reset };
 }

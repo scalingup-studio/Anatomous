@@ -5,6 +5,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-d
 import { AuthProvider, useAuth } from "./api/AuthContext.jsx";
 import { NotificationProvider } from "./api/NotificationContext.jsx";
 import { ThemeProvider } from "./contexts/ThemeContext.jsx";
+import { usePreventNumberInputScroll } from "./hooks/usePreventNumberInputScroll.js";
 import { LoginPage } from "./pages/Login.jsx";
 import { SignupPage } from "./pages/Signup.jsx";
 import OAuthCallbackGoogle from "./pages/OAuthCallbackGoogle.jsx";
@@ -68,6 +69,9 @@ function AutoRedirectRoute() {
 }
 
 function AppRouter() {
+  // Prevent number input value change on scroll for all number inputs in the app
+  usePreventNumberInputScroll();
+  
   // Bridge non-hash direct URLs to HashRouter before react renders routes
   try {
     const path = window.location.pathname || "";
@@ -193,9 +197,12 @@ if (!rootElement) {
 }
 
 // Створюємо root один раз (React автоматично обробляє HMR)
-const root = ReactDOM.createRoot(rootElement);
+// Використовуємо глобальну змінну для збереження root при hot reload
+if (!window.__reactRoot) {
+  window.__reactRoot = ReactDOM.createRoot(rootElement);
+}
 
-root.render(
+window.__reactRoot.render(
   <ThemeProvider>
     <AuthProvider>
       <NotificationProvider>

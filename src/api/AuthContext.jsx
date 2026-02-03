@@ -50,14 +50,38 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function initAuth() {
-      // Skip any auth bootstrap on public shared report route
+      // Skip any auth bootstrap on public routes
+      let isPublicRoute = false;
       try {
-        const href = typeof window !== 'undefined' ? (window.location.hash || window.location.pathname || '') : '';
-        if (href.includes('/shared-reports/')) {
-          setLoading(false);
-          return;
-        }
-      } catch {}
+        const hash = typeof window !== 'undefined' ? (window.location.hash || '') : '';
+        const pathname = typeof window !== 'undefined' ? (window.location.pathname || '') : '';
+        const publicRoutes = ['/shared-reports/', '/login', '/signup', '/forgot-password', '/reset-password', '/oauth'];
+        
+        // Check if we're on a public route
+        // For hash-based routing, check both hash and pathname
+        const hashPath = hash.startsWith('#') ? hash.substring(1) : hash;
+        const currentPath = hashPath || pathname;
+        
+        isPublicRoute = publicRoutes.some(route => {
+          // Check if route matches exactly or is at the start of the path
+          const normalizedRoute = route.replace(/\/$/, ''); // Remove trailing slash for comparison
+          const normalizedPath = currentPath.replace(/\/$/, '');
+          return normalizedPath === normalizedRoute || 
+                 normalizedPath.startsWith(normalizedRoute + '/') || 
+                 normalizedPath.startsWith(normalizedRoute + '#');
+        });
+      } catch (error) {
+        console.warn('Error checking public route:', error);
+      }
+      
+      // Don't try to refresh token on public routes - exit early
+      if (isPublicRoute) {
+        setLoading(false);
+        setAuthToken(null);
+        setUser(null);
+        return;
+      }
+      
       try {
         // 1) Try localStorage token first and use it if still valid
         const storedToken = (() => { try { return localStorage.getItem('authToken') || null; } catch { return null; } })();
@@ -81,6 +105,7 @@ export function AuthProvider({ children }) {
           } catch {}
         }
 
+        // Only try to refresh token if we're not on a public route
         const refreshRes = await AuthApi.refreshToken();
 
         if (refreshRes?.authToken) {
@@ -443,17 +468,17 @@ export function AuthProvider({ children }) {
   const handleInactivity = useCallback(async () => {
     // Перевіряємо, чи компонент не розмонтовується
     if (isUnmountingRef.current) {
-      console.log('⏰ Inactivity timer triggered but component is unmounting');
+     // console.log('⏰ Inactivity timer triggered but component is unmounting');
       return;
     }
 
     // Перевіряємо, чи користувач все ще авторизований (використовуємо ref для актуального значення)
     if (!authTokenRef.current) {
-      console.log('⏰ Inactivity timer triggered but user already logged out');
+     // console.log('⏰ Inactivity timer triggered but user already logged out');
       return;
     }
 
-    console.log('⏰ User inactive for 15 minutes, logging out...');
+    //console.log('⏰ User inactive for 15 minutes, logging out...');
     
     try {
       // Очищаємо токен через tokenManager
@@ -514,7 +539,7 @@ export function AuthProvider({ children }) {
   
   useInactivityTimer(
     authToken ? handleInactivity : null, // Тільки якщо є токен
-    1, // 15 хвилин
+    15, // 15 хвилин
     inactivityEvents // Стабільний масив подій
   );
 
