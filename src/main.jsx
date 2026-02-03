@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 import { LoginPage } from "./pages/Login.jsx";
 import { SignupPage } from "./pages/Signup.jsx";
 import OAuthCallbackGoogle from "./pages/OAuthCallbackGoogle.jsx";
+import OAuthCallbackApple from "./pages/OAuthCallbackApple.jsx";
 import DashboardLayout from "./routes/DashboardLayout.jsx";
 import DashboardHome from "./routes/pages/Home.jsx";
 import DashboardInsights from "./routes/pages/Insights.jsx";
@@ -91,6 +92,9 @@ function AppRouter() {
         {/* ✅ Google OAuth callback route */}
         <Route path="/auth/callback/google" element={<OAuthCallbackGoogle />} />
         <Route path="/auth/success" element={<OAuthCallbackGoogle />} />
+        
+        {/* ✅ Apple OAuth callback route */}
+        <Route path="/auth/callback/apple" element={<OAuthCallbackApple />} />
 
         {/* Public shared report viewer */}
         <Route path="/shared-reports/:token" element={<SharedReportPage />} />

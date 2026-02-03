@@ -50,6 +50,10 @@ export const CUSTOM_ENDPOINTS = {
     google: `${API_BASE_AUTH}/auth/google`,
     googleCallback: `${API_BASE_AUTH}/auth/callback/google`,
     googleSuccess: `${API_BASE_AUTH}/auth/success`,
+    // Apple Sign-In: auth URL живе в основній API групі (5PA_dIPO),
+    // а callback лишається в auth-групі (HBbbpjK5)
+    apple: `${API_BASE}/auth/apple`,
+    appleCallback: `${API_BASE_AUTH}/auth/callback/apple`,
     checkAuth: `${API_BASE_AUTH}/auth/check-auth`,
   },
   account: {

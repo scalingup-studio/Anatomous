@@ -172,6 +172,79 @@ export function LoginPage({ onOpenSignup }) {
     }
   }
 
+  async function handleAppleLogin() {
+    try {
+      setLoading(true);
+      setError('');
+
+      console.log('🍎 [1] Starting Apple login...');
+
+      // Import AuthApi dynamically
+      const { AuthApi } = await import('../api/authApi.js');
+      console.log('🍎 [2] AuthApi imported');
+
+      console.log('🍎 [3] Calling endpoint: /auth/apple');
+      
+      const url = await AuthApi.getAppleAuthUrl();
+      console.log('🍎 [4] Received response from server');
+      console.log('🍎 [5] URL value:', url);
+      console.log('🍎 [6] URL type:', typeof url);
+      console.log('🍎 [7] URL length:', url?.length);
+
+      if (!url) {
+        console.error('🍎 [ERROR] URL is empty or null');
+        throw new Error('Failed to get Apple OAuth URL from server. The endpoint may not be configured.');
+      }
+
+      if (typeof url !== 'string') {
+        console.error('🍎 [ERROR] URL is not a string:', url);
+        throw new Error('Invalid URL format received from server.');
+      }
+
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        console.error('🍎 [ERROR] URL does not start with http:// or https://:', url);
+        throw new Error('Invalid URL format: must start with http:// or https://');
+      }
+
+      console.log('🍎 [8] URL is valid, redirecting to Apple...');
+      console.log('🍎 [9] Full URL:', url);
+      
+      // Використовуємо window.location.replace для надійності
+      window.location.replace(url);
+      
+      // Fallback на href якщо replace не спрацював
+      setTimeout(() => {
+        if (window.location.href !== url) {
+          console.log('🍎 [10] Fallback: using window.location.href');
+          window.location.href = url;
+        }
+      }, 100);
+
+    } catch (err) {
+      console.error('❌ Apple login error:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        status: err.status,
+        stack: err.stack
+      });
+      
+      // Більш детальна обробка помилок
+      let errorMessage = 'Failed to start Apple login.';
+      
+      if (err.status === 404) {
+        errorMessage = 'Apple login endpoint not found (404). Please configure the /auth/apple endpoint on the backend.';
+      } else if (err.status === 500) {
+        errorMessage = 'Server error. Please check backend configuration.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      showError(errorMessage);
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="auth-layout">
       <div className="theme-toggle-container" style={{ 
@@ -281,7 +354,7 @@ export function LoginPage({ onOpenSignup }) {
             <button
               type="button"
               className="btn outline"
-              onClick={() => alert("Apple Sign-In integration depends on your backend")}
+              onClick={handleAppleLogin}
               disabled={loading}
             >
               {isLight ? (

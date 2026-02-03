@@ -242,6 +242,111 @@ export const AuthApi = {
     }
   },
 
+  async getAppleAuthUrl() {
+    try {
+      console.log('🍎 [API] Calling endpoint:', CUSTOM_ENDPOINTS.auth.apple);
+      
+      const response = await request(CUSTOM_ENDPOINTS.auth.apple, {
+        method: 'GET'
+      });
+      
+      console.log('🍎 [API] Response received:', response);
+      console.log('🍎 [API] Response type:', typeof response);
+      console.log('🍎 [API] Response keys:', Object.keys(response || {}));
+      
+      // Check if response has url field
+      if (!response) {
+        console.error('🍎 [API] Response is null or undefined');
+        throw new Error('Invalid response from server: empty response');
+      }
+      
+      // Xano може обгортати відповідь в result
+      const data = response.result || response;
+      console.log('🍎 [API] Extracted data:', data);
+      
+      let url = null;
+      
+      // Перевірка на стандартний формат { url: "..." }
+      if (data.url && typeof data.url === 'string') {
+        url = data.url;
+        console.log('🍎 [API] Found url field (standard format)');
+      }
+      // Перевірка на формат { authorization_url: [...] }
+      else if (data.authorization_url && Array.isArray(data.authorization_url)) {
+        console.log('🍎 [API] Found authorization_url array, constructing URL...');
+        
+        // Збираємо URL з масиву
+        const baseUrl = 'https://appleid.apple.com/auth/authorize';
+        const queryParts = data.authorization_url;
+        
+        // Об'єднуємо всі частини масиву в один рядок
+        const queryString = queryParts.join('');
+        
+        // Перевіряємо, чи є id_token в response_type
+        let fullQueryString = queryString;
+        if (queryString.includes('response_type=code') && !queryString.includes('id_token')) {
+          // Додаємо id_token до response_type
+          fullQueryString = queryString.replace('response_type=code', 'response_type=code id_token');
+          console.log('🍎 [API] Added id_token to response_type');
+        }
+        
+        url = `${baseUrl}${fullQueryString}`;
+        console.log('🍎 [API] Constructed URL from array:', url);
+      }
+      // Перевірка на рядок authorization_url
+      else if (data.authorization_url && typeof data.authorization_url === 'string') {
+        const baseUrl = 'https://appleid.apple.com/auth/authorize';
+        url = data.authorization_url.startsWith('http') 
+          ? data.authorization_url 
+          : `${baseUrl}${data.authorization_url}`;
+        console.log('🍎 [API] Found authorization_url string');
+      }
+      
+      if (!url) {
+        console.error('🍎 [API] Missing url or authorization_url field in response:', data);
+        throw new Error('Invalid response from server: missing url or authorization_url field. Response: ' + JSON.stringify(data));
+      }
+      
+      // Перевірка, чи URL валідний
+      if (typeof url !== 'string' || url.length === 0) {
+        console.error('🍎 [API] URL is not a valid string:', url);
+        throw new Error('Invalid URL format received from server');
+      }
+      
+      // Перевірка, чи URL починається з https://
+      if (!url.startsWith('https://appleid.apple.com/auth/authorize')) {
+        console.warn('🍎 [API] URL does not start with expected base URL, but proceeding:', url);
+      }
+      
+      console.log('🍎 [API] Final URL:', url);
+      console.log('🍎 [API] URL is valid:', typeof url === 'string' && url.length > 0);
+      
+      return url;
+    } catch (error) {
+      console.error('❌ [API] Failed to get Apple auth URL:', error);
+      console.error('❌ [API] Error details:', {
+        message: error.message,
+        status: error.status,
+        code: error.code
+      });
+      throw error;
+    }
+  },
+
+  async handleAppleCallback(code) {
+    try {
+      const response = await request(`${CUSTOM_ENDPOINTS.auth.appleCallback}?code=${code}`, {
+        method: "GET",
+        credentials: "include"
+      });
+
+      return response;
+    } catch (error) {
+      clearAuthCookies();
+      throw error;
+    }
+  },
+
   // Нова функція для перевірки статусу токена
   async validateToken() {
     try {
