@@ -184,7 +184,7 @@ export default function OAuthCallbackGoogle() {
       color: '#fff'
     }}>
       <h3 style={{ marginTop: 0, color: '#00bace' }}>
-        Completing Google Sign-In
+        Completing Sign-In
       </h3>
       <p style={{ color: '#ccc', marginBottom: 24 }}>{status}</p>
       <div style={{
