@@ -297,6 +297,28 @@ function DownloadReportsTab() {
   );
 }
 
+// Helper to normalize share URLs for GitHub Pages / hash routing
+function normalizeShareUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return rawUrl || "";
+  try {
+    // If URL already uses hash routing, return as is
+    if (rawUrl.includes("#/shared-reports/")) return rawUrl;
+
+    // Match URLs like:
+    // https://scalingup-studio.github.io/Anatomous/shared-reports/<token>
+    // or any <origin>/<base>/shared-reports/<token>
+    const match = rawUrl.match(/^(https?:\/\/[^#]+)\/shared-reports\/([^/?#]+)/i);
+    if (match) {
+      const base = match[1];   // e.g. https://scalingup-studio.github.io/Anatomous
+      const token = match[2];  // e.g. shr_xxx
+      return `${base}#/shared-reports/${token}`;
+    }
+  } catch {
+    // If anything goes wrong, fall back to original URL
+  }
+  return rawUrl;
+}
+
 function ShareWithProviderTab() {
   const { user } = useAuth();
   const { isLight } = useTheme();
@@ -416,10 +438,10 @@ function ShareWithProviderTab() {
       const normalized = {
         ...s,
         id: s?.id ?? s?.share_id ?? s?.shareId,
-        share_url: s?.share_url ?? s?.url ?? s?.shareUrl,
+        share_url: normalizeShareUrl(s?.share_url ?? s?.url ?? s?.shareUrl),
       };
       setShare(normalized);
-      setShareUrl(normalized.share_url || "");
+      setShareUrl(normalizeShareUrl(normalized.share_url || ""));
       setStatus("Share link created/updated.");
     } catch (e) {
       setStatus(e?.message || "Failed to create/update share.");
@@ -429,7 +451,7 @@ function ShareWithProviderTab() {
   };
 
   const handleCopyLink = async () => {
-    const url = shareUrl || share?.share_url;
+    const url = normalizeShareUrl(shareUrl || share?.share_url);
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
