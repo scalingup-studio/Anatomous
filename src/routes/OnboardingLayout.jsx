@@ -64,8 +64,8 @@ const OnboardingLayout = () => {
     height: '',
     weight: '',
     zipCode: '',
-    heightUnit: 'cm',
-    weightUnit: 'lb',
+    heightUnit: 'in',   // Default: inches (left toggle button)
+    weightUnit: 'lb',   // Default: pounds (left toggle button)
 
     // Health Snapshot
     healthConditions: [],
@@ -223,7 +223,7 @@ const OnboardingLayout = () => {
     }
     
     // Validate and set default units
-    const validHeightUnit = (apiHeightType === 'in' || apiHeightType === 'cm') ? apiHeightType : 'cm';
+    const validHeightUnit = (apiHeightType === 'in' || apiHeightType === 'cm') ? apiHeightType : 'in';
     const validWeightUnit = (apiWeightType === 'lb' || apiWeightType === 'kg') ? apiWeightType : 'lb';
     
     // Get stored values
@@ -429,7 +429,7 @@ const OnboardingLayout = () => {
         ...prev,
         ...populatedFormData,
         // Ensure measurement units are always defined
-        heightUnit: prev.heightUnit || 'cm',
+        heightUnit: prev.heightUnit || 'in',
         weightUnit: prev.weightUnit || 'lb',
       }));
       
@@ -840,45 +840,7 @@ const OnboardingLayout = () => {
                     overflow: 'hidden',
                     backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
                   }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newUnit = 'cm';
-                        const h = parseFloat(formData.height);
-                        if (!isNaN(h)) {
-                          if (formData.heightUnit === 'in' && newUnit === 'cm') {
-                            const cm = (h * 2.54).toFixed(0);
-                            updateFormData('height', cm);
-                          }
-                        }
-                        updateFormData('heightUnit', newUnit);
-                      }}
-                      style={{
-                        padding: '8px 12px',
-                        border: 'none',
-                        backgroundColor: formData.heightUnit === 'cm' ? 'var(--primary)' : 'transparent',
-                        color: formData.heightUnit === 'cm' ? '#fff' : 'var(--text)',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        transition: 'all 0.2s ease',
-                        borderRight: '1px solid var(--border)',
-                        minWidth: '44px',
-                        textAlign: 'center'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (formData.heightUnit !== 'cm') {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (formData.heightUnit !== 'cm') {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      cm
-                    </button>
+                    {/* Left button: inches (in) */}
                     <button
                       type="button"
                       onClick={() => {
@@ -901,6 +863,7 @@ const OnboardingLayout = () => {
                         fontSize: '14px',
                         fontWeight: 500,
                         transition: 'all 0.2s ease',
+                        borderRight: '1px solid var(--border)',
                         minWidth: '44px',
                         textAlign: 'center'
                       }}
@@ -916,6 +879,45 @@ const OnboardingLayout = () => {
                       }}
                     >
                       in
+                    </button>
+                    {/* Right button: centimeters (cm) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newUnit = 'cm';
+                        const h = parseFloat(formData.height);
+                        if (!isNaN(h)) {
+                          if (formData.heightUnit === 'in' && newUnit === 'cm') {
+                            const cm = (h * 2.54).toFixed(0);
+                            updateFormData('height', cm);
+                          }
+                        }
+                        updateFormData('heightUnit', newUnit);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        border: 'none',
+                        backgroundColor: formData.heightUnit === 'cm' ? 'var(--primary)' : 'transparent',
+                        color: formData.heightUnit === 'cm' ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                        minWidth: '44px',
+                        textAlign: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.heightUnit !== 'cm') {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.heightUnit !== 'cm') {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      cm
                     </button>
                   </div>
                 </div>
@@ -940,45 +942,7 @@ const OnboardingLayout = () => {
                     overflow: 'hidden',
                     backgroundColor: 'var(--background-secondary, rgba(0, 0, 0, 0.02))'
                   }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newUnit = 'kg';
-                        const w = parseFloat(formData.weight);
-                        if (!isNaN(w)) {
-                          if (formData.weightUnit === 'lb' && newUnit === 'kg') {
-                            const kg = (w / 2.20462).toFixed(1);
-                            updateFormData('weight', kg);
-                          }
-                        }
-                        updateFormData('weightUnit', newUnit);
-                      }}
-                      style={{
-                        padding: '8px 12px',
-                        border: 'none',
-                        backgroundColor: formData.weightUnit === 'kg' ? 'var(--primary)' : 'transparent',
-                        color: formData.weightUnit === 'kg' ? '#fff' : 'var(--text)',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        transition: 'all 0.2s ease',
-                        borderRight: '1px solid var(--border)',
-                        minWidth: '44px',
-                        textAlign: 'center'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (formData.weightUnit !== 'kg') {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (formData.weightUnit !== 'kg') {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      kg
-                    </button>
+                    {/* Left button: pounds (lb) */}
                     <button
                       type="button"
                       onClick={() => {
@@ -1001,6 +965,7 @@ const OnboardingLayout = () => {
                         fontSize: '14px',
                         fontWeight: 500,
                         transition: 'all 0.2s ease',
+                        borderRight: '1px solid var(--border)',
                         minWidth: '44px',
                         textAlign: 'center'
                       }}
@@ -1016,6 +981,45 @@ const OnboardingLayout = () => {
                       }}
                     >
                       lb
+                    </button>
+                    {/* Right button: kilograms (kg) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newUnit = 'kg';
+                        const w = parseFloat(formData.weight);
+                        if (!isNaN(w)) {
+                          if (formData.weightUnit === 'lb' && newUnit === 'kg') {
+                            const kg = (w / 2.20462).toFixed(1);
+                            updateFormData('weight', kg);
+                          }
+                        }
+                        updateFormData('weightUnit', newUnit);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        border: 'none',
+                        backgroundColor: formData.weightUnit === 'kg' ? 'var(--primary)' : 'transparent',
+                        color: formData.weightUnit === 'kg' ? '#fff' : 'var(--text)',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                        minWidth: '44px',
+                        textAlign: 'center'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (formData.weightUnit !== 'kg') {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (formData.weightUnit !== 'kg') {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      kg
                     </button>
                   </div>
                 </div>
@@ -1034,7 +1038,7 @@ const OnboardingLayout = () => {
                     );
                   }
                   // Normalize units with sensible defaults
-                  const normalizedHeightUnit = formData.heightUnit || 'cm';
+                  const normalizedHeightUnit = formData.heightUnit || 'in';
                   const normalizedWeightUnit = formData.weightUnit || 'lb';
 
                   // Convert height to meters
@@ -2034,7 +2038,7 @@ const OnboardingLayout = () => {
                   <p><strong>Phone:</strong> {formData.phoneNumber}</p>
                   <p><strong>Date of Birth:</strong> {formData.dateOfBirth}</p>
                   <p><strong>Sex:</strong> {formData.sexAtBirth}</p>
-                  {formData.height && <p><strong>Height:</strong> {formData.height} {formData.heightUnit || 'cm'}</p>}
+                  {formData.height && <p><strong>Height:</strong> {formData.height} {formData.heightUnit || 'in'}</p>}
                   {formData.weight && <p><strong>Weight:</strong> {formData.weight} {formData.weightUnit || 'lb'}</p>}
                   {formData.zipCode && <p><strong>ZIP Code:</strong> {formData.zipCode}</p>}
                 </div>

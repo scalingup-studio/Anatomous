@@ -307,7 +307,9 @@ function ShareWithProviderTab() {
   const [title, setTitle] = React.useState("");
   const [share, setShare] = React.useState(null);
   const [shareUrl, setShareUrl] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
+  // Separate loading states for link creation and email sending
+  const [linkLoading, setLinkLoading] = React.useState(false);
+  const [emailLoading, setEmailLoading] = React.useState(false);
   const [status, setStatus] = React.useState("");
   const [upgradePromptOpen, setUpgradePromptOpen] = React.useState(false);
   const [upgradeFeature, setUpgradeFeature] = React.useState(null);
@@ -342,9 +344,52 @@ function ShareWithProviderTab() {
   }, [reports, selectedIdx]);
 
   const handleCreateOrUpdateShare = async () => {
-    // Check if user has access to Share with Providers
-    if (!hasFeatureAccess(user, 'shareWithProviders')) {
-      setUpgradeFeature('shareWithProviders');
+    // ✅ Check access to "Share with Providers" using live subscription data
+    let hasShareAccess = false;
+    try {
+      const subData = await SubscriptionApi.getMySubscription();
+      const root = subData?.result || subData || {};
+      const subscription = root.subscription || {};
+      const planFeatures = root.plan_features || {};
+      const usage = root.usage || {};
+      const subscriptionPlan =
+        (subscription.plan_tier ||
+          subscription.plan_name ||
+          subscription.subscription_plan ||
+          subscription.plan ||
+          "").toString().toLowerCase().trim();
+
+      // Build a virtual user object that includes the latest subscription plan
+      const userWithPlan = {
+        ...user,
+        subscription_plan: subscriptionPlan || user?.subscription_plan,
+        plan_name: subscriptionPlan || user?.plan_name,
+        plan_tier: subscriptionPlan || user?.plan_tier,
+      };
+
+      // Backend contract:
+      // - subscription.share_with_providers:
+      //    true / 1 → enabled with limit
+      //    0        → unlimited (also enabled)
+      // - plan_features.provider_sharing: true → feature included in plan
+      const shareWithProvidersFlag =
+        subscription.share_with_providers ?? planFeatures.share_with_providers;
+      const providerSharingFlag = planFeatures.provider_sharing;
+
+      hasShareAccess =
+        shareWithProvidersFlag === true ||
+        shareWithProvidersFlag === 1 ||
+        shareWithProvidersFlag === 0 || // 0 means unlimited, still enabled
+        providerSharingFlag === true ||
+        usage?.share_with_providers?.enabled === true ||
+        hasFeatureAccess(userWithPlan, "shareWithProviders");
+    } catch (e) {
+      // If subscription call fails, fall back to plan inferred from user
+      hasShareAccess = hasFeatureAccess(user, "shareWithProviders");
+    }
+
+    if (!hasShareAccess) {
+      setUpgradeFeature("shareWithProviders");
       setUpgradePromptOpen(true);
       return;
     }
@@ -355,7 +400,7 @@ function ShareWithProviderTab() {
       setStatus("Selected report has no id to share. Generate a new report first.");
       return;
     }
-    setLoading(true);
+    setLinkLoading(true);
     setStatus("");
     try {
       const payload = {
@@ -379,7 +424,7 @@ function ShareWithProviderTab() {
     } catch (e) {
       setStatus(e?.message || "Failed to create/update share.");
     } finally {
-      setLoading(false);
+      setLinkLoading(false);
     }
   };
 
@@ -403,7 +448,7 @@ function ShareWithProviderTab() {
       setStatus("Please enter a recipient email address.");
       return;
     }
-    setLoading(true);
+    setEmailLoading(true);
     setStatus("");
     try {
       const res = await ReportsApi.sendShareEmail({
@@ -428,7 +473,7 @@ function ShareWithProviderTab() {
         setStatus(errorMessage);
       }
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
     }
   };
 
@@ -508,15 +553,15 @@ function ShareWithProviderTab() {
           <button 
             className="btn primary" 
             onClick={handleCreateOrUpdateShare} 
-            disabled={loading}
+            disabled={linkLoading || emailLoading}
             style={{ flex: 1, minWidth: "150px" }}
           >
-            {loading ? 'Saving…' : 'Create/Update Link'}
+            {linkLoading ? 'Saving…' : 'Create/Update Link'}
           </button>
           <button 
             className="btn outline" 
             onClick={handleCopyLink} 
-            disabled={!shareUrl && !share?.share_url}
+            disabled={(!shareUrl && !share?.share_url) || linkLoading || emailLoading}
             style={{ minWidth: "120px" }}
           >
             Copy Link
@@ -549,7 +594,10 @@ function ShareWithProviderTab() {
         ) : null}
 
         <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Send via Email</div>
+          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>Send via Email</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
+            To send this report by email, first create or update a share link above.
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Recipient Email *</label>
@@ -588,10 +636,19 @@ function ShareWithProviderTab() {
             <button 
               className="btn primary" 
               onClick={handleSendEmail} 
-              disabled={loading || !recipientEmail || !share?.id}
+              disabled={linkLoading || emailLoading || !recipientEmail || !share?.id}
               style={{ width: "100%", minHeight: "40px" }}
+              title={
+                !share?.id
+                  ? "Create or update a share link above before sending an email."
+                  : (!recipientEmail ? "Enter recipient email to enable sending." : "")
+              }
             >
-              {loading ? 'Sending...' : 'Send Email'}
+              {linkLoading
+                ? 'Saving link...'
+                : emailLoading
+                  ? 'Sending...'
+                  : 'Send Email'}
             </button>
           </div>
         </div>

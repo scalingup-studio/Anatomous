@@ -207,6 +207,16 @@ class TokenManager {
 
             const data = await response.json();
 
+            // 🔍 DEBUG: Сира відповідь від API
+            console.log('🔍 [DEBUG] Сира відповідь від API /auth/refresh:', {
+                hasAuthToken: !!data.authToken,
+                hasUser: !!data.user,
+                userEmail: data.user?.email,
+                userKeys: data.user ? Object.keys(data.user) : [],
+                // Показуємо структуру без чутливих даних
+                responseKeys: Object.keys(data),
+            });
+
             if (!data.authToken) {
                 throw new Error('No authToken in refresh response');
             }

@@ -31,6 +31,15 @@ export default function OAuthCallbackGoogle() {
         // Use token manager to refresh (which uses the refresh_token cookie)
         const refreshResult = await tokenManager.refreshToken();
 
+        // 🔍 DEBUG: Перевірка даних користувача з API
+        console.log('🔍 [DEBUG] refreshResult від API:', {
+          hasToken: !!refreshResult.authToken,
+          hasUser: !!refreshResult.user,
+          userEmail: refreshResult.user?.email,
+          userFullData: refreshResult.user,
+          // Не показуємо повний токен з міркувань безпеки
+        });
+
         // SECURITY: Commented to prevent token leakage - was logging token length
         // console.log('📋 refreshAuth result:', {
         //   hasToken: !!refreshResult.authToken,
@@ -50,6 +59,26 @@ export default function OAuthCallbackGoogle() {
         // Update auth context
         setAuthToken(refreshResult.authToken);
         setUser(refreshResult.user ?? null);
+        
+        // 🔍 DEBUG: Перевірка збережених даних
+        console.log('🔍 [DEBUG] Дані збережені в AuthContext:', {
+          userEmail: refreshResult.user?.email,
+          userId: refreshResult.user?.id,
+        });
+        
+        // 🔍 DEBUG: Перевірка localStorage
+        try {
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            const parsedUser = JSON.parse(storedUser);
+            console.log('🔍 [DEBUG] Дані в localStorage:', {
+              email: parsedUser?.email,
+              id: parsedUser?.id,
+            });
+          }
+        } catch (e) {
+          console.warn('🔍 [DEBUG] Помилка читання localStorage:', e);
+        }
         
         // Check if this is a new user (onboarding not completed)
         // Use the same logic as hasCompletedOnboarding() in AuthContext

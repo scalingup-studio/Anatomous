@@ -19,14 +19,39 @@ export default function DashboardLayout() {
   const dashContentRef = React.useRef(null);
 
   const handleLogOut = async () => {
-
     await logout();
 
     document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-
     localStorage.removeItem('refresh_token');
 
-    navigate("/login");
+    try {
+      // Спочатку переходимо на сторінку логіну
+      if (typeof window !== 'undefined') {
+        if (window.location.hash) {
+          // Для hash‑router міняємо hash
+          window.location.hash = '/login';
+        } else {
+          // Fallback – повний редірект
+          const base = window.location.origin + window.location.pathname;
+          window.location.href = `${base}#/login`;
+        }
+        // Після редіректу робимо повне перезавантаження, щоб очистити весь стан SPA
+        setTimeout(() => {
+          try {
+            window.location.reload();
+          } catch {}
+        }, 0);
+      } else {
+        // На всяк випадок – SPA‑навігація
+        navigate("/login", { replace: true });
+      }
+    } catch {
+      // Якщо щось пішло не так з window.location – просто навігуємо та перезавантажуємо
+      navigate("/login", { replace: true });
+      try {
+        window.location.reload();
+      } catch {}
+    }
   }
 
   const scrollToTop = () => {
@@ -439,7 +464,18 @@ function UserSummaryAndLogout({ onLogout }) {
             })()}
           </div>
           <div style={{ fontSize:12, color:'#666', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-            {user?.email || profileData?.email || '—'}
+            {(() => {
+              // 🔍 DEBUG: Перевірка джерела email для відображення
+              const emailToShow = user?.email || profileData?.email || '—';
+              console.log('🔍 [DEBUG] Email для відображення в меню:', {
+                fromUser: user?.email,
+                fromProfileData: profileData?.email,
+                finalEmail: emailToShow,
+                userObject: user ? { id: user.id, email: user.email, keys: Object.keys(user) } : null,
+                profileDataObject: profileData ? { id: profileData.id, email: profileData.email, keys: Object.keys(profileData) } : null,
+              });
+              return emailToShow;
+            })()}
           </div>
         </div>
       </div>
