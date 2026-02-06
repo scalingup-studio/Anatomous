@@ -642,11 +642,11 @@ function ShareWithProviderTab() {
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Custom Message (Optional)</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--muted)", marginBottom: 6, fontWeight: 500 }}>Custom Message</label>
               <textarea
                 value={customMessage}
                 onChange={(e)=>setCustomMessage(e.target.value)}
-                placeholder="Custom message (optional)"
+                placeholder="Custom message"
                 rows={3}
                 style={{ width: "100%", padding: "8px 12px", background: isLight ? "rgba(249, 250, 251, 0.8)" : "rgba(17,17,17,.85)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, resize: "vertical" }}
               />

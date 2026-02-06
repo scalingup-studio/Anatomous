@@ -48,6 +48,7 @@ export default function DashboardProfile() {
     body_fat_method: "",
     waist_circumference: "",
     hip_circumference: "",
+    blood_type: "",
   });
   const [initialFormValues, setInitialFormValues] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -872,6 +873,24 @@ export default function DashboardProfile() {
         if (healthData.daily_step_count && (parseInt(healthData.daily_step_count) < 0 || parseInt(healthData.daily_step_count) > 100000)) {
           errors.push('Daily step count should be between 0-100000');
         }
+        // Validate hydration: healthData.hydration_liters is always stored in liters
+        if (healthData.hydration_liters !== undefined && healthData.hydration_liters !== null && healthData.hydration_liters.toString().trim() !== '') {
+          const hydrationLiters = parseFloat(healthData.hydration_liters);
+          if (!isNaN(hydrationLiters)) {
+            if (hydrationLiters < 0 || hydrationLiters > 30) {
+              errors.push('Daily water intake should be between 0-1000 oz (0-30 L)');
+            }
+          }
+        }
+        // Validate hydration: healthData.hydration_liters is always stored in liters
+        if (healthData.hydration_liters !== undefined && healthData.hydration_liters !== null && healthData.hydration_liters.toString().trim() !== '') {
+          const hydrationLiters = parseFloat(healthData.hydration_liters);
+          if (!isNaN(hydrationLiters)) {
+            if (hydrationLiters < 0 || hydrationLiters > 30) {
+              errors.push('Daily water intake should be between 0-1000 oz (0-30 L)');
+            }
+          }
+        }
         
         return errors;
       };
@@ -897,13 +916,18 @@ export default function DashboardProfile() {
         ...(healthData.blood_pressure_diastolic && healthData.blood_pressure_diastolic.trim() !== '' && { blood_pressure_diastolic: parseInt(healthData.blood_pressure_diastolic) }),
         ...(healthData.weekly_activity_minutes && healthData.weekly_activity_minutes.trim() !== '' && { weekly_activity_minutes: parseFloat(healthData.weekly_activity_minutes) }),
         ...(healthData.activity_level && healthData.activity_level.trim() !== '' && { activity_level: parseInt(healthData.activity_level) }),
-        ...(healthData.hydration_liters && healthData.hydration_liters.trim() !== '' && { 
-          // hydration_liters is stored in liters, convert to selected unit for API
-          hydration_liters: waterUnit === 'oz' 
-            ? litersToOz(parseFloat(healthData.hydration_liters))
-            : parseFloat(healthData.hydration_liters),
-          hydration_liter_unit: waterUnit === 'oz' ? 'ounces' : 'liter'
-        }),
+        ...(healthData.hydration_liters && healthData.hydration_liters.trim() !== '' && (() => {
+          // hydration_liters is stored in liters in state; clamp to safe range before sending
+          let hydrationLiters = parseFloat(healthData.hydration_liters);
+          if (isNaN(hydrationLiters)) return {};
+          hydrationLiters = Math.min(30, Math.max(0, hydrationLiters));
+          return {
+            hydration_liters: waterUnit === 'oz'
+              ? litersToOz(hydrationLiters)
+              : hydrationLiters,
+            hydration_liter_unit: waterUnit === 'oz' ? 'ounces' : 'liter'
+          };
+        })()),
         ...(healthData.pulse_oximetry && healthData.pulse_oximetry.trim() !== '' && { pulse_oximetry: parseInt(healthData.pulse_oximetry) }),
         ...(healthData.respiratory_rate && healthData.respiratory_rate.trim() !== '' && { respiratory_rate: parseInt(healthData.respiratory_rate) }),
         ...(healthData.body_mass_index && healthData.body_mass_index.trim() !== '' && { body_mass_index: parseFloat(healthData.body_mass_index) }),
@@ -911,9 +935,8 @@ export default function DashboardProfile() {
           blood_glucose: parseFloat(healthData.blood_glucose),
           blood_glucose_unit: glucoseType || 'fasting'
         }),
-        ...(healthData.blood_type && healthData.blood_type.trim() !== '' && { 
-          blood_type: healthData.blood_type
-        }),
+        // Always send blood_type, use empty string if not specified
+        blood_type: healthData.blood_type || "",
         ...(healthData.body_temperature && healthData.body_temperature.trim() !== '' && {
           body_temperature: parseFloat(healthData.body_temperature),
           body_temperature_unit: temperatureUnit || 'F'
@@ -1419,13 +1442,18 @@ export default function DashboardProfile() {
         ...(healthData.blood_pressure_diastolic && healthData.blood_pressure_diastolic.trim() !== '' && { blood_pressure_diastolic: parseInt(healthData.blood_pressure_diastolic) }),
         ...(healthData.weekly_activity_minutes && healthData.weekly_activity_minutes.trim() !== '' && { weekly_activity_minutes: parseFloat(healthData.weekly_activity_minutes) }),
         ...(healthData.activity_level && healthData.activity_level.trim() !== '' && { activity_level: parseInt(healthData.activity_level) }),
-        ...(healthData.hydration_liters && healthData.hydration_liters.trim() !== '' && { 
-          // hydration_liters is stored in liters, convert to selected unit for API
-          hydration_liters: waterUnit === 'oz' 
-            ? litersToOz(parseFloat(healthData.hydration_liters))
-            : parseFloat(healthData.hydration_liters),
-          hydration_liter_unit: waterUnit === 'oz' ? 'ounces' : 'liter'
-        }),
+        ...(healthData.hydration_liters && healthData.hydration_liters.trim() !== '' && (() => {
+          // hydration_liters is stored in liters in state; clamp to safe range before sending
+          let hydrationLiters = parseFloat(healthData.hydration_liters);
+          if (isNaN(hydrationLiters)) return {};
+          hydrationLiters = Math.min(30, Math.max(0, hydrationLiters));
+          return {
+            hydration_liters: waterUnit === 'oz'
+              ? litersToOz(hydrationLiters)
+              : hydrationLiters,
+            hydration_liter_unit: waterUnit === 'oz' ? 'ounces' : 'liter'
+          };
+        })()),
         ...(healthData.pulse_oximetry && healthData.pulse_oximetry.trim() !== '' && { pulse_oximetry: parseInt(healthData.pulse_oximetry) }),
         ...(healthData.respiratory_rate && healthData.respiratory_rate.trim() !== '' && { respiratory_rate: parseInt(healthData.respiratory_rate) }),
         ...(healthData.body_mass_index && healthData.body_mass_index.trim() !== '' && { body_mass_index: parseFloat(healthData.body_mass_index) }),
@@ -1433,9 +1461,8 @@ export default function DashboardProfile() {
           blood_glucose: parseFloat(healthData.blood_glucose),
           blood_glucose_unit: glucoseType || 'fasting'
         }),
-        ...(healthData.blood_type && healthData.blood_type.trim() !== '' && { 
-          blood_type: healthData.blood_type
-        }),
+        // Always send blood_type, use empty string if not specified
+        blood_type: healthData.blood_type || "",
         ...(healthData.body_temperature && healthData.body_temperature.trim() !== '' && {
           body_temperature: parseFloat(healthData.body_temperature),
           body_temperature_unit: temperatureUnit || 'F'
@@ -1949,6 +1976,7 @@ const calculateAgeFromDOB = (dob) => {
             const num = parseFloat(hipForDisplay);
             return isNaN(num) ? "" : Math.round(num).toString();
           })(),
+          blood_type: dataToUse?.blood_type || "",
         };
         
         setFormValues(formData);
@@ -2077,6 +2105,7 @@ const calculateAgeFromDOB = (dob) => {
             const num = parseFloat(fallbackHip);
             return isNaN(num) ? "" : Math.round(num).toString();
           })(),
+          blood_type: profileData?.blood_type || "",
         };
         setFormValues(fallbackFormData);
         // Save initial form values for cancel functionality
@@ -2200,6 +2229,63 @@ const calculateAgeFromDOB = (dob) => {
     }
   }
 
+  // When using imperial height units, store the value internally as total inches in formValues.height_cm
+  const handleHeightFeetChange = (feetStr) => {
+    setFormValues(prev => {
+      const prevTotalInches = parseFloat(prev.height_cm);
+      let currentFeet = 0;
+      let currentInches = 0;
+      if (!isNaN(prevTotalInches) && prevTotalInches > 0) {
+        currentFeet = Math.floor(prevTotalInches / 12);
+        currentInches = prevTotalInches - currentFeet * 12;
+      }
+
+      const feet = feetStr === '' ? 0 : Math.max(0, parseFloat(feetStr) || 0);
+      const inchesClamped = Math.max(0, Math.min(11.9, currentInches));
+
+      if (feet === 0 && (isNaN(inchesClamped) || inchesClamped === 0)) {
+        return { ...prev, height_cm: '' };
+      }
+
+      const totalInches = feet * 12 + inchesClamped;
+      const stored = totalInches.toFixed(1).replace(/\.0$/, '');
+      return { ...prev, height_cm: stored };
+    });
+  };
+
+  const handleHeightInchesChange = (inchesStr) => {
+    setFormValues(prev => {
+      const prevTotalInches = parseFloat(prev.height_cm);
+      let currentFeet = 0;
+      if (!isNaN(prevTotalInches) && prevTotalInches > 0) {
+        currentFeet = Math.floor(prevTotalInches / 12);
+      }
+
+      if (inchesStr === '') {
+        if (currentFeet === 0) {
+          return { ...prev, height_cm: '' };
+        }
+        const totalInches = currentFeet * 12;
+        const stored = totalInches.toFixed(1).replace(/\.0$/, '');
+        return { ...prev, height_cm: stored };
+      }
+
+      let inches = parseFloat(inchesStr);
+      if (isNaN(inches)) {
+        inches = 0;
+      }
+      inches = Math.max(0, Math.min(11.9, inches));
+
+      if (currentFeet === 0 && inches === 0) {
+        return { ...prev, height_cm: '' };
+      }
+
+      const totalInches = currentFeet * 12 + inches;
+      const stored = totalInches.toFixed(1).replace(/\.0$/, '');
+      return { ...prev, height_cm: stored };
+    });
+  };
+
   // Save only Core Body Metrics (separate from profile)
   async function handleSaveCoreBodyMetrics(e) {
     e?.preventDefault?.();
@@ -2317,6 +2403,7 @@ const calculateAgeFromDOB = (dob) => {
         weight_kg: weightToSave,
         weight_type: weightUnit || "",
         zip_code: formValues.zip_code?.trim() || "",
+        blood_type: formValues.blood_type || "",
         // Note: core_body_metrics fields (body_fat_percentage, body_fat_method, waist_circumference, hip_circumference) are now saved separately
         // Note: profile_photo is handled separately via photo upload API
       };
@@ -2818,13 +2905,105 @@ const calculateAgeFromDOB = (dob) => {
                   </select>
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
+                  <span>Blood Type</span>
+                  <select 
+                    name="blood_type" 
+                    value={formValues.blood_type || ""} 
+                    onChange={handleChange}
+                  >
+                    <option value="">Not specified</option>
+                    <option value="A+ / A−">A+ / A−</option>
+                    <option value="B+ / B−">B+ / B−</option>
+                    <option value="AB+ / AB−">AB+ / AB−</option>
+                    <option value="O+ / O−">O+ / O−</option>
+                    <option value="Unknown / Prefer not to say">Unknown / Prefer not to say</option>
+                  </select>
+                </label>
+                <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>ZIP Code</span>
                   <input name="zip_code" value={formValues.zip_code} onChange={handleChange} placeholder="e.g. 94105" />
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6  }}>
                   <span>Height</span>
                   <div style={{ display:'flex', gap:8, alignItems: 'center' }}>
-                    <input type="number" inputMode="numeric" name="height_cm" value={formValues.height_cm} onChange={handleChange} placeholder={heightUnit === 'cm' ? 'e.g. 175' : 'e.g. 69'} style={{ flex: 1 }} />
+                    {heightUnit === 'cm' ? (
+                      <input 
+                        type="number" 
+                        inputMode="numeric" 
+                        name="height_cm" 
+                        value={formValues.height_cm} 
+                        onChange={handleChange} 
+                        placeholder="e.g. 175" 
+                        style={{ flex: 1 }} 
+                      />
+                    ) : (
+                      (() => {
+                        const totalInches = (() => {
+                          const h = parseFloat(formValues.height_cm);
+                          return !isNaN(h) && h > 0 ? h : 0;
+                        })();
+                        const feet = totalInches > 0 ? Math.floor(totalInches / 12) : 0;
+                        const inchesRaw = totalInches > 0 ? totalInches - feet * 12 : 0;
+                        const feetDisplay = feet > 0 ? feet.toString() : '';
+                        const inchesDisplay = inchesRaw > 0 
+                          ? (Math.round(inchesRaw * 10) / 10).toString().replace(/\.0$/, '') 
+                          : '';
+                        return (
+                          <div style={{ display: 'flex', gap: 8, flex: 1 }}>
+                            <div style={{ position: 'relative', flex: 1 }}>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                value={feetDisplay}
+                                onChange={(e) => handleHeightFeetChange(e.target.value)}
+                                placeholder="e.g. 5"
+                                style={{ width: '100%', paddingRight: 30 }}
+                                min="0"
+                              />
+                              <span
+                                style={{
+                                  position: 'absolute',
+                                  right: 8,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  fontSize: 12,
+                                  color: 'var(--text-secondary)',
+                                  pointerEvents: 'none',
+                                }}
+                              >
+                                ft
+                              </span>
+                            </div>
+                            <div style={{ position: 'relative', flex: 1 }}>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                step="0.1"
+                                value={inchesDisplay}
+                                onChange={(e) => handleHeightInchesChange(e.target.value)}
+                                placeholder="e.g. 4"
+                                style={{ width: '100%', paddingRight: 30 }}
+                                min="0"
+                                max="11.9"
+                              />
+                              <span
+                                style={{
+                                  position: 'absolute',
+                                  right: 8,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  fontSize: 12,
+                                  color: 'var(--text-secondary)',
+                                  pointerEvents: 'none',
+                                }}
+                              >
+                                in
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
                     <div style={{ 
                       display: 'flex', 
                       border: '1px solid var(--border)', 
@@ -2913,6 +3092,23 @@ const calculateAgeFromDOB = (dob) => {
                       </button>
                     </div>
                   </div>
+                  {(() => {
+                    const raw = parseFloat(formValues.height_cm);
+                    if (isNaN(raw) || raw <= 0) return null;
+
+                    if (heightUnit === 'in') {
+                      const totalInches = raw;
+                      const cmVal = totalInches * 2.54;
+                      const inchesRounded = Math.round(totalInches * 10) / 10;
+                      const inchesText = inchesRounded.toString().replace(/\.0$/, '');
+                      return (
+                        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-secondary)' }}>
+                          ≈ {cmVal.toFixed(1).replace(/\.0$/, '')} cm ({inchesText} in)
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </label>
                 <label className="form-field" style={{ display: "flex", flexDirection: "column" , gap:6 }}>
                   <span>Weight</span>
