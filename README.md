@@ -214,9 +214,24 @@ Anatomous is an innovative health monitoring platform with a focus on user priva
 
 ---
 
-## 🚀 Deployment
+## Environment variables
 
-### **Development**
+- **VITE_API_BASE_URL**  
+  - **Приклад**: `https://xu6p-ejbd-2ew4.n7e.xano.io`  
+  - **Призначення**: базовий домен Xano. На фронтенді з нього збираються всі групові API‑бази (auth, reports, subscriptions, payments, notifications тощо) в `src/api/apiConfig.js` через `API_BASE_URL` з `src/api/configEnv.js`.
+  - **Важливо**: не додавайте `/api:...` у значення. Суфікси `api:5PA_dIPO`, `api:HBbbpjK5` і т.п. підставляються у коді автоматично.
+
+- **VITE_BASE_PATH** (опціонально, використовується в `vite.config.js` як `process.env.VITE_BASE_PATH`)  
+  - **За замовчуванням**: `/`  
+  - **Призначення**: змінює `base` в Vite для випадків, коли фронтенд хоститься не з кореня домену (наприклад, GitHub Pages під `/Anatomous/`).  
+  - **Приклад**: `VITE_BASE_PATH=/Anatomous/`
+
+> Усі `.env`, `.env.*` файли ігноруються Git через оновлений `.gitignore` і мають зберігатися лише локально або в CI/секрет‑менеджері.
+
+## 🚀 Build & deploy
+
+- **Development (локальний запуск)**  
+
 ```bash
 # Clone repository
 git clone [repository-url]
@@ -228,6 +243,54 @@ npm install
 # Start development server
 npm run dev
 ```
+
+- **Production build**  
+
+```bash
+# Build optimized production bundle
+npm run build
+```
+
+- **Результат**  
+  - Продакшн‑бандл збирається в директорію `dist/` (один `index.html`, CSS/JS‑асети в `dist/assets`).
+  - Вміст `dist/` призначений для деплою як **статичний сайт** (наприклад, на **S3 + CloudFront**, Vercel, Netlify тощо).
+  - Для CloudFront, який віддає сайт з кореня домену (наприклад, `https://app.yourdomain.com/`), **нічого додатково міняти не потрібно** — `base` у `vite.config.js` вже дорівнює `/` за замовчуванням.
+  - Для хостингу в підкаталозі (наприклад, GitHub Pages під `/Anatomous/`) задайте `VITE_BASE_PATH=/Anatomous/` на етапі білду, щоб шляхи до статичних ресурсів були коректні.
+
+## Інтеграція з Xano
+
+- **Очікуваний VITE_API_BASE_URL**  
+  - Dev / prod‑значення мають вказувати на Xano‑інстанс, наприклад:  
+    - Dev: `https://xu6p-ejbd-2ew4.n7e.xano.io`  
+    - Prod: `https://api.yourdomain.xano.io` (умовно)  
+  - Усі конкретні API‑групи (auth, reports, subscriptions, payments, notifications, account, account_settings) формуються в `src/api/apiConfig.js` на основі цього домену.
+
+- **Frontend callback / redirect URLs (для налаштування в Xano / OAuth / Stripe)**  
+  - Додатково враховуйте, що додаток використовує `HashRouter`, тому шляхи мають виглядати як `https://yourdomain.com/#/route`.
+
+  - **Google OAuth**  
+    - Callback: `https://yourdomain.com/#/auth/callback/google`  
+    - Success (альтернативний маршрут того ж компонента): `https://yourdomain.com/#/auth/success`
+
+  - **Apple OAuth**  
+    - Callback: `https://yourdomain.com/#/auth/callback/apple`
+
+  - **Reset password (email‑link із Xano)**  
+    - Landing page: `https://yourdomain.com/#/reset-password`  
+    - В `AuthApi.requestPasswordReset` цей URL за замовчуванням генерується як `<origin> + "#/reset-password"` і може бути перевизначений опцією `opts.url`.
+
+  - **Stripe Checkout (subscriptions)**  
+    - Success URL:  
+      - Dev: `http://localhost:5173/#/dashboard/subscriptions/checkout/success?session_id={CHECKOUT_SESSION_ID}`  
+      - Prod: `https://yourdomain.com/#/dashboard/subscriptions/checkout/success?session_id={CHECKOUT_SESSION_ID}`  
+    - Cancel URL:  
+      - Dev: `http://localhost:5173/#/dashboard/subscriptions/checkout/cancel`  
+      - Prod: `https://yourdomain.com/#/dashboard/subscriptions/checkout/cancel`
+
+  - **Shared reports (public viewer з токеном від Xano)**  
+    - Viewer: `https://yourdomain.com/#/shared-reports/{token}`
+
+> Всі ці URL мають бути внесені у відповідні налаштування Xano (OAuth, Stripe webhooks / success / cancel, email‑шаблони) для коректної роботи редіректів.
 
 ## 🔮 Roadmap
 

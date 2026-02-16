@@ -9,6 +9,10 @@
 *.user
 *.userosscache
 *.sln.docstates
+
+# Environment/config files (frontend/backend secrets, API keys, etc.)
+# IMPORTANT: prevent any Vite/Node env files from being committed
+.env*
 *.env
 
 # User-specific files (MonoDevelop/Xamarin Studio)

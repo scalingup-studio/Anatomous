@@ -1,11 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Use base only in production (GH Pages). In dev, base should be '/'
-const isProd = process.env.NODE_ENV === 'production';
+// Base path configuration:
+// - By default use '/' (works for CloudFront / root-domain hosting)
+// - For GitHub Pages or subfolder hosting, set VITE_BASE_PATH env, e.g. '/Anatomous/'
+const base = process.env.VITE_BASE_PATH || '/';
 
 export default defineConfig({
   plugins: [react()],
-  base: isProd ? '/Anatomous/' : '/',
+  base,
 });
 

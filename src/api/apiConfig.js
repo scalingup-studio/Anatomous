@@ -1,14 +1,34 @@
-export const API_BASE = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:5PA_dIPO";
-export const API_BASE_AUTH = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:HBbbpjK5";
-export const API_BASE_SUBSCRIPTION = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:IqZoSRZI";
-export const API_BASE_PAYMENT = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:c4HYH1BF";
+import { API_BASE_URL } from "./configEnv";
+
+// NOTE:
+// Historically this project used separate per-group Xano URLs with inline :slug
+// (e.g. /api:5PA_dIPO, /api:HBbbpjK5, etc).
+// To keep backward compatibility but centralize configuration,
+// we derive group-specific bases from a single API_BASE_URL where needed.
+
+// Main app API group
+export const API_BASE = `${API_BASE_URL}/api:5PA_dIPO`;
+
+// Auth group
+export const API_BASE_AUTH = `${API_BASE_URL}/api:HBbbpjK5`;
+
+// Subscription & plans group
+export const API_BASE_SUBSCRIPTION = `${API_BASE_URL}/api:IqZoSRZI`;
+
+// Payments group
+export const API_BASE_PAYMENT = `${API_BASE_URL}/api:c4HYH1BF`;
+
 // Notifications service (separate Xano API group)
-export const API_BASE_NOTIFICATIONS = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:V6Md0ZUL";
+export const API_BASE_NOTIFICATIONS = `${API_BASE_URL}/api:V6Md0ZUL`;
+
 // Account & security services (non-dev base)
-export const API_BASE_ACCOUNT = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:nZuNxVVd";
+export const API_BASE_ACCOUNT = `${API_BASE_URL}/api:nZuNxVVd`;
+
 // Account settings & AI preferences (separate API group, NON-dev)
-export const API_BASE_ACCOUNT_SETTINGS = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:nZuNxVVd";
-export const API_DOMEN_DEV = "https://xu6p-ejbd-2ew4.n7e.xano.io/api";
+export const API_BASE_ACCOUNT_SETTINGS = `${API_BASE_URL}/api:nZuNxVVd`;
+
+// Generic domain/dev base (without per-group slugs)
+export const API_DOMEN_DEV = `${API_BASE_URL}/api`;
 
 // CRUD helper
 function crud(table) {

@@ -70,10 +70,7 @@ export default function SharedReportPage() {
         // Fallbacks if remote disallows embedding or CORS blocks reading
         // 1) Try local proxy which strips X-Frame-Options
         const origin = window.location.origin.replace(/\/$/, '');
-        const localProxy = `${origin}/api/pdf/proxy?url=${encodeURIComponent(fileUrl)}`;
-        // Also try dev server if backend runs on :3000 while UI on :5173
-        const devProxy = `http://localhost:3000/api/pdf/proxy?url=${encodeURIComponent(fileUrl)}`;
-        const candidate = origin.includes('3000') ? localProxy : devProxy;
+        const candidate = `${origin}/api/pdf/proxy?url=${encodeURIComponent(fileUrl)}`;
         setViewerUrl(candidate);
       }
     }

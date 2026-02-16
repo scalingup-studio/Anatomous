@@ -1,7 +1,8 @@
 import React from "react";
+import { API_BASE_URL } from "../../api/configEnv";
 // NOTE: For Help Center we use a local Q&A helper and DO NOT call /generate-insight
 
-const HELP_API_BASE = "https://xu6p-ejbd-2ew4.n7e.xano.io/api:14W4C75i";
+const HELP_API_BASE = `${API_BASE_URL}/api:14W4C75i`;
 
 export default function HelpCenterPage() {
   const [categories, setCategories] = React.useState([]);
@@ -12,7 +13,7 @@ export default function HelpCenterPage() {
     setFetching(true);
     setFetchError("");
     try {
-      const res = await fetch("https://xu6p-ejbd-2ew4.n7e.xano.io/api:14W4C75i/get_faqs_by_category");
+      const res = await fetch(`${HELP_API_BASE}/get_faqs_by_category`);
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = await res.json();
       const apiCategories = data?.categories || data || [];
